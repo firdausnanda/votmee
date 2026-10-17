@@ -1,6 +1,7 @@
 import { Head, Link } from "@inertiajs/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import "../../css/welcome.css";
+import SearchMenu from "../Components/SearchMenu";
 
 const posts = [
     {
@@ -140,6 +141,19 @@ const translations = {
         skip: "Lewati ke feed",
         searchRanking: "Cari ranking",
         searchPlaceholder: "Cari produk, tempat, atau topik...",
+        recentSearches: "Pencarian Terkini",
+        clearAll: "Hapus Semua",
+        trendingNow: "Sedang Tren di Votmee",
+        browseCategories: "Jelajahi Kategori",
+        matchingRankings: "Rekomendasi Ranking",
+        searchAllFor: "Cari semua tentang",
+        inAllCategories: "di semua ranking",
+        pressEnterToSearch: "Pilih / Cari",
+        pressEscToClose: "Tutup",
+        navigationHint: "Navigasi",
+        clearQuery: "Hapus pencarian",
+        votesLabel: "suara",
+        supportersLabel: "pendukung",
         login: "Masuk",
         register: "Daftar",
         search: "Cari",
@@ -219,6 +233,19 @@ const translations = {
         skip: "Skip to feed",
         searchRanking: "Search rankings",
         searchPlaceholder: "Search products, places, or topics...",
+        recentSearches: "Recent Searches",
+        clearAll: "Clear All",
+        trendingNow: "Trending on Votmee",
+        browseCategories: "Browse Categories",
+        matchingRankings: "Matching Rankings",
+        searchAllFor: "Search all for",
+        inAllCategories: "across all rankings",
+        pressEnterToSearch: "Select / Search",
+        pressEscToClose: "Close",
+        navigationHint: "Navigate",
+        clearQuery: "Clear search",
+        votesLabel: "votes",
+        supportersLabel: "supporters",
         login: "Log in",
         register: "Sign up",
         search: "Search",
@@ -782,24 +809,27 @@ export default function Welcome({ auth }) {
                         >
                             <Brand />
                         </a>
-                        <form
-                            className="vm-header-search"
-                            onSubmit={submitSearch}
-                        >
-                            <Icon name="search" size={17} />
-                            <label className="vm-sr-only" htmlFor="vm-search">
-                                {ui.searchRanking}
-                            </label>
-                            <input
-                                id="vm-search"
-                                type="search"
-                                placeholder={ui.searchPlaceholder}
-                                value={searchInput}
-                                onChange={(event) =>
-                                    setSearchInput(event.target.value)
-                                }
-                            />
-                        </form>
+                        <SearchMenu
+                            searchInput={searchInput}
+                            setSearchInput={setSearchInput}
+                            onSearchSubmit={(query) => {
+                                setSearchTerm(query);
+                                feedRef.current?.scrollIntoView({
+                                    behavior: "smooth",
+                                    block: "start",
+                                });
+                            }}
+                            onSelectCategory={(catName) => {
+                                chooseCategory(catName);
+                            }}
+                            posts={posts}
+                            leaders={leaders}
+                            categories={categories}
+                            englishPosts={englishPosts}
+                            language={language}
+                            ui={ui}
+                            isMobile={false}
+                        />
                         <div className="vm-header-right">
                             <LanguageSelect
                                 language={language}
@@ -853,29 +883,33 @@ export default function Welcome({ auth }) {
                         </div>
                     </div>
                     {searchOpen && (
-                        <form
-                            className="vm-mobile-search"
-                            onSubmit={submitSearch}
-                        >
-                            <Icon name="search" size={18} />
-                            <label
-                                className="vm-sr-only"
-                                htmlFor="vm-mobile-search"
-                            >
-                                {ui.searchRanking}
-                            </label>
-                            <input
-                                id="vm-mobile-search"
-                                autoFocus
-                                type="search"
-                                placeholder={ui.searchPlaceholder}
-                                value={searchInput}
-                                onChange={(event) =>
-                                    setSearchInput(event.target.value)
-                                }
+                        <div className="vm-mobile-search-wrapper">
+                            <SearchMenu
+                                isMobile={true}
+                                autoFocus={true}
+                                searchInput={searchInput}
+                                setSearchInput={setSearchInput}
+                                onSearchSubmit={(query) => {
+                                    setSearchTerm(query);
+                                    setSearchOpen(false);
+                                    feedRef.current?.scrollIntoView({
+                                        behavior: "smooth",
+                                        block: "start",
+                                    });
+                                }}
+                                onSelectCategory={(catName) => {
+                                    chooseCategory(catName);
+                                    setSearchOpen(false);
+                                }}
+                                onClose={() => setSearchOpen(false)}
+                                posts={posts}
+                                leaders={leaders}
+                                categories={categories}
+                                englishPosts={englishPosts}
+                                language={language}
+                                ui={ui}
                             />
-                            <button type="submit">{ui.search}</button>
-                        </form>
+                        </div>
                     )}
                 </header>
 
@@ -1050,6 +1084,23 @@ export default function Welcome({ auth }) {
                                     <button
                                         type="button"
                                         onClick={() => setCategory("Semua Kategori")}
+                                    >
+                                        <Icon name="close" size={15} />
+                                        {ui.clearFilter}
+                                    </button>
+                                </div>
+                            )}
+                            {searchTerm && (
+                                <div className="vm-active-filter">
+                                    <span>
+                                        {language === "en" ? "Search" : "Pencarian"}: <strong>"{searchTerm}"</strong>
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSearchTerm("");
+                                            setSearchInput("");
+                                        }}
                                     >
                                         <Icon name="close" size={15} />
                                         {ui.clearFilter}
