@@ -145,8 +145,6 @@ const translations = {
         search: "Cari",
         openMenu: "Buka menu",
         closeMenu: "Tutup menu",
-        switchToDark: "Aktifkan mode gelap",
-        switchToLight: "Aktifkan mode terang",
         mobileMenu: "Menu seluler",
         dismissNotice: "Tutup pemberitahuan",
         communitySummary: "Ringkasan komunitas",
@@ -226,8 +224,6 @@ const translations = {
         search: "Search",
         openMenu: "Open menu",
         closeMenu: "Close menu",
-        switchToDark: "Switch to dark mode",
-        switchToLight: "Switch to light mode",
         mobileMenu: "Mobile menu",
         dismissNotice: "Dismiss notification",
         communitySummary: "Community overview",
@@ -326,13 +322,6 @@ const iconPaths = {
     ),
     menu: <path d="M4 6h16M4 12h16M4 18h16" />,
     close: <path d="M5 5 19 19M19 5 5 19" />,
-    moon: <path d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5 8.5 8.5 0 1 0 20.5 15.5Z" />,
-    sun: (
-        <>
-            <circle cx="12" cy="12" r="4" />
-            <path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" />
-        </>
-    ),
     bookmark: (
         <path d="M5 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-3.5L5 21V5Z" />
     ),
@@ -440,23 +429,6 @@ function Icon({ name, size = 18, className = "" }) {
 
 function Brand() {
     return <span className="vm-brand">votmee</span>;
-}
-
-function ThemeToggle({ theme, onToggle, ui }) {
-    const label = theme === "dark" ? ui.switchToLight : ui.switchToDark;
-
-    return (
-        <button
-            type="button"
-            className="vm-theme-toggle"
-            aria-label={label}
-            aria-pressed={theme === "dark"}
-            title={label}
-            onClick={onToggle}
-        >
-            <Icon name={theme === "dark" ? "sun" : "moon"} size={19} />
-        </button>
-    );
 }
 
 function LanguageSelect({ language, onChange, mobile = false }) {
@@ -692,18 +664,6 @@ function FeedCard({ post, vote, saved, onVote, onSave, onComments, ui }) {
 }
 
 export default function Welcome({ auth }) {
-    const [theme, setTheme] = useState(() => {
-        if (typeof window === "undefined") return "light";
-        try {
-            const savedTheme = window.localStorage.getItem("votmee-theme");
-            if (savedTheme === "dark" || savedTheme === "light") {
-                return savedTheme;
-            }
-        } catch {}
-        return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches
-            ? "dark"
-            : "light";
-    });
     const [language, setLanguage] = useState(() => {
         if (typeof window === "undefined") return "id";
         try {
@@ -734,17 +694,6 @@ export default function Welcome({ auth }) {
             window.localStorage.setItem("votmee-language", language);
         } catch {}
     }, [language]);
-
-    useEffect(() => {
-        const previousColorScheme = document.documentElement.style.colorScheme;
-        document.documentElement.style.colorScheme = theme;
-        try {
-            window.localStorage.setItem("votmee-theme", theme);
-        } catch {}
-        return () => {
-            document.documentElement.style.colorScheme = previousColorScheme;
-        };
-    }, [theme]);
 
     const visiblePosts = useMemo(() => {
         const result = posts.filter(
@@ -823,7 +772,7 @@ export default function Welcome({ auth }) {
             <a className="vm-skip" href="#feed">
                 {ui.skip}
             </a>
-            <div className="vm-page" id="beranda" data-theme={theme}>
+            <div className="vm-page" id="beranda">
                 <header className="vm-header">
                     <div className="vm-shell vm-header-inner">
                         <a
@@ -852,13 +801,6 @@ export default function Welcome({ auth }) {
                             />
                         </form>
                         <div className="vm-header-right">
-                            <ThemeToggle
-                                theme={theme}
-                                onToggle={() =>
-                                    setTheme(theme === "dark" ? "light" : "dark")
-                                }
-                                ui={ui}
-                            />
                             <LanguageSelect
                                 language={language}
                                 onChange={setLanguage}
@@ -888,13 +830,6 @@ export default function Welcome({ auth }) {
                             )}
                         </div>
                         <div className="vm-mobile-header-actions">
-                            <ThemeToggle
-                                theme={theme}
-                                onToggle={() =>
-                                    setTheme(theme === "dark" ? "light" : "dark")
-                                }
-                                ui={ui}
-                            />
                             <button
                                 type="button"
                                 aria-label={ui.search}
