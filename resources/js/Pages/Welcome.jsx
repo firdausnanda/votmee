@@ -140,7 +140,7 @@ function FeedCard({ post, vote, saved, onVote, onSave, onComments, ui }) {
     const image = `/images/stitch/feed-desktop-${post.id}.jpg`;
     const mobileImage = `/images/stitch/feed-mobile-${post.id}.jpg`;
 
-    return <article className="vm-feed-card">
+    return <article className="vm-feed-card items-center">
         <div className="vm-desktop-vote" aria-label={`${ui.voteFor} ${post.title}`}>
             <button type="button" aria-label={`${ui.support} ${post.title}`} aria-pressed={vote === 1} className={vote === 1 ? 'selected' : ''} onClick={() => onVote(post.id, 1)}><Icon name="chevronUp" size={18} /></button>
             <strong>{post.voteLabel}</strong>
