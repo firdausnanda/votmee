@@ -2,6 +2,8 @@ import { Head, Link } from "@inertiajs/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import "../../css/welcome.css";
 import SearchMenu from "../Components/SearchMenu";
+import LanguageSelect from "../Components/LanguageSelect";
+import ProfileDropdown from "../Components/ProfileDropdown";
 
 const posts = [
     {
@@ -458,133 +460,6 @@ function Brand() {
     return <span className="vm-brand">votmee</span>;
 }
 
-function LanguageSelect({ language, onChange, mobile = false }) {
-    const [open, setOpen] = useState(false);
-    const containerRef = useRef(null);
-
-    useEffect(() => {
-        function handleClickOutside(event) {
-            if (
-                containerRef.current &&
-                !containerRef.current.contains(event.target)
-            ) {
-                setOpen(false);
-            }
-        }
-        function handleKeyDown(event) {
-            if (event.key === "Escape" && open) {
-                setOpen(false);
-            }
-        }
-        if (open) {
-            document.addEventListener("mousedown", handleClickOutside);
-            document.addEventListener("touchstart", handleClickOutside);
-            document.addEventListener("keydown", handleKeyDown);
-        }
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-            document.removeEventListener("touchstart", handleClickOutside);
-            document.removeEventListener("keydown", handleKeyDown);
-        };
-    }, [open]);
-
-    const options = [
-        {
-            code: "id",
-            label: "Bahasa Indonesia",
-            short: "ID",
-            flag: (
-                <svg
-                    className="vm-flag-id"
-                    viewBox="0 0 20 14"
-                    width="18"
-                    height="13"
-                >
-                    <path fill="#fff" d="M0 0h20v14H0z" />
-                    <path fill="#ed1c24" d="M0 0h20v7H0z" />
-                </svg>
-            ),
-        },
-        {
-            code: "en",
-            label: "English",
-            short: "EN",
-            flag: <Icon name="globe" size={16} />,
-        },
-    ];
-
-    const current = options.find((opt) => opt.code === language) || options[0];
-
-    return (
-        <div
-            ref={containerRef}
-            className={`vm-lang-select-box${mobile ? " vm-mobile-language" : ""}`}
-        >
-            <button
-                type="button"
-                className={`vm-lang-trigger ${open ? "open" : ""}`}
-                onClick={() => setOpen(!open)}
-                aria-haspopup="listbox"
-                aria-expanded={open}
-                aria-label="Pilih bahasa / Select language"
-            >
-                <span className="vm-lang-flag">{current.flag}</span>
-                <span className="vm-lang-code">{current.short}</span>
-                <Icon
-                    name="chevronDown"
-                    size={13}
-                    className={`vm-select-chevron ${open ? "rotate" : ""}`}
-                />
-            </button>
-
-            {open && (
-                <div className="vm-lang-dropdown" role="listbox">
-                    <div className="vm-select-dropdown-header">
-                        <span>
-                            {language === "id" ? "Pilih Bahasa" : "Language"}
-                        </span>
-                    </div>
-                    {options.map((item) => {
-                        const isSelected = language === item.code;
-                        return (
-                            <button
-                                key={item.code}
-                                type="button"
-                                role="option"
-                                aria-selected={isSelected}
-                                className={`vm-lang-option ${isSelected ? "selected" : ""}`}
-                                onClick={() => {
-                                    onChange(item.code);
-                                    setOpen(false);
-                                }}
-                            >
-                                <span className="vm-lang-opt-main">
-                                    <span className="vm-lang-opt-flag">
-                                        {item.flag}
-                                    </span>
-                                    <span className="vm-lang-opt-label">
-                                        {item.label}
-                                    </span>
-                                </span>
-                                <span className="vm-lang-opt-extra">
-                                    <span className="vm-lang-opt-code">
-                                        {item.short}
-                                    </span>
-                                    {isSelected && (
-                                        <span className="vm-select-option-check">
-                                            <Icon name="check" size={14} />
-                                        </span>
-                                    )}
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
-            )}
-        </div>
-    );
-}
-
 function FeedCard({ post, vote, saved, onVote, onSave, onComments, ui }) {
     const image = `/images/stitch/feed-desktop-${post.id}.jpg`;
     const mobileImage = `/images/stitch/feed-mobile-${post.id}.jpg`;
@@ -836,12 +711,11 @@ export default function Welcome({ auth }) {
                                 onChange={setLanguage}
                             />
                             {auth?.user ? (
-                                <Link
-                                    href="/dashboard"
-                                    className="vm-auth-link"
-                                >
-                                    Dashboard
-                                </Link>
+                                <ProfileDropdown
+                                    user={auth.user}
+                                    locale={language}
+                                    canModerate={auth.can?.moderate ?? false}
+                                />
                             ) : (
                                 <>
                                     <Link

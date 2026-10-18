@@ -9,12 +9,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Mattiverse\Userstamps\Traits\Userstamps;
 
-#[Fillable(['creator_id', 'category_id', 'slug', 'title', 'criteria', 'language_code', 'region_code', 'status', 'published_at'])]
+#[Fillable(['creator_id', 'category_id', 'slug', 'title', 'criteria', 'language_code', 'region_code', 'status', 'published_at', 'created_by', 'updated_by'])]
 class RankingPost extends Model
 {
     /** @use HasFactory<RankingPostFactory> */
-    use HasFactory, HasUlids;
+    use HasFactory, HasUlids, Userstamps;
 
     protected function casts(): array
     {
@@ -24,6 +25,11 @@ class RankingPost extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'creator_id');
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
     }
 
     public function entries(): HasMany

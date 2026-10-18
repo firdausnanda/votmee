@@ -25,6 +25,8 @@ class MasterObjectFactory extends Factory
         return [
             'category_id' => Category::factory(),
             'submitted_by' => User::factory(),
+            'created_by' => fn (array $attributes) => $attributes['submitted_by'] ?? User::factory(),
+            'updated_by' => fn (array $attributes) => $attributes['submitted_by'] ?? User::factory(),
             'canonical_name' => Str::title($name),
             'normalized_name' => Str::lower($name),
             'slug' => Str::slug($name).'-'.Str::lower((string) Str::ulid()),

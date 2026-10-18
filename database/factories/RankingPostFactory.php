@@ -24,6 +24,8 @@ class RankingPostFactory extends Factory
 
         return [
             'creator_id' => User::factory(),
+            'created_by' => fn (array $attributes) => $attributes['creator_id'] ?? User::factory(),
+            'updated_by' => fn (array $attributes) => $attributes['creator_id'] ?? User::factory(),
             'category_id' => Category::factory(),
             'title' => $title,
             'slug' => Str::slug($title).'-'.Str::lower((string) Str::ulid()),

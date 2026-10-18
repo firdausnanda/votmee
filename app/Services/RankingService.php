@@ -28,6 +28,8 @@ class RankingService
         return DB::transaction(function () use ($creator, $data, $objectIds): RankingPost {
             $post = RankingPost::create([
                 'creator_id' => $creator->id,
+                'created_by' => $creator->id,
+                'updated_by' => $creator->id,
                 'category_id' => $data['category_id'],
                 'slug' => Str::slug($data['title']).'-'.Str::lower((string) Str::ulid()),
                 'title' => $data['title'],

@@ -13,6 +13,7 @@ class SetRequestLocale
     {
         $preferred = $request->header('X-Locale')
             ?? $request->route('locale')
+            ?? $request->query('locale')
             ?? $request->user()?->locale
             ?? substr((string) $request->header('Accept-Language', 'id'), 0, 2);
         App::setLocale(in_array($preferred, ['id', 'en'], true) ? $preferred : 'id');

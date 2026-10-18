@@ -9,12 +9,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Mattiverse\Userstamps\Traits\Userstamps;
 
-#[Fillable(['category_id', 'brand_id', 'parent_id', 'submitted_by', 'verified_by', 'merged_into_id', 'canonical_name', 'normalized_name', 'slug', 'identity_attributes', 'status'])]
+#[Fillable(['category_id', 'brand_id', 'parent_id', 'submitted_by', 'verified_by', 'merged_into_id', 'canonical_name', 'normalized_name', 'slug', 'identity_attributes', 'status', 'created_by', 'updated_by'])]
 class MasterObject extends Model
 {
     /** @use HasFactory<MasterObjectFactory> */
-    use HasFactory, HasUlids;
+    use HasFactory, HasUlids, Userstamps;
 
     protected $table = 'objects';
 

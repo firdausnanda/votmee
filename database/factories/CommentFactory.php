@@ -22,6 +22,8 @@ class CommentFactory extends Factory
         return [
             'ranking_post_id' => RankingPost::factory(),
             'user_id' => User::factory(),
+            'created_by' => fn (array $attributes) => $attributes['user_id'] ?? User::factory(),
+            'updated_by' => fn (array $attributes) => $attributes['user_id'] ?? User::factory(),
             'body' => fake()->sentence(),
             'status' => 'visible',
         ];

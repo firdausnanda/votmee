@@ -15,6 +15,7 @@ class RankingController extends Controller
     public function index(Request $request, FeedService $feed): JsonResponse
     {
         $data = $request->validate([
+            'q' => ['nullable', 'string', 'max:120'],
             'sort' => ['nullable', 'in:latest,popular'],
             'category_id' => ['nullable', 'integer', 'exists:categories,id'],
             'language_code' => ['nullable', 'in:id,en'],
@@ -27,7 +28,7 @@ class RankingController extends Controller
     public function show(RankingPost $post): JsonResponse
     {
         abort_unless($post->status === 'published', 404);
-        $post->load(['creator:id,name,username', 'entries.object', 'comments' => fn ($query) => $query->where('status', 'visible')->latest()->limit(50)]);
+        $post->load(['creator:id,name,username', 'entries.object', 'comments' => fn ($query) => $query->where('status', 'visible')->with('user:id,name,username')->withCount('likes')->latest()->limit(50)]);
         $scores = DB::table('support_events')
             ->selectRaw('ranking_entry_id, SUM(amount) as points, COUNT(DISTINCT user_id) as supporters')
             ->where('status', 'valid')

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\GoogleLoginController;
 use App\Http\Controllers\Backend\CategoryController;
 use App\Http\Controllers\Backend\LeaderboardController;
 use App\Http\Controllers\Backend\ModerationController;
@@ -8,23 +9,41 @@ use App\Http\Controllers\Backend\RankingController;
 use App\Http\Controllers\Backend\SocialController;
 use App\Http\Controllers\Backend\WalletController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Web\CommunityController;
 use App\Http\Middleware\SetRequestLocale;
-use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
+Route::get('/', [CommunityController::class, 'home'])->middleware(SetRequestLocale::class);
+
+Route::get('/auth/google/callback', [GoogleLoginController::class, 'callback'])
+    ->middleware(['guest', 'throttle:10,1'])->name('google.callback');
+
+Route::get('/admin', [CommunityController::class, 'admin'])
+    ->middleware(['auth', SetRequestLocale::class, 'can:moderate'])->name('community.admin');
+
+Route::prefix('{locale}')->where(['locale' => 'id|en'])->middleware(SetRequestLocale::class)->name('community.')->group(function () {
+    Route::get('/', [CommunityController::class, 'home'])->name('home');
+    Route::get('/explore', [CommunityController::class, 'explore'])->name('explore');
+    Route::get('/ranking/{post:slug}', [CommunityController::class, 'ranking'])->name('ranking');
+    Route::get('/object/{object:slug}', [CommunityController::class, 'object'])->name('object');
+    Route::get('/profile/{user:username}', [CommunityController::class, 'profile'])->name('profile');
+    Route::get('/login', fn () => Inertia::render('Auth/Login', [
+        'canResetPassword' => Route::has('password.request'),
+        'status' => session('status'),
+        'googleAuthError' => session('google_auth_error'),
+    ]))->middleware('guest')->name('login');
+    Route::get('/auth/google', [GoogleLoginController::class, 'redirect'])
+        ->middleware(['guest', 'throttle:10,1'])->name('google.redirect');
+    Route::get('/register', fn () => Inertia::render('Auth/Register'))->middleware('guest')->name('register');
+    Route::middleware('auth')->group(function () {
+        Route::get('/create', [CommunityController::class, 'create'])->name('create');
+        Route::get('/wallet', [CommunityController::class, 'wallet'])->name('wallet');
+    });
 });
 
-Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', fn () => redirect()->route('community.home', ['locale' => auth()->user()->locale ?? 'id']))
+    ->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -41,6 +60,7 @@ Route::prefix('backend')->middleware(SetRequestLocale::class)->name('backend.')-
     Route::get('objects/{object:slug}', [ObjectController::class, 'show'])->name('objects.show');
     Route::get('rankings', [RankingController::class, 'index'])->name('rankings.index');
     Route::get('rankings/{post:slug}', [RankingController::class, 'show'])->name('rankings.show');
+    Route::get('rankings/{post:slug}/comments', [SocialController::class, 'getComments'])->name('comments.index');
     Route::get('leaderboard', [LeaderboardController::class, 'index'])->name('leaderboard');
     Route::get('profile/{user:username}', [SocialController::class, 'profile'])->name('profile');
 
@@ -51,6 +71,7 @@ Route::prefix('backend')->middleware(SetRequestLocale::class)->name('backend.')-
         Route::post('wallet/claim', [WalletController::class, 'claim'])->name('wallet.claim');
         Route::post('support', [WalletController::class, 'support'])->name('support.store');
         Route::post('rankings/{post:slug}/comments', [SocialController::class, 'comment'])->name('comments.store');
+        Route::post('comments/{comment}/like', [SocialController::class, 'toggleCommentLike'])->name('comments.like');
         Route::post('reports', [SocialController::class, 'report'])->name('reports.store');
     });
 });

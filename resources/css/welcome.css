@@ -89,21 +89,28 @@
   background: #f8fafc;
   color: #64748b;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   outline: none !important;
 }
 
 .vm-header-search:hover {
   background: #f1f5f9;
   border-color: #cbd5e1;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+}
+
+.vm-search-container *:focus-visible {
+  outline: none !important;
 }
 
 .vm-header-search:focus-within,
+.vm-header-search:focus-visible,
 .vm-header-search.is-focused {
   border-color: #0f172a;
   background: #ffffff;
-  box-shadow: 0 0 0 1px #0f172a, 0 8px 24px -4px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 0 0 1px #0f172a, 0 12px 28px -4px rgba(15, 23, 42, 0.09);
   color: #0f172a;
+  transform: translateY(-1px);
   outline: none !important;
 }
 
@@ -112,13 +119,13 @@
   place-items: center;
   flex: none;
   color: #94a3b8;
-  transition: all 0.2s ease;
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease;
 }
 
 .vm-header-search:focus-within .vm-search-lead-icon,
 .vm-header-search.is-focused .vm-search-lead-icon {
   color: #0f172a;
-  transform: scale(1.05);
+  transform: scale(1.08) rotate(5deg);
 }
 
 .vm-header-search input {
@@ -166,13 +173,25 @@
   background: #e2e8f0;
   color: #64748b;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: vmPopIn 0.18s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes vmPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.6) rotate(-45deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
 }
 
 .vm-search-clear-btn:hover {
   background: #cbd5e1;
   color: #0f172a;
-  transform: scale(1.08);
+  transform: scale(1.15) rotate(90deg);
 }
 
 .vm-search-kbd {
@@ -190,6 +209,18 @@
   pointer-events: none;
   flex: none;
   user-select: none;
+  transition: all 0.2s ease;
+}
+
+.vm-header-search:hover .vm-search-kbd {
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+.vm-header-search:focus-within .vm-search-kbd,
+.vm-header-search.is-focused .vm-search-kbd {
+  border-color: #0f172a;
+  color: #0f172a;
 }
 
 /* Search Dropdown Popover */
@@ -199,22 +230,25 @@
   left: 0;
   right: 0;
   z-index: 60;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid #e2e8f0;
   border-radius: 16px;
-  box-shadow: 0 20px 35px -8px rgba(15, 23, 42, 0.14), 0 0 0 1px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(15, 23, 42, 0.04);
   max-height: 480px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
-  animation: vmSearchDrop 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: vmSearchDrop 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: top center;
 }
 
 @keyframes vmSearchDrop {
   from {
     opacity: 0;
-    transform: translateY(-6px) scale(0.99);
+    transform: translateY(-8px) scale(0.985);
   }
   to {
     opacity: 1;
@@ -267,24 +301,60 @@
 }
 
 .vm-search-section-title .vm-icon-flame {
-  color: #f97316;
+  color: #ea580c;
+}
+
+/* Pulsing Live indicator */
+.vm-live-indicator {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 8px;
+  height: 8px;
+  margin-right: 2px;
+}
+
+.vm-live-ping {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #f97316;
+  opacity: 0.75;
+  animation: vmLivePing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.vm-live-core {
+  position: relative;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ea580c;
+}
+
+@keyframes vmLivePing {
+  75%, 100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
 }
 
 .vm-search-clear-all {
   border: 0;
   background: transparent;
-  padding: 2px 6px;
+  padding: 2px 7px;
   border-radius: 4px;
-  color: #2563eb;
+  color: #64748b;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.14s ease;
+  transition: all 0.15s ease;
 }
 
 .vm-search-clear-all:hover {
-  background: #eff6ff;
-  text-decoration: underline;
+  background: #f1f5f9;
+  color: #0f172a;
 }
 
 .vm-search-count-badge {
@@ -293,8 +363,8 @@
   justify-content: center;
   padding: 1px 7px;
   border-radius: 999px;
-  background: #eff6ff;
-  color: #2563eb;
+  background: #f1f5f9;
+  color: #475569;
   font-size: 10px;
   font-weight: 700;
 }
@@ -311,38 +381,48 @@
   justify-content: space-between;
   gap: 10px;
   width: 100%;
-  padding: 8px 10px;
+  padding: 8px 11px;
   border: 0;
   border-radius: 10px;
   background: transparent;
   color: #1e293b;
   text-align: left;
   cursor: pointer;
-  transition: background 0.14s ease, color 0.14s ease;
+  transition: background 0.16s ease, transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), color 0.16s ease;
 }
 
 .vm-search-item:hover,
 .vm-search-item.is-active {
   background: #f1f5f9;
   color: #0f172a;
+  transform: translateX(3px);
 }
 
 .vm-search-item:hover .vm-search-item-arrow,
 .vm-search-item.is-active .vm-search-item-arrow {
   opacity: 1;
-  transform: translateX(2px);
-  color: #2563eb;
+  transform: translateX(0);
+  color: #0f172a;
+}
+
+.vm-search-item-arrow {
+  display: grid;
+  place-items: center;
+  color: #94a3b8;
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .vm-search-item-direct {
-  background: #f8fbff;
-  border: 1px dashed #bfdbfe;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
 }
 
 .vm-search-item-direct:hover,
 .vm-search-item-direct.is-active {
-  background: #eff6ff;
-  border-color: #93c5fd;
+  background: #f1f5f9;
+  border-color: #94a3b8;
 }
 
 .vm-search-item-left {
@@ -363,12 +443,12 @@
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   color: #64748b;
-  transition: all 0.15s ease;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .vm-search-item:hover .vm-search-item-icon,
 .vm-search-item.is-active .vm-search-item-icon {
-  transform: scale(1.04);
+  transform: scale(1.08);
 }
 
 .vm-search-icon-recent {
@@ -377,15 +457,15 @@
 }
 
 .vm-search-icon-direct {
-  background: #2563eb;
-  border-color: #2563eb;
+  background: #0f172a;
+  border-color: #0f172a;
   color: #ffffff;
 }
 
 .vm-search-icon-cat {
-  background: #eff6ff;
-  border-color: #bfdbfe;
-  color: #2563eb;
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #0f172a;
 }
 
 .vm-search-icon-leader {
@@ -440,8 +520,11 @@
 }
 
 .vm-search-keyword {
-  color: #2563eb;
+  color: #0f172a;
   font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: #cbd5e1;
 }
 
 .vm-search-item-desc {
@@ -454,11 +537,12 @@
 }
 
 .vm-search-highlight {
-  background: #dbeafe;
-  color: #1e40af;
+  background: #f1f5f9;
+  color: #0f172a;
   font-weight: 700;
-  border-radius: 3px;
-  padding: 0 2px;
+  border-radius: 4px;
+  padding: 1px 4px;
+  border: 1px solid #e2e8f0;
 }
 
 .vm-search-item-remove {
@@ -472,13 +556,13 @@
   background: transparent;
   color: #94a3b8;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .vm-search-item-remove:hover {
   background: #fee2e2;
   color: #dc2626;
-  transform: scale(1.1);
+  transform: scale(1.15) rotate(90deg);
 }
 
 .vm-search-item-arrow {
@@ -529,9 +613,18 @@
   font-weight: 700;
   padding: 3px 8px;
   border-radius: 999px;
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
   flex: none;
+  transition: all 0.16s ease;
+}
+
+.vm-search-item:hover .vm-search-vote-pill,
+.vm-search-item.is-active .vm-search-vote-pill {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
 }
 
 /* Category grid chips */
@@ -546,7 +639,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 6px 11px;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   background: #f8fafc;
@@ -554,24 +647,27 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.14s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .vm-search-cat-chip:hover {
-  border-color: #93c5fd;
-  background: #eff6ff;
-  color: #1d4ed8;
-  transform: translateY(-1px);
+  border-color: #0f172a;
+  background: #ffffff;
+  color: #0f172a;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.08);
 }
 
 .vm-search-cat-icon {
   display: grid;
   place-items: center;
   color: #64748b;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .vm-search-cat-chip:hover .vm-search-cat-icon {
-  color: #2563eb;
+  color: #0f172a;
+  transform: scale(1.12);
 }
 
 /* Dropdown Empty State */
@@ -686,11 +782,11 @@
 .vm-hero h1{letter-spacing:-.6px}
 .vm-hero-copy>button{font-size:14px}
 .vm-tabs button{font-size:15px}
-.vm-active-filter{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0;padding:8px 12px;border:1px solid #dbeafe;border-radius:10px;background:#f8fbff;color:#475569;font-size:13px}
-.vm-active-filter strong{color:#1d4ed8;font-weight:700}
-.vm-active-filter button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:38px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:#1d4ed8;font:inherit;font-weight:700;white-space:nowrap;cursor:pointer}
-.vm-active-filter button:hover{background:#e8f0ff}
-.vm-active-filter button:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
+.vm-active-filter{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0;padding:8px 12px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;color:#334155;font-size:13px;box-shadow:0 1px 3px rgba(15,23,42,0.04);animation:vmPopIn 0.2s cubic-bezier(0.16,1,0.3,1) forwards}
+.vm-active-filter strong{color:#0f172a;font-weight:700}
+.vm-active-filter button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 10px;border:1px solid #e2e8f0;border-radius:8px;background:#ffffff;color:#0f172a;font:inherit;font-size:12px;font-weight:700;white-space:nowrap;cursor:pointer;transition:all 0.15s ease}
+.vm-active-filter button:hover{background:#0f172a;color:#ffffff;border-color:#0f172a}
+.vm-active-filter button:focus-visible{outline:2px solid #0f172a;outline-offset:2px}
 
 /* ==========================================================================
    VM SELECT BOX & DROPDOWN - Modern SaaS System Component

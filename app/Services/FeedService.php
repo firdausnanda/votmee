@@ -24,16 +24,20 @@ class FeedService
                 'support_points' => (clone $scoresForPost)->selectRaw('COALESCE(SUM(support_events.amount), 0)'),
                 'supporters_count' => (clone $scoresForPost)->selectRaw('COUNT(DISTINCT support_events.user_id)'),
             ])
+            ->when($filters['q'] ?? null, fn ($query, $search) => $query->where(function ($query) use ($search): void {
+                $query->where('title', 'like', '%'.$search.'%')
+                    ->orWhere('criteria', 'like', '%'.$search.'%');
+            }))
             ->when($filters['category_id'] ?? null, fn ($query, $id) => $query->where('category_id', $id));
 
         if (($filters['sort'] ?? 'latest') === 'popular') {
             $query->orderByDesc('support_points')->orderByDesc('published_at');
         } else {
-            if (isset($filters['language_code'])) {
+            if (($filters['sort'] ?? 'for_you') === 'for_you' && isset($filters['language_code'])) {
                 $query->orderByRaw('CASE WHEN language_code = ? THEN 0 ELSE 1 END', [$filters['language_code']]);
             }
 
-            if (isset($filters['region_code'])) {
+            if (($filters['sort'] ?? 'for_you') === 'for_you' && isset($filters['region_code'])) {
                 $query->orderByRaw('CASE WHEN region_code = ? OR region_code = ? THEN 0 ELSE 1 END', [$filters['region_code'], 'GLOBAL']);
             }
 

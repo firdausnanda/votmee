@@ -22,6 +22,13 @@ Artisan::command('votmee:grant-role {email} {role}', function () {
 
     DB::transaction(function () use ($user, $role): void {
         $user->forceFill(['role' => $role])->save();
+
+        if ($role === 'admin') {
+            $user->syncRoles(['administrator']);
+        } elseif ($role === 'user') {
+            $user->syncRoles(['user']);
+        }
+
         DB::table('audit_logs')->insert([
             'actor_id' => null,
             'action' => 'user.role.grant',

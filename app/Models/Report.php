@@ -6,10 +6,11 @@ use Database\Factories\ReportFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Mattiverse\Userstamps\Traits\Userstamps;
 
-#[Fillable(['reporter_id', 'target_type', 'target_id', 'reason', 'status'])]
+#[Fillable(['reporter_id', 'target_type', 'target_id', 'reason', 'status', 'created_by', 'updated_by'])]
 class Report extends Model
 {
     /** @use HasFactory<ReportFactory> */
-    use HasFactory;
+    use HasFactory, Userstamps;
 }

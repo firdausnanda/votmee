@@ -21,6 +21,8 @@ class ReportFactory extends Factory
     {
         return [
             'reporter_id' => User::factory(),
+            'created_by' => fn (array $attributes) => $attributes['reporter_id'] ?? User::factory(),
+            'updated_by' => fn (array $attributes) => $attributes['reporter_id'] ?? User::factory(),
             'target_type' => 'ranking_post',
             'target_id' => fn (): string => RankingPost::factory()->create()->id,
             'reason' => fake()->sentence(),

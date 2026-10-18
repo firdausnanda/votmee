@@ -1,50 +1,16 @@
-import PrimaryButton from '@/Components/PrimaryButton';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 
 export default function VerifyEmail({ status }) {
+    const isId = (localStorage.getItem('votmee.locale') ?? 'id') === 'id';
     const { post, processing } = useForm({});
-
-    const submit = (e) => {
-        e.preventDefault();
-
-        post(route('verification.send'));
-    };
-
-    return (
-        <GuestLayout>
-            <Head title="Email Verification" />
-
-            <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-                Thanks for signing up! Before getting started, could you verify
-                your email address by clicking on the link we just emailed to
-                you? If you didn't receive the email, we will gladly send you
-                another.
-            </div>
-
-            {status === 'verification-link-sent' && (
-                <div className="mb-4 text-sm font-medium text-green-600 dark:text-green-400">
-                    A new verification link has been sent to the email address
-                    you provided during registration.
-                </div>
-            )}
-
-            <form onSubmit={submit}>
-                <div className="mt-4 flex items-center justify-between">
-                    <PrimaryButton disabled={processing}>
-                        Resend Verification Email
-                    </PrimaryButton>
-
-                    <Link
-                        href={route('logout')}
-                        method="post"
-                        as="button"
-                        className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:text-gray-400 dark:hover:text-gray-100 dark:focus:ring-offset-gray-800"
-                    >
-                        Log Out
-                    </Link>
-                </div>
-            </form>
-        </GuestLayout>
-    );
+    const submit = (event) => { event.preventDefault(); post(route('verification.send')); };
+    return <GuestLayout>
+        <Head title={isId ? 'Verifikasi email' : 'Verify email'} />
+        <p className="vt-eyebrow">Votmee</p><h2>{isId ? 'Verifikasi email Anda' : 'Verify your email'}</h2>
+        <p className="vt-auth-caption">{isId ? 'Buka tautan verifikasi yang kami kirim ke email Anda sebelum melanjutkan.' : 'Open the verification link we sent to your email before continuing.'}</p>
+        {status === 'verification-link-sent' && <p className="vt-form-message" role="status">{isId ? 'Tautan baru telah dikirim.' : 'A new link has been sent.'}</p>}
+        <form className="vt-auth-form" onSubmit={submit}><button disabled={processing}>{isId ? 'Kirim ulang email verifikasi' : 'Resend verification email'}</button></form>
+        <p className="vt-auth-switch"><Link href={route('logout')} method="post" as="button">{isId ? 'Keluar' : 'Log out'}</Link></p>
+    </GuestLayout>;
 }

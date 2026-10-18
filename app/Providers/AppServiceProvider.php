@@ -23,7 +23,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Vite::prefetch(concurrency: 3);
-        Gate::define('moderate', fn (User $user): bool => in_array($user->role, ['moderator', 'admin'], true));
-        Gate::define('administer', fn (User $user): bool => $user->role === 'admin');
+        Gate::define('moderate', fn (User $user): bool => $user->hasRole('administrator') || in_array($user->role, ['moderator', 'admin'], true));
+        Gate::define('administer', fn (User $user): bool => $user->hasRole('administrator') || $user->role === 'admin');
     }
 }

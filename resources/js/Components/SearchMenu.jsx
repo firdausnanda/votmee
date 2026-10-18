@@ -378,10 +378,12 @@ export default function SearchMenu({
         }
         setIsOpen(false);
         setActiveIndex(-1);
-        if (categoryToSelect) {
-            onSelectCategory?.(categoryToSelect);
+        const categoryHandled = categoryToSelect
+            ? onSelectCategory?.(categoryToSelect)
+            : false;
+        if (!categoryHandled) {
+            onSearchSubmit?.(q);
         }
-        onSearchSubmit?.(q);
         if (isMobile) {
             onClose?.();
         }
@@ -666,6 +668,10 @@ export default function SearchMenu({
                             <div className="vm-search-section">
                                 <div className="vm-search-section-header">
                                     <span className="vm-search-section-title">
+                                        <span className="vm-live-indicator" aria-hidden="true">
+                                            <span className="vm-live-ping"></span>
+                                            <span className="vm-live-core"></span>
+                                        </span>
                                         <MenuIcon name="flame" size={13} className="vm-icon-flame" />
                                         {labels.trendingTitle}
                                     </span>
