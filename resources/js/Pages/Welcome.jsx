@@ -460,9 +460,29 @@ function Brand() {
     return <span className="vm-brand">votmee</span>;
 }
 
-function FeedCard({ post, vote, saved, onVote, onSave, onComments, ui }) {
+function FeedCard({ post, vote, saved, onVote, onSave, onComments, ui, language = "id" }) {
     const image = `/images/stitch/feed-desktop-${post.id}.jpg`;
     const mobileImage = `/images/stitch/feed-mobile-${post.id}.jpg`;
+    const authorUsername = post.author?.replace('@', '');
+    const profileUrl = authorUsername ? `/${language}/profile/${authorUsername}` : null;
+    const avatarElement = profileUrl ? (
+        <Link href={profileUrl} className="vm-author-avatar-link" aria-hidden="true" tabIndex={-1}>
+            <span className="vm-avatar">
+                {post.author[1].toUpperCase()}
+            </span>
+        </Link>
+    ) : (
+        <span className="vm-avatar">
+            {post.author[1].toUpperCase()}
+        </span>
+    );
+    const authorLink = profileUrl ? (
+        <Link href={profileUrl} className="vm-author-link">
+            {post.author}
+        </Link>
+    ) : (
+        post.author
+    );
 
     return (
         <article className="vm-feed-card items-center">
@@ -518,11 +538,9 @@ function FeedCard({ post, vote, saved, onVote, onSave, onComments, ui }) {
                 <h2>{post.title}</h2>
                 <p className="vm-feed-description">{post.description}</p>
                 <div className="vm-feed-meta">
-                    <span className="vm-avatar">
-                        {post.author[1].toUpperCase()}
-                    </span>
+                    {avatarElement}
                     <span>
-                        {post.author} <span className="vm-dot">·</span>{" "}
+                        {authorLink} <span className="vm-dot">·</span>{" "}
                         {post.age}
                     </span>
                     <span className="vm-desktop-comments">
@@ -534,11 +552,9 @@ function FeedCard({ post, vote, saved, onVote, onSave, onComments, ui }) {
             </div>
             <div className="vm-mobile-footer">
                 <span className="vm-mobile-author">
-                    <span className="vm-avatar">
-                        {post.author[1].toUpperCase()}
-                    </span>
+                    {avatarElement}
                     <span>
-                        {post.author} · {post.age}
+                        {authorLink} · {post.age}
                     </span>
                 </span>
                 <div className="vm-mobile-actions">
@@ -994,6 +1010,7 @@ export default function Welcome({ auth }) {
                                             showNotice(ui.commentsSoon)
                                         }
                                         ui={ui}
+                                        language={language}
                                     />
                                 ))}
                                 {visiblePosts.length === 0 && (

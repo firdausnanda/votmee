@@ -92,6 +92,7 @@ export default function SelectBox({
             if (opt.isDivider) return false;
             return (
                 opt.label.toLowerCase().includes(query) ||
+                (opt.badge && opt.badge.toLowerCase().includes(query)) ||
                 (opt.description && opt.description.toLowerCase().includes(query))
             );
         });
@@ -258,6 +259,14 @@ export default function SelectBox({
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            if (displayedOptions.length > 0) {
+                                                handleSelect(displayedOptions[0].value);
+                                            }
+                                        }
+                                    }}
                                     placeholder={searchPlaceholder}
                                     onClick={(e) => e.stopPropagation()}
                                 />
@@ -281,7 +290,7 @@ export default function SelectBox({
                         <div className="vm-select-options-list">
                             {displayedOptions.length === 0 ? (
                                 <div className="vm-select-empty-state">
-                                    Tidak ada kategori ditemukan
+                                    Tidak ada hasil
                                 </div>
                             ) : (
                                 displayedOptions.map((opt, idx) => {

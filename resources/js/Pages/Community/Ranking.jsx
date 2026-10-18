@@ -1,6 +1,7 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { api, categoryHashtag, dateLabel, dictionary, Layout, numberLabel, PageHead, path } from './Shared';
+import ReportDialog from './ReportDialog';
 
 function RankingIcon({ name, size = 16, className = '', fill = 'none' }) {
     const icons = {
@@ -141,7 +142,6 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
     }, [scores]);
     const [comment, setComment] = useState('');
     const [reporting, setReporting] = useState(null);
-    const [reportReason, setReportReason] = useState('');
     const [busy, setBusy] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
     const [toastType, setToastType] = useState('info');
@@ -453,23 +453,10 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
         }
     };
 
-    const submitReport = async (event) => {
-        event.preventDefault();
-        if (busy || reportReason.trim().length < 5) return;
-        setBusy(true);
-        try {
-            await api('/backend/reports', 'POST', { ...reporting, reason: reportReason });
-            setReporting(null);
-            setReportReason('');
-            showToast(
-                isId ? 'Laporan berhasil dikirim.' : 'Report submitted.',
-                'success'
-            );
-        } catch (error) {
-            showToast(error.message, 'error');
-        } finally {
-            setBusy(false);
-        }
+    const submitReport = async (reason) => {
+        await api('/backend/reports', 'POST', { ...reporting, reason });
+        setReporting(null);
+        showToast(isId ? 'Laporan berhasil dikirim.' : 'Report submitted.', 'success');
     };
 
     const share = async () => {
@@ -511,20 +498,6 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
         if (pointsB !== pointsA) return pointsB - pointsA;
         return a.position - b.position;
     });
-
-    const reportTemplates = isId
-        ? [
-              'Informasi menyesatkan atau tidak akurat',
-              'Spam atau promosi tidak relevan',
-              'Objek duplikat atau salah kategori',
-              'Pelanggaran pedoman komunitas',
-          ]
-        : [
-              'Misleading or inaccurate content',
-              'Spam or inappropriate promotion',
-              'Duplicate candidate or wrong category',
-              'Community guidelines violation',
-          ];
 
     // Build comment map and hierarchy for threaded replies
     const commentMap = Object.fromEntries(comments.map((c) => [c.id, c]));
@@ -724,12 +697,14 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
     };
 
     return (
-        <Layout locale={locale} categories={categories} leaders={leaders}>
+        <Layout locale={locale} categories={categories} leaders={leaders} active="ranking">
             <PageHead
                 title={`${post.title} - Ranking Votmee`}
                 locale={locale}
                 description={post.criteria.slice(0, 155)}
             />
+
+            <div className="vr-detail-page">
 
             {/* Simple Top Navigation */}
             <div className="vr-simple-nav">
@@ -842,6 +817,7 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                 </div>
             </article>
 
+            <div className="vr-detail-columns">
             <section
                 ref={candidatesSectionRef}
                 id="candidates-section"
@@ -1172,6 +1148,9 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                 </div>
             </section>
 
+            </div>
+            </div>
+
             {/* Support Modal Dialog */}
             {selected && (
                 <div
@@ -1328,89 +1307,13 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                 </div>
             )}
 
-            {/* Report Modal Dialog */}
             {reporting && (
-                <div
-                    className="vr-modal-backdrop"
-                    role="presentation"
-                    onMouseDown={(event) => {
-                        if (event.target === event.currentTarget) setReporting(null);
-                    }}
-                >
-                    <form
-                        className="vr-modal-dialog"
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="report-dialog-title"
-                        onSubmit={submitReport}
-                    >
-                        <div className="vr-modal-header">
-                            <div>
-                                <h2 id="report-dialog-title" className="vr-modal-title vr-modal-title-with-icon">
-                                    <RankingIcon name="shieldAlert" size={17} className="vr-report-modal-icon" />
-                                    <span>{t.report}</span>
-                                </h2>
-                                <p className="vr-modal-subtitle">
-                                    {reporting.target_type === 'ranking_post'
-                                        ? (isId ? 'Laporkan Ranking' : 'Report ranking')
-                                        : (isId ? 'Laporkan Komentar' : 'Report comment')}
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                className="vr-modal-close"
-                                onClick={() => setReporting(null)}
-                                aria-label="Close"
-                            >
-                                <RankingIcon name="x" size={16} />
-                            </button>
-                        </div>
-
-                        <div className="vr-modal-body">
-                            <label className="vr-label">{t.reportReason}</label>
-                            <textarea
-                                className="vr-simple-textarea"
-                                minLength={5}
-                                maxLength={2000}
-                                rows={3}
-                                value={reportReason}
-                                onChange={(e) => setReportReason(e.target.value)}
-                                placeholder={isId ? 'Jelaskan alasan laporan...' : 'Provide details...'}
-                                required
-                            />
-
-                            <div className="vr-templates-list">
-                                {reportTemplates.map((template, idx) => (
-                                    <button
-                                        key={idx}
-                                        type="button"
-                                        className="vr-template-chip"
-                                        onClick={() => setReportReason(template)}
-                                    >
-                                        {template}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="vr-modal-footer">
-                            <button
-                                type="button"
-                                className="vr-btn-secondary"
-                                onClick={() => setReporting(null)}
-                            >
-                                {t.cancel}
-                            </button>
-                            <button
-                                type="submit"
-                                className="vr-btn-danger"
-                                disabled={busy || reportReason.trim().length < 5}
-                            >
-                                {busy ? '...' : t.sendReport}
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                <ReportDialog
+                    locale={locale}
+                    targetType={reporting.target_type}
+                    onClose={() => setReporting(null)}
+                    onSubmit={submitReport}
+                />
             )}
 
             {/* Subtle Toast Notification */}

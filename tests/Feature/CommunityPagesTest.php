@@ -3,8 +3,10 @@
 use App\Models\Category;
 use App\Models\Comment;
 use App\Models\MasterObject;
+use App\Models\PointLedger;
 use App\Models\RankingPost;
 use App\Models\User;
+use App\Models\Wallet;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
 
@@ -31,6 +33,47 @@ test('explore filters ranking titles and returns matching objects', function () 
         ->has('feed.data', 1)
         ->where('feed.data.0.title', 'Galaxy A26 versus others')
         ->where('objects.0.id', $object->id)
+        ->etc());
+});
+
+test('wallet shows claim status and filters transactions across the full ledger', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user)->get('/id/wallet')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('Community/Wallet')
+        ->where('claimedToday', false)
+        ->where('flow', 'all')
+        ->etc());
+
+    $this->postJson(route('backend.wallet.claim'))->assertOk()
+        ->assertJsonPath('claimed', true)
+        ->assertJsonPath('balance', 5);
+    $this->postJson(route('backend.wallet.claim'))->assertOk()
+        ->assertJsonPath('claimed', false)
+        ->assertJsonPath('balance', 5);
+
+    $wallet = Wallet::query()->where('user_id', $user->id)->firstOrFail();
+    PointLedger::factory()->create([
+        'wallet_id' => $wallet->id,
+        'user_id' => $user->id,
+        'amount' => -2,
+        'type' => 'support',
+        'claimed_on' => null,
+    ]);
+
+    $this->get('/id/wallet?flow=incoming')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('claimedToday', true)
+        ->where('flow', 'incoming')
+        ->where('ledger.total', 1)
+        ->where('ledger.data.0.amount', 5)
+        ->etc());
+    $this->get('/id/wallet?flow=outgoing')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('flow', 'outgoing')
+        ->where('ledger.total', 1)
+        ->where('ledger.data.0.amount', -2)
+        ->etc());
+    $this->get('/id/wallet?flow=invalid')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('flow', 'all')
+        ->where('ledger.total', 2)
         ->etc());
 });
 

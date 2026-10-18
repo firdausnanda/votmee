@@ -106,6 +106,9 @@ export function PageHead({ title, locale, description }) {
 
 export function Layout({ locale, categories = [], leaders = [], children, active = '', searchPosts = [] }) {
     const t = dictionary(locale);
+    const showRankingPanel = active === 'home' || active === 'explore';
+    const useWideContent = ['create', 'wallet', 'profile', 'object', 'ranking'].includes(active);
+    const useFeedFrame = showRankingPanel || useWideContent;
     const user = usePage().props.auth?.user;
     const access = useCommunityAccess();
     const [query, setQuery] = useState('');
@@ -150,7 +153,7 @@ export function Layout({ locale, categories = [], leaders = [], children, active
     return <div className="vt-app vm-page">
         <a className="vm-skip" href="#main-content">{locale === 'id' ? 'Langsung ke konten' : 'Skip to content'}</a>
         <header className="vt-header vm-header">
-            <div className="vt-header-inner vm-shell vm-header-inner vm-header-2col">
+            <div className={`vt-header-inner vm-shell vm-header-inner vm-header-2col${useFeedFrame ? ' vm-header-3col' : ''}`}>
                 <Link href={path(locale)} className="vt-wordmark vm-brand" aria-label="Votmee home">votmee</Link>
                 <SearchMenu {...searchMenuProps} />
                 <div className="vt-header-actions vm-header-right">
@@ -165,7 +168,7 @@ export function Layout({ locale, categories = [], leaders = [], children, active
             </div>
             {searchOpen && <div className="vm-mobile-search-wrapper"><SearchMenu {...searchMenuProps} isMobile autoFocus onClose={() => setSearchOpen(false)} /></div>}
         </header>
-        <div className="vt-shell vm-shell vm-layout vm-layout-2col">
+        <div className={`vt-shell vm-shell vm-layout vm-layout-2col${useFeedFrame ? ' vm-layout-3col' : ''}${useWideContent ? ' vm-layout-wide-content' : ''}`}>
             <aside className={`vt-left vm-sidebar ${menuOpen ? 'vt-left-open' : ''}`} aria-label={t.menu}>
                 <nav className="vt-main-nav vm-side-nav">
                     <Link className={active === 'home' ? 'active' : ''} href={path(locale)}><NavIcon name="home" />{t.home}</Link>
@@ -184,6 +187,11 @@ export function Layout({ locale, categories = [], leaders = [], children, active
                 </div>
             </aside>
             <main className="vt-main vm-main" id="main-content">{children}</main>
+            {showRankingPanel && <aside className="vm-rightbar vm-ranking-sidebar" aria-label={locale === 'id' ? 'Panel ranking' : 'Ranking panel'}>
+                <Leaderboard locale={locale} initialLeaders={leaders} />
+                <CategoryPanel locale={locale} categories={categories} />
+                <DiscussionPanel locale={locale} posts={searchPosts} categories={categories} />
+            </aside>}
         </div>
         <nav className={`vt-bottom-nav vm-bottom-nav ${user ? '' : 'vm-bottom-nav-guest'}`} aria-label={t.menu}>
             <Link className={active === 'home' ? 'active' : ''} href={path(locale)}><NavIcon name="home" size={21} /><span>{t.home}</span></Link>
@@ -198,33 +206,85 @@ export function Layout({ locale, categories = [], leaders = [], children, active
 export function Leaderboard({ locale, initialLeaders = [] }) {
     const t = dictionary(locale);
     const [period, setPeriod] = useState('weekly');
-    const [rankType, setRankType] = useState('community');
     const [leaders, setLeaders] = useState(initialLeaders);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (period === 'weekly' && rankType === 'community') { setLeaders(initialLeaders); return; }
+        if (period === 'weekly') { setLeaders(initialLeaders); return; }
         let active = true;
         setLoading(true);
-        api(`/backend/leaderboard?period=${period}&rank_type=${rankType}`).then(result => {
+        api(`/backend/leaderboard?period=${period}&rank_type=support`).then(result => {
             if (active) setLeaders(result.leaders);
         }).catch(() => { if (active) setLeaders([]); }).finally(() => { if (active) setLoading(false); });
         return () => { active = false; };
-    }, [period, rankType, initialLeaders]);
+    }, [period, initialLeaders]);
 
-    return <section className="vt-leaderboard vm-panel">
-        <h2>{locale === 'id' ? 'Peringkat Teratas' : 'Top Rankings'}</h2>
-        <div className="vt-periods vm-periods" role="group" aria-label={t.community}>
+    return <section className="vt-leaderboard vm-panel" aria-labelledby="vm-object-rankings-title">
+        <h2 id="vm-object-rankings-title">{locale === 'id' ? 'Peringkat Objek' : 'Object Rankings'}</h2>
+        <div className="vt-periods vm-periods" role="group" aria-label={locale === 'id' ? 'Periode ranking' : 'Ranking period'}>
             {['daily', 'weekly', 'all_time'].map(value =>
-                <button key={value} className={period === value ? 'active' : ''} onClick={() => setPeriod(value)}>{value === 'all_time' ? t.allTime : t[value]}</button>)}
+                <button key={value} type="button" aria-pressed={period === value} className={period === value ? 'active' : ''} onClick={() => setPeriod(value)}>{value === 'all_time' ? t.allTime : t[value]}</button>)}
         </div>
-        <select className="vt-rank-type" value={rankType} aria-label={t.community} onChange={e => setRankType(e.target.value)}>
-            <option value="community">{t.communityRank}</option><option value="support">{t.supportRank}</option>
-        </select>
-        {loading ? <p className="vt-muted" role="status">…</p> : leaders.length ? <ol className="vt-leader-list vm-leader-list">{leaders.slice(0, 5).map((leader, index) =>
-            <li key={leader.object_id}><span className={`vm-leader-position vm-position-${index + 1}`}>{index + 1}</span><img className="vt-leader-image" src={`/images/stitch/object-${index + 1}.jpg`} alt="" loading="lazy" /><span className="vm-leader-name"><strong><Link href={path(locale, `/object/${leader.slug}`)}>{leader.name}</Link></strong><small>{numberLabel(leader.score, locale)} {locale === 'id' ? 'poin' : 'points'}</small></span><span className="vt-leader-score">{numberLabel(leader.score, locale)}</span></li>)}</ol>
+        {loading ? <p className="vt-muted" role="status">{locale === 'id' ? 'Memuat ranking...' : 'Loading rankings...'}</p> : leaders.length ? <ol className="vt-leader-list vm-leader-list">{leaders.slice(0, 5).map((leader, index) =>
+            <li key={leader.object_id}>
+                <span className={`vm-leader-position vm-position-${index + 1}`}>{index + 1}</span>
+                <span className="vm-rank-avatar" aria-hidden="true">{leader.name.slice(0, 1).toUpperCase()}</span>
+                <span className="vm-leader-name"><strong><Link href={path(locale, `/object/${leader.slug}`)}>{leader.name}</Link></strong><small>{numberLabel(leader.score, locale)} {t.points}</small></span>
+            </li>)}</ol>
             : <p className="vt-muted vt-side-empty">{t.noResults}</p>}
-        <Link className="vm-panel-link" href={path(locale, '/explore')}>{locale === 'id' ? 'Lihat semua ranking' : 'View all rankings'} →</Link>
+        <Link className="vm-panel-link" href={path(locale, '/explore')}>{locale === 'id' ? 'Jelajahi ranking' : 'Explore rankings'} →</Link>
+    </section>;
+}
+
+function CategoryPanel({ locale, categories }) {
+    const isId = locale === 'id';
+    const topCategories = [...categories]
+        .sort((first, second) => Number(second.ranking_posts_count ?? 0) - Number(first.ranking_posts_count ?? 0) || first.name.localeCompare(second.name))
+        .slice(0, 5);
+    const categoryImages = {
+        teknologi: '/images/stitch/category-1.jpg',
+        wisata: '/images/stitch/category-2.jpg',
+        kuliner: '/images/stitch/category-3.jpg',
+        otomotif: '/images/stitch/category-4.jpg',
+        hiburan: '/images/stitch/category-5.jpg',
+    };
+
+    return <section className="vm-panel vm-category-panel" aria-labelledby="vm-top-categories-title">
+        <h2 id="vm-top-categories-title">{isId ? 'Kategori Populer' : 'Popular Categories'}</h2>
+        {topCategories.length ? <ol className="vm-category-ranking">
+            {topCategories.map((category) => <li key={category.id}>
+                <Link href={path(locale, `/explore?category_id=${category.id}`)}>
+                    {categoryImages[category.slug]
+                        ? <img src={categoryImages[category.slug]} alt="" loading="lazy" />
+                        : <span className="vm-category-avatar" aria-hidden="true">{category.name.slice(0, 1).toUpperCase()}</span>}
+                    <span><strong>{category.name}</strong><small>{numberLabel(category.ranking_posts_count, locale)} ranking</small></span>
+                </Link>
+            </li>)}
+        </ol> : <p className="vt-muted vt-side-empty">{isId ? 'Belum ada kategori.' : 'No categories yet.'}</p>}
+        <Link className="vm-panel-link" href={path(locale, '/explore')}>{isId ? 'Jelajahi kategori' : 'Browse categories'} →</Link>
+    </section>;
+}
+
+function DiscussionPanel({ locale, posts, categories }) {
+    const isId = locale === 'id';
+    const discussions = [...posts].sort((first, second) => (second.comments_count ?? 0) - (first.comments_count ?? 0)).slice(0, 3);
+
+    return <section className="vm-panel vm-discussion-panel" aria-labelledby="vm-discussions-title">
+        <div className="vm-panel-heading">
+            <h2 id="vm-discussions-title">{isId ? 'Dari Komunitas' : 'From the Community'}</h2>
+            <Link href={path(locale, '/explore')}>{isId ? 'Lihat semua' : 'View all'}</Link>
+        </div>
+        {discussions.length ? <ol className="vm-discussion-list">
+            {discussions.map((post) => {
+                const category = categories.find((item) => item.id === post.category_id);
+                return <li key={post.id}>
+                    <Link href={path(locale, `/ranking/${post.slug}`)}>
+                        <span className="vm-discussion-avatar" aria-hidden="true">{post.title.slice(0, 1).toUpperCase()}</span>
+                        <span><strong>{post.title}</strong><small>{category?.name ?? 'Ranking'} · {numberLabel(post.comments_count ?? 0, locale)} {isId ? 'komentar' : 'comments'}</small></span>
+                    </Link>
+                </li>;
+            })}
+        </ol> : <p className="vt-muted vt-side-empty">{isId ? 'Belum ada ranking pada halaman ini.' : 'No rankings on this page yet.'}</p>}
     </section>;
 }
 
@@ -234,6 +294,8 @@ export function RankingCard({ post, locale, category }) {
     const imageNumber = categorySlug === 'wisata' ? 2 : categorySlug === 'kuliner' ? 3 : categorySlug === 'otomotif' ? 4 : categorySlug === 'hiburan' ? 5 : 1;
     const rankingUrl = path(locale, `/ranking/${post.slug}`);
     const author = post.creator?.username ? `@${post.creator.username}` : post.creator?.name ?? 'Votmee';
+    const authorUsername = post.creator?.username ?? (typeof post.author === 'string' && post.author.startsWith('@') ? post.author.slice(1) : null);
+    const profileUrl = authorUsername ? path(locale, `/profile/${authorUsername}`) : null;
     const [saved, setSaved] = useState(false);
 
     useEffect(() => {
@@ -258,6 +320,22 @@ export function RankingCard({ post, locale, category }) {
         setSaved(updated.includes(post.id));
     };
 
+    const avatarElement = profileUrl ? (
+        <Link href={profileUrl} className="vm-author-avatar-link" aria-hidden="true" tabIndex={-1}>
+            <span className="vm-avatar">{author.replace('@', '').slice(0, 1).toUpperCase()}</span>
+        </Link>
+    ) : (
+        <span className="vm-avatar">{author.replace('@', '').slice(0, 1).toUpperCase()}</span>
+    );
+
+    const authorLink = profileUrl ? (
+        <Link href={profileUrl} className="vm-author-link">
+            {author}
+        </Link>
+    ) : (
+        author
+    );
+
     return <article className="vm-feed-card vt-legacy-card">
         <Link className="vm-desktop-vote vt-legacy-vote" href={rankingUrl} aria-label={`${t.viewRanking}: ${post.title}`}>
             <NavIcon name="chevronUp" size={18} />
@@ -274,10 +352,10 @@ export function RankingCard({ post, locale, category }) {
             </div>
             <h2><Link href={rankingUrl}>{post.title}</Link></h2>
             <p className="vm-feed-description">{post.criteria}</p>
-            <div className="vm-feed-meta"><span className="vm-avatar">{author.replace('@', '').slice(0, 1).toUpperCase()}</span><span>{author} <span className="vm-dot">·</span> {relativeDate(post.published_at, locale)}</span><span className="vm-desktop-comments"><span className="vm-dot">·</span><NavIcon name="comment" size={15} /> {numberLabel(post.comments_count ?? 0, locale)} {t.comments}</span></div>
+            <div className="vm-feed-meta">{avatarElement}<span>{authorLink} <span className="vm-dot">·</span> {relativeDate(post.published_at, locale)}</span><span className="vm-desktop-comments"><span className="vm-dot">·</span><NavIcon name="comment" size={15} /> {numberLabel(post.comments_count ?? 0, locale)} {t.comments}</span></div>
         </div>
         <div className="vm-mobile-footer">
-            <span className="vm-mobile-author"><span className="vm-avatar">{author.replace('@', '').slice(0, 1).toUpperCase()}</span><span>{author} · {relativeDate(post.published_at, locale)}</span></span>
+            <span className="vm-mobile-author">{avatarElement}<span>{authorLink} · {relativeDate(post.published_at, locale)}</span></span>
             <div className="vm-mobile-actions"><Link href={rankingUrl}><NavIcon name="chevronUp" size={15} /> {numberLabel(post.supporters_count ?? 0, locale)} <NavIcon name="chevronDown" size={13} /></Link><Link href={rankingUrl} aria-label={`${numberLabel(post.comments_count ?? 0, locale)} ${t.comments}, ${post.title}`}><NavIcon name="comment" size={15} /> {numberLabel(post.comments_count ?? 0, locale)}</Link></div>
         </div>
     </article>;

@@ -29,7 +29,7 @@ class CommunityController extends Controller
             ...$this->shared($request),
             'feed' => $feed->paginate($filters)->withQueryString(),
             'filters' => $filters,
-            'leaders' => $leaderboard->leaders(),
+            'leaders' => $leaderboard->leaders('weekly', 'support'),
         ]);
     }
 
@@ -42,7 +42,7 @@ class CommunityController extends Controller
             'feed' => $feed->paginate($filters)->withQueryString(),
             'filters' => $filters,
             'objects' => isset($filters['q']) ? $matching->search($filters['q'], $filters['category_id'] ?? null) : [],
-            'leaders' => $leaderboard->leaders(),
+            'leaders' => $leaderboard->leaders('weekly', 'support'),
         ]);
     }
 
@@ -138,10 +138,22 @@ class CommunityController extends Controller
 
     public function wallet(Request $request, LeaderboardService $leaderboard): Response
     {
+        $flow = in_array($request->query('flow'), ['incoming', 'outgoing'], true) ? $request->query('flow') : 'all';
+        $ledger = PointLedger::query()->where('user_id', $request->user()->id)->latest();
+
+        if ($flow === 'incoming') {
+            $ledger->where('amount', '>', 0);
+        } elseif ($flow === 'outgoing') {
+            $ledger->where('amount', '<', 0);
+        }
+
         return Inertia::render('Community/Wallet', [
             ...$this->shared($request),
             'balance' => Wallet::query()->where('user_id', $request->user()->id)->value('balance') ?? 0,
-            'ledger' => PointLedger::query()->where('user_id', $request->user()->id)->latest()->paginate(20),
+            'claimedToday' => PointLedger::query()->where('user_id', $request->user()->id)->where('type', 'daily_bonus')
+                ->whereDate('claimed_on', now('Asia/Jakarta')->toDateString())->exists(),
+            'flow' => $flow,
+            'ledger' => $ledger->paginate(20)->withQueryString(),
             'leaders' => $leaderboard->leaders(),
         ]);
     }

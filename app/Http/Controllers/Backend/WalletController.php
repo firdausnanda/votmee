@@ -24,7 +24,11 @@ class WalletController extends Controller
     {
         $ledger = $support->claimDaily($request->user());
 
-        return response()->json(['ledger' => $ledger, 'balance' => Wallet::query()->where('user_id', $request->user()->id)->value('balance')]);
+        return response()->json([
+            'ledger' => $ledger,
+            'balance' => Wallet::query()->where('user_id', $request->user()->id)->value('balance'),
+            'claimed' => $ledger->wasRecentlyCreated,
+        ]);
     }
 
     public function support(Request $request, SupportService $support): JsonResponse

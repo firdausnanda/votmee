@@ -5,7 +5,17 @@ export default function Feed({ locale, categories, leaders, feed, filters }) {
     const t = dictionary(locale);
     const access = useCommunityAccess();
     const activeSort = filters.sort || 'for_you';
-    const visit = (sort) => router.get(path(locale), { sort });
+    const visit = (sort) => {
+        if (activeSort === sort) return;
+        router.get(
+            path(locale),
+            sort === 'for_you' ? {} : { sort },
+            {
+                preserveScroll: true,
+                preserveState: true,
+            }
+        );
+    };
 
     return <Layout locale={locale} categories={categories} leaders={leaders} searchPosts={feed.data} active="home">
         <PageHead title={t.home} locale={locale} description={t.feedDescription} />
@@ -22,7 +32,7 @@ export default function Feed({ locale, categories, leaders, feed, filters }) {
         </section>
         <div className="vt-feed-toolbar vm-feed-toolbar">
             <div className="vt-tabs vm-tabs" role="group" aria-label={t.rankings}>
-                {['for_you', 'popular', 'latest'].map(sort => <button key={sort} className={activeSort === sort ? 'active' : ''} onClick={() => visit(sort)}>{sort === 'for_you' ? t.forYou : t[sort]}</button>)}
+                {['for_you', 'popular', 'latest'].map(sort => <button key={sort} type="button" className={activeSort === sort ? 'active' : ''} onClick={() => visit(sort)}>{sort === 'for_you' ? t.forYou : t[sort]}</button>)}
                 <Link className="vt-global-tab" href={path(locale, '/explore')}>{locale === 'id' ? 'Peringkat Global' : 'Global Rankings'}</Link>
             </div>
         </div>

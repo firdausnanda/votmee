@@ -26,9 +26,9 @@ export default function Explore({ locale, categories, leaders, feed, filters, ob
         <div className="vx-explore">
             <h1 className="vm-sr-only">{t.explore}</h1>
             <nav className="vx-category-rail" aria-label={isId ? 'Jelajahi berdasarkan kategori' : 'Browse by category'}>
-                <Link href={exploreUrl({ category_id: null })} className={!activeCategory ? 'is-active' : ''} aria-current={!activeCategory ? 'page' : undefined}>{isId ? 'Semua topik' : 'All topics'}</Link>
-                {categories.map((category) => <Link key={category.id} href={exploreUrl({ category_id: category.id })} className={activeCategory?.id === category.id ? 'is-active' : ''} aria-current={activeCategory?.id === category.id ? 'page' : undefined}>
-                    <span className={`vx-topic-dot vx-topic-${category.slug}`} aria-hidden="true" />{categoryHashtag(category)}
+                <Link href={exploreUrl({ category_id: null })} preserveScroll className={!activeCategory ? 'is-active' : ''} aria-current={!activeCategory ? 'page' : undefined}>{isId ? 'Semua topik' : 'All topics'}</Link>
+                {categories.map((category) => <Link key={category.id} href={exploreUrl({ category_id: category.id })} preserveScroll className={activeCategory?.id === category.id ? 'is-active' : ''} aria-current={activeCategory?.id === category.id ? 'page' : undefined}>
+                    {categoryHashtag(category)}
                 </Link>)}
             </nav>
 
@@ -36,7 +36,7 @@ export default function Explore({ locale, categories, leaders, feed, filters, ob
                 <span>{isId ? 'Menampilkan hasil untuk' : 'Showing results for'}</span>
                 {filters.q && <strong>{filters.q}</strong>}
                 {activeCategory && <strong>{categoryHashtag(activeCategory)}</strong>}
-                <Link href={path(locale, '/explore')}>{isId ? 'Hapus filter' : 'Clear filters'}</Link>
+                <Link href={path(locale, '/explore')} preserveScroll>{isId ? 'Hapus filter' : 'Clear filters'}</Link>
             </div>}
 
             {filters.q && <section className="vx-results-section" aria-labelledby="explore-objects-heading">
@@ -77,7 +77,7 @@ export default function Explore({ locale, categories, leaders, feed, filters, ob
                 <div className="vx-section-heading">
                     <div>
                         <span className="vx-section-kicker">{isId ? 'TEMUKAN LEBIH BANYAK' : 'DISCOVER MORE'}</span>
-                        <h2 id="explore-rankings-heading">{t.rankings}<span>{numberLabel(feed.total, locale)}</span></h2>
+                        <h2 id="explore-rankings-heading">{t.rankings}</h2>
                         <p>{hasActiveFilters
                             ? (isId ? 'Ranking sesuai filter Anda' : 'Rankings matching your filters')
                             : (isId ? 'Ide dan pilihan dari komunitas' : 'Ideas and picks from the community')}
@@ -86,7 +86,7 @@ export default function Explore({ locale, categories, leaders, feed, filters, ob
                 </div>
                 <nav className="vx-sort-tabs" aria-label={isId ? 'Urutkan ranking' : 'Sort rankings'}>
                     {[['for_you', isId ? 'Untukmu' : 'For you'], ['popular', isId ? 'Populer' : 'Popular'], ['latest', isId ? 'Terbaru' : 'Latest']].map(([value, label]) =>
-                        <Link key={value} href={exploreUrl({ sort: value })} className={filters.sort === value ? 'is-active' : ''} aria-current={filters.sort === value ? 'page' : undefined}>{label}</Link>)}
+                        <Link key={value} href={exploreUrl({ sort: value })} preserveScroll className={filters.sort === value ? 'is-active' : ''} aria-current={filters.sort === value ? 'page' : undefined}>{label}</Link>)}
                 </nav>
                 <div className="vt-feed-list vm-feed-list vx-explore-feed">
                     {regularPosts.length

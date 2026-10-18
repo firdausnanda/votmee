@@ -1,38 +1,64 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { api, dateLabel, dictionary, Layout, numberLabel, PageHead, path } from './Shared';
+import ReportDialog from './ReportDialog';
 
 export default function ObjectPage({ locale, categories, leaders, object, stats, rankings }) {
     const t = dictionary(locale);
     const user = usePage().props.auth?.user;
     const [reporting, setReporting] = useState(false);
-    const [reason, setReason] = useState('');
     const [message, setMessage] = useState('');
-    const [busy, setBusy] = useState(false);
+    const displayName = object.translations.find(item => item.locale === locale)?.name ?? object.canonical_name;
 
-    const report = async (event) => {
-        event.preventDefault(); setBusy(true); setMessage('');
-        try {
-            await api('/backend/reports', 'POST', { target_type: 'object', target_id: object.id, reason });
-            setReporting(false); setReason(''); setMessage(locale === 'id' ? 'Laporan terkirim.' : 'Report sent.');
-        } catch (error) { setMessage(error.message); } finally { setBusy(false); }
+    const report = async (reason) => {
+        await api('/backend/reports', 'POST', { target_type: 'object', target_id: object.id, reason });
+        setReporting(false);
+        setMessage(locale === 'id' ? 'Laporan terkirim.' : 'Report sent.');
     };
 
-    return <Layout locale={locale} categories={categories} leaders={leaders}>
+    return <Layout locale={locale} categories={categories} leaders={leaders} active="object">
         <PageHead title={object.canonical_name} locale={locale} />
-        <div className="vt-object-header"><p className="vt-eyebrow">{object.category?.name ?? t.objects}</p><h1>{object.translations.find(item => item.locale === locale)?.name ?? object.canonical_name}</h1><span className="vt-status">{object.status === 'verified' ? t.verified : t.pending}</span></div>
-        <div className="vt-object-stat-grid"><div><strong>{numberLabel(stats.supporters, locale)}</strong><span>{t.supporters}</span></div><div><strong>{numberLabel(stats.points, locale)}</strong><span>{t.points}</span></div></div>
-        {object.aliases.length > 0 && <div className="vt-object-aliases"><strong>{locale === 'id' ? 'Nama lain' : 'Also known as'}</strong><p>{object.aliases.map(item => item.alias).join(' · ')}</p></div>}
-        <div className="vt-object-actions"><button onClick={() => user ? setReporting(true) : router.visit(path(locale, '/login'))}>{t.report}</button></div>
-        {message && <p className="vt-form-message" role="status">{message}</p>}
-        <section className="vt-results-section"><div className="vt-section-heading"><h2>{t.objectRankings}</h2><span>{rankings.length}</span></div>
-            {rankings.length ? <div className="vt-simple-list">{rankings.map(post => <article key={post.id}><div><Link href={path(locale, `/ranking/${post.slug}`)}>{post.title}</Link><p>{t.createdBy} <Link href={path(locale, `/profile/${post.creator?.username}`)}>{post.creator?.name}</Link> · {dateLabel(post.published_at, locale)}</p></div><span>→</span></article>)}</div>
-                : <p className="vt-muted">{t.noRankings}</p>}
-        </section>
-        {reporting && <div className="vt-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setReporting(false); }}><form className="vt-modal" role="dialog" aria-modal="true" aria-labelledby="object-report-title" onSubmit={report}>
-            <h2 id="object-report-title">{t.report}</h2><label>{t.reportReason}<textarea minLength={10} maxLength={2000} value={reason} onChange={e => setReason(e.target.value)} required /></label>
-            {message && <p className="vt-form-message" role="alert">{message}</p>}
-            <div className="vt-modal-actions"><button type="button" onClick={() => setReporting(false)}>{t.cancel}</button><button disabled={busy}>{t.sendReport}</button></div>
-        </form></div>}
+        <div className="vdc-page vdc-object-page">
+            <div className="vdc-object-overview">
+                <header className="vdc-object-hero">
+                    <div className="vdc-object-mark" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</div>
+                    <div className="vdc-object-heading">
+                        <p className="vdc-eyebrow">{object.category?.name ?? t.objects}</p>
+                        <h1>{displayName}</h1>
+                        <span className={`vdc-status ${object.status === 'verified' ? 'is-verified' : ''}`}>
+                            {object.status === 'verified' ? t.verified : t.pending}
+                        </span>
+                    </div>
+                    {object.aliases.length > 0 && <div className="vdc-object-aliases">
+                        <strong>{locale === 'id' ? 'Nama lain' : 'Also known as'}</strong>
+                        <p>{object.aliases.map(item => item.alias).join(' · ')}</p>
+                    </div>}
+                </header>
+
+                <div className="vdc-object-summary">
+                    <dl className="vdc-object-stats">
+                        <div><dt>{t.supporters}</dt><dd>{numberLabel(stats.supporters, locale)}</dd></div>
+                        <div><dt>{t.points}</dt><dd>{numberLabel(stats.points, locale)}</dd></div>
+                    </dl>
+                    <button type="button" className="vdc-report-button" onClick={() => user ? setReporting(true) : router.visit(path(locale, '/login'))}>{t.report}</button>
+                </div>
+            </div>
+
+            {message && <p className="vt-form-message" role="status">{message}</p>}
+            <section className="vdc-results" aria-labelledby="vdc-object-rankings-title">
+                <div className="vdc-section-heading">
+                    <h2 id="vdc-object-rankings-title">{t.objectRankings}</h2>
+                    <span>{numberLabel(rankings.length, locale)}</span>
+                </div>
+                {rankings.length ? <div className="vdc-ranking-grid">
+                    {rankings.map(post => <article className="vdc-ranking-card" key={post.id}>
+                        <span className="vdc-ranking-category">{object.category?.name ?? t.rankings}</span>
+                        <h3><Link href={path(locale, `/ranking/${post.slug}`)}>{post.title}</Link></h3>
+                        <p>{t.createdBy} <Link href={path(locale, `/profile/${post.creator?.username}`)}>{post.creator?.name}</Link> · {dateLabel(post.published_at, locale)}</p>
+                    </article>)}
+                </div> : <p className="vdc-empty">{t.noRankings}</p>}
+            </section>
+        </div>
+        {reporting && <ReportDialog locale={locale} targetType="object" onClose={() => setReporting(false)} onSubmit={report} />}
     </Layout>;
 }
