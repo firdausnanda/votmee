@@ -1,16 +1,11 @@
-import GuestLayout from '@/Layouts/GuestLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 
-export default function Login({ status, canResetPassword, googleAuthError }) {
-    const locale = typeof window !== 'undefined' && window.location.pathname.startsWith('/en')
-        ? 'en'
-        : typeof window !== 'undefined' && window.location.pathname.startsWith('/id')
-            ? 'id'
-            : (typeof window !== 'undefined' && (localStorage.getItem('votmee-language') === 'en' || localStorage.getItem('votmee.locale') === 'en'))
-                ? 'en'
-                : 'id';
+export default function LoginForm({ locale, status, canResetPassword, googleAuthError, onRegister }) {
     const isId = locale === 'id';
+    const returnTo = /\/(login|register)$/.test(window.location.pathname)
+        ? `/${locale}`
+        : `${window.location.pathname}${window.location.search}`;
 
     const [showPassword, setShowPassword] = useState(false);
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -21,17 +16,15 @@ export default function Login({ status, canResetPassword, googleAuthError }) {
 
     const submit = (event) => {
         event.preventDefault();
-        post(route('login'), {
+        post(route('login', { return_to: returnTo }), {
             onFinish: () => reset('password'),
         });
     };
 
     return (
-        <GuestLayout currentLocale={locale} variant="login">
-            <Head title={isId ? 'Masuk ke Akun' : 'Log In to Account'} />
-
+        <div className="vm-auth-card">
             <div className="vm-auth-card-header">
-                <h1 className="vm-auth-title">{isId ? 'Selamat datang kembali' : 'Welcome back'}</h1>
+                <h1 id="vm-login-title" className="vm-auth-title">{isId ? 'Selamat datang kembali' : 'Welcome back'}</h1>
                 <p className="vm-auth-subtitle">
                     {isId
                         ? 'Masuk untuk melanjutkan dukungan dan ranking Anda.'
@@ -300,7 +293,7 @@ export default function Login({ status, canResetPassword, googleAuthError }) {
 
             <div className="vm-auth-divider"><span>{isId ? 'atau' : 'or'}</span></div>
 
-            <a href={route('community.google.redirect', { locale })} className="vm-google-button">
+            <a href={route('community.google.redirect', { locale, return_to: returnTo })} className="vm-google-button">
                 <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
                     <path fill="#4285F4" d="M43.6 24.5c0-1.4-.1-2.7-.4-4H24v7.6h11a9.4 9.4 0 0 1-4.1 6.2v5.1h6.6c3.9-3.6 6.1-8.8 6.1-14.9Z" />
                     <path fill="#34A853" d="M24 44c5.4 0 10-1.8 13.4-4.8l-6.6-5.1c-1.8 1.2-4.1 1.9-6.8 1.9-5.2 0-9.7-3.5-11.3-8.2H5.9v5.2A20 20 0 0 0 24 44Z" />
@@ -312,10 +305,10 @@ export default function Login({ status, canResetPassword, googleAuthError }) {
 
             <p className="vm-register-callout">
                 <span>{isId ? 'Belum punya akun?' : 'New to Votmee?'}</span>{' '}
-                <Link href={`/${locale}/register`}>
+                <button type="button" onClick={onRegister}>
                     {isId ? 'Daftar' : 'Create an account'} →
-                </Link>
+                </button>
             </p>
-        </GuestLayout>
+        </div>
     );
 }

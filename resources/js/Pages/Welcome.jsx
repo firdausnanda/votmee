@@ -435,6 +435,17 @@ const iconPaths = {
             <polyline points="2 12 12 17 22 12" />
         </>
     ),
+    refresh: (
+        <>
+            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+            <path d="M3 3v5h5" />
+            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+            <path d="M16 21h5v-5" />
+        </>
+    ),
+    flame: <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />,
+    zap: <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />,
+    sparkles: <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />,
 };
 
 function Icon({ name, size = 18, className = "" }) {
@@ -581,6 +592,126 @@ function FeedCard({ post, vote, saved, onVote, onSave, onComments, ui, language 
     );
 }
 
+function WelcomeQuickDuel({ isEn }) {
+    const [voteChoice, setVoteChoice] = useState(null);
+    const [votesA, setVotesA] = useState(58);
+    const [votesB, setVotesB] = useState(42);
+
+    const castVote = (choice) => {
+        setVoteChoice(choice);
+        if (choice === 'a') {
+            setVotesA(64);
+            setVotesB(36);
+        } else {
+            setVotesB(64);
+            setVotesA(36);
+        }
+    };
+
+    const resetVote = (e) => {
+        e.stopPropagation();
+        setVoteChoice(null);
+    };
+
+    return (
+        <section className="vm-panel vm-duel-panel" aria-labelledby="vm-welcome-duel-title">
+            <div className="vm-duel-header">
+                <span className="vm-duel-badge-label">
+                    <Icon name="zap" size={12} /> {isEn ? 'QUICK VOTE' : 'VOTE CEPAT'}
+                </span>
+                <h3 id="vm-welcome-duel-title" className="vm-duel-title">
+                    {isEn ? 'Community Faceoff' : 'Duel Pilihan Komunitas'}
+                </h3>
+                <p className="vm-duel-subtitle">
+                    {isEn ? 'Which contender gets your support?' : 'Mana jagoan favoritmu minggu ini?'}
+                </p>
+            </div>
+            <div className="vm-duel-arena">
+                <div className={`vm-duel-card ${voteChoice === 'a' ? 'voted' : ''}`}>
+                    <Link
+                        href={`/${isEn ? 'en' : 'id'}/object/samsung-galaxy-a26`}
+                        className="vm-duel-avatar-link"
+                        title={`${isEn ? 'View details' : 'Lihat detail'} Samsung Galaxy A26`}
+                    >
+                        <span className="vm-duel-avatar" aria-hidden="true">
+                            S
+                        </span>
+                    </Link>
+                    <strong className="vm-duel-name">
+                        <Link
+                            href={`/${isEn ? 'en' : 'id'}/object/samsung-galaxy-a26`}
+                            title={`${isEn ? 'View details' : 'Lihat detail'} Samsung Galaxy A26`}
+                        >
+                            Samsung Galaxy A26
+                        </Link>
+                    </strong>
+                    <button
+                        type="button"
+                        className="vm-duel-btn"
+                        onClick={() => castVote('a')}
+                    >
+                        {voteChoice === 'a' ? (
+                            <><Icon name="check" size={12} /> {isEn ? 'Supported' : 'Didukung'}</>
+                        ) : (
+                            <>{isEn ? 'Support' : 'Dukung'}</>
+                        )}
+                    </button>
+                </div>
+                <div className="vm-duel-vs" aria-hidden="true">VS</div>
+                <div className={`vm-duel-card ${voteChoice === 'b' ? 'voted' : ''}`}>
+                    <Link
+                        href={`/${isEn ? 'en' : 'id'}/object/iphone-16`}
+                        className="vm-duel-avatar-link"
+                        title={`${isEn ? 'View details' : 'Lihat detail'} iPhone 16`}
+                    >
+                        <span className="vm-duel-avatar" aria-hidden="true" style={{ background: '#fff7ed', color: '#c2410c' }}>
+                            I
+                        </span>
+                    </Link>
+                    <strong className="vm-duel-name">
+                        <Link
+                            href={`/${isEn ? 'en' : 'id'}/object/iphone-16`}
+                            title={`${isEn ? 'View details' : 'Lihat detail'} iPhone 16`}
+                        >
+                            iPhone 16
+                        </Link>
+                    </strong>
+                    <button
+                        type="button"
+                        className="vm-duel-btn"
+                        onClick={() => castVote('b')}
+                    >
+                        {voteChoice === 'b' ? (
+                            <><Icon name="check" size={12} /> {isEn ? 'Supported' : 'Didukung'}</>
+                        ) : (
+                            <>{isEn ? 'Support' : 'Dukung'}</>
+                        )}
+                    </button>
+                </div>
+            </div>
+            {voteChoice ? (
+                <div className="vm-duel-result-wrap">
+                    <div className="vm-duel-bar-track">
+                        <div className="vm-duel-bar-a" style={{ width: `${votesA}%` }} />
+                        <div className="vm-duel-bar-b" style={{ width: `${votesB}%` }} />
+                    </div>
+                    <div className="vm-duel-stats">
+                        <span style={{ color: '#1044bb' }}>{votesA}% suara</span>
+                        <button type="button" onClick={resetVote} style={{ border: 0, background: 'transparent', color: '#64748b', fontSize: '10px', cursor: 'pointer', textDecoration: 'none' }}>
+                            {isEn ? 'Change vote' : 'Ganti pilihan'}
+                        </button>
+                        <span style={{ color: '#d97706' }}>{votesB}% suara</span>
+                    </div>
+                </div>
+            ) : (
+                <p style={{ margin: '4px 0 0', textAlign: 'center', fontSize: '10.5px', color: '#94a3b8' }}>
+                    {isEn ? 'Click support to see live results!' : 'Klik tombol dukung untuk melihat hasil langsung!'}
+                </p>
+            )}
+        </section>
+    );
+}
+
 export default function Welcome({ auth }) {
     const [language, setLanguage] = useState(() => {
         if (typeof window === "undefined") return "id";
@@ -602,6 +733,7 @@ export default function Welcome({ auth }) {
     const [votes, setVotes] = useState({});
     const [saved, setSaved] = useState([]);
     const [joined, setJoined] = useState([]);
+    const [commTab, setCommTab] = useState("comments");
     const [notice, setNotice] = useState("");
     const feedRef = useRef(null);
     const ui = translations[language];
@@ -1038,7 +1170,20 @@ export default function Welcome({ auth }) {
                         aria-label={ui.communitySummary}
                     >
                         <section className="vm-panel">
-                            <h2>{ui.rankingPanel}</h2>
+                            <div className="vm-panel-header-interactive">
+                                <h2>
+                                    <Icon name="trophy" size={17} />
+                                    {ui.rankingPanel}
+                                </h2>
+                                <button
+                                    type="button"
+                                    className="vm-panel-refresh-btn"
+                                    aria-label="Refresh ranking"
+                                    onClick={() => showNotice("Data ranking diperbarui")}
+                                >
+                                    <Icon name="refresh" size={14} />
+                                </button>
+                            </div>
                             <div
                                 className="vm-periods"
                                 aria-label={ui.rankingPeriod}
@@ -1060,33 +1205,55 @@ export default function Welcome({ auth }) {
                                 )}
                             </div>
                             <ol className="vm-leader-list">
-                                {leaders.map(
-                                    ([name, count, change, up], index) => (
-                                        <li key={name}>
-                                            <span
-                                                className={`vm-leader-position vm-position-${index + 1}`}
-                                            >
-                                                {index + 1}
-                                            </span>
-                                            <img
-                                                src={`/images/stitch/object-${index + 1}.jpg`}
-                                                alt=""
-                                            />
-                                            <span className="vm-leader-name">
-                                                <strong>{name}</strong>
-                                                <small>
-                                                    {count} {ui.supporters}
-                                                </small>
-                                            </span>
-                                            <span
-                                                className={
-                                                    up ? "vm-up" : "vm-down"
-                                                }
-                                            >
-                                                {up ? "▲" : "▼"} {change}
-                                            </span>
-                                        </li>
-                                    ),
+                                {leaders.slice(0, 5).map(
+                                    ([name, count, change, up], index) => {
+                                        const rankNumber = index + 1;
+                                        const rankClass = rankNumber === 1
+                                            ? 'vm-leader-rank-badge vm-leader-rank-1'
+                                            : rankNumber === 2
+                                                ? 'vm-leader-rank-badge vm-leader-rank-2'
+                                                : rankNumber === 3
+                                                    ? 'vm-leader-rank-badge vm-leader-rank-3'
+                                                    : 'vm-leader-rank-badge vm-leader-rank-other';
+                                        const scoreRatio = Math.max(20, Math.min(100, Math.round(100 - index * 16)));
+
+                                        return (
+                                            <li key={name} className="vm-leader-interactive-item">
+                                                <span className={rankClass}>
+                                                    {rankNumber}
+                                                </span>
+                                                <Link
+                                                    href={`/${language}/object/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`}
+                                                    tabIndex={-1}
+                                                    aria-hidden="true"
+                                                >
+                                                    <img
+                                                        src={`/images/stitch/object-${index + 1}.jpg`}
+                                                        alt=""
+                                                        style={{ width: '40px', height: '40px', borderRadius: '9px', objectFit: 'cover' }}
+                                                    />
+                                                </Link>
+                                                <span className="vm-leader-name">
+                                                    <strong>
+                                                        <Link href={`/${language}/object/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`}>
+                                                            {name}
+                                                        </Link>
+                                                    </strong>
+                                                    <small>
+                                                        {count} {ui.supporters}
+                                                    </small>
+                                                    <div className="vm-leader-progress-wrap" aria-hidden="true">
+                                                        <div className="vm-leader-progress-bar" style={{ width: `${scoreRatio}%` }} />
+                                                    </div>
+                                                </span>
+                                                <span
+                                                    className={`vm-trend-pill ${up ? 'vm-trend-up' : 'vm-trend-hot'}`}
+                                                >
+                                                    {up ? '▲' : '▼'} {change}
+                                                </span>
+                                            </li>
+                                        );
+                                    },
                                 )}
                             </ol>
                             <button
@@ -1103,87 +1270,156 @@ export default function Welcome({ auth }) {
                                 <Icon name="arrow" size={14} />
                             </button>
                         </section>
-                        <section className="vm-panel">
-                            <h2>{ui.weeklyCategories}</h2>
-                            <ol className="vm-top-categories">
-                                {topCategories.map(([name, count], index) => (
-                                    <li key={name}>
-                                        <img
-                                            src={`/images/stitch/category-${index + 1}.jpg`}
-                                            alt=""
-                                        />
-                                        <span>
-                                            <strong>
-                                                {ui.categories[name]}
-                                            </strong>
-                                            <small>{count} ranking</small>
-                                        </span>
-                                    </li>
-                                ))}
-                            </ol>
-                            <button
-                                type="button"
-                                className="vm-panel-link"
-                                onClick={() => {
-                                    setCategory("Semua Kategori");
-                                    feedRef.current?.scrollIntoView({
-                                        behavior: "smooth",
-                                    });
-                                }}
-                            >
-                                {ui.viewCategories}{" "}
-                                <Icon name="arrow" size={14} />
-                            </button>
-                        </section>
-                        <section className="vm-panel">
-                            <div className="vm-panel-heading">
-                                <h2>{ui.activeCommunities}</h2>
+                        <WelcomeQuickDuel isEn={language === 'en'} />
+                        <section className="vm-panel vm-comm-panel" aria-labelledby="vm-communities-title">
+                            <div className="vm-comm-header">
+                                <h2 id="vm-communities-title">
+                                    <Icon name="users" size={16} />
+                                    {language === 'en' ? 'Votmee Community' : 'Komunitas Votmee'}
+                                </h2>
+                                <span className="vm-comm-status-pill">
+                                    <span className="vm-comm-status-dot" />
+                                    <span>Live</span>
+                                </span>
+                            </div>
+
+                            <div className="vm-comm-tabs">
                                 <button
                                     type="button"
-                                    onClick={() =>
-                                        showNotice(ui.communitiesSoon)
-                                    }
+                                    className={commTab === 'comments' ? 'active' : ''}
+                                    onClick={() => setCommTab('comments')}
                                 >
-                                    {ui.viewAll}
+                                    <Icon name="comment" size={13} />
+                                    {language === 'en' ? 'Recent Comments' : 'Komentar Terbaru'}
+                                </button>
+                                <button
+                                    type="button"
+                                    className={commTab === 'discussions' ? 'active' : ''}
+                                    onClick={() => setCommTab('discussions')}
+                                >
+                                    <Icon name="flame" size={13} />
+                                    {language === 'en' ? 'Rangking' : 'Rangking'}
                                 </button>
                             </div>
-                            <ul className="vm-community-list">
-                                {communities.map(
-                                    ([emoji, name, count], index) => (
-                                        <li key={name}>
-                                            <span className="vm-community-emoji">
-                                                {emoji}
-                                            </span>
-                                            <span>
-                                                <strong>
-                                                    {ui.communities[name]}
-                                                </strong>
-                                                <small>
-                                                    {count.replace(
-                                                        "anggota",
-                                                        ui.members,
-                                                    )}
-                                                </small>
-                                            </span>
-                                            <button
-                                                type="button"
-                                                className={
-                                                    joined.includes(index)
-                                                        ? "joined"
-                                                        : ""
-                                                }
-                                                onClick={() =>
-                                                    toggleJoined(index)
-                                                }
+
+                            {commTab === 'comments' ? (
+                                <ul className="vm-comm-list vm-comm-comments-list">
+                                    {(language === 'en' ? [
+                                        {
+                                            id: 'wc1',
+                                            name: 'Galih Pratama',
+                                            username: '@galihpratama',
+                                            body: 'Battery and temps are super stable for all-day gaming, totally worth it!',
+                                            time: '35m ago',
+                                            target: 'Best Gaming Smartphones in 2026',
+                                            slug: 'smartphone-terbaik-di-2026-untuk-gaming',
+                                        },
+                                        {
+                                            id: 'wc2',
+                                            name: 'Safira Andini',
+                                            username: '@safirandini',
+                                            body: 'The sunrise at Mount Bromo is truly breathtaking, definitely bucket list material!',
+                                            time: '3h ago',
+                                            target: 'Best Nature Destinations in Indonesia',
+                                            slug: 'destinasi-wisata-alam-terbaik-di-indonesia',
+                                        },
+                                        {
+                                            id: 'wc3',
+                                            name: 'Raditya Kurniawan',
+                                            username: '@radityakrn',
+                                            body: 'The curry broth and satay in Blok M is unbeaten late at night.',
+                                            time: '7h ago',
+                                            target: 'Best Late-Night Food in Jakarta',
+                                            slug: 'kuliner-malam-terbaik-di-jakarta',
+                                        },
+                                    ] : [
+                                        {
+                                            id: 'wc1',
+                                            name: 'Galih Pratama',
+                                            username: '@galihpratama',
+                                            body: 'Baterai dan suhunya stabil banget buat gaming seharian, worth it!',
+                                            time: '35m lalu',
+                                            target: 'Smartphone Terbaik di 2026 untuk Gaming',
+                                            slug: 'smartphone-terbaik-di-2026-untuk-gaming',
+                                        },
+                                        {
+                                            id: 'wc2',
+                                            name: 'Safira Andini',
+                                            username: '@safirandini',
+                                            body: 'Pemandangan sunrise di Bromo beneran magis, wajib masuk bucket list!',
+                                            time: '3j lalu',
+                                            target: 'Destinasi Wisata Alam Terbaik di Indonesia',
+                                            slug: 'destinasi-wisata-alam-terbaik-di-indonesia',
+                                        },
+                                        {
+                                            id: 'wc3',
+                                            name: 'Raditya Kurniawan',
+                                            username: '@radityakrn',
+                                            body: 'Kuah gulai di Blok M emang paling juara kalau malam-malam.',
+                                            time: '7j lalu',
+                                            target: 'Kuliner Malam Terbaik di Jakarta',
+                                            slug: 'kuliner-malam-terbaik-di-jakarta',
+                                        },
+                                    ]).map((comment) => (
+                                        <li key={comment.id} className="vm-comm-comment-item">
+                                            <Link
+                                                href={`/${language}/ranking/${comment.slug}`}
+                                                className="vm-comm-comment-link"
                                             >
-                                                {joined.includes(index)
-                                                    ? ui.joined
-                                                    : ui.join}
-                                            </button>
+                                                <div className="vm-comm-comment-top">
+                                                    <span className="vm-comm-comment-avatar" aria-hidden="true">
+                                                        {comment.name.slice(0, 1).toUpperCase()}
+                                                    </span>
+                                                    <div className="vm-comm-comment-user">
+                                                        <strong className="vm-comm-comment-name">{comment.name}</strong>
+                                                        <small className="vm-comm-comment-username">{comment.username}</small>
+                                                    </div>
+                                                    <span className="vm-comm-comment-time">
+                                                        {comment.time}
+                                                    </span>
+                                                </div>
+                                                <p className="vm-comm-comment-text">"{comment.body}"</p>
+                                                <div className="vm-comm-comment-target">
+                                                    <span className="vm-comm-comment-target-badge" title={comment.target}>
+                                                        ↳ {comment.target}
+                                                    </span>
+                                                </div>
+                                            </Link>
                                         </li>
-                                    ),
-                                )}
-                            </ul>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <div className="vm-comm-list">
+                                    {visiblePosts.slice(0, 4).map((post) => (
+                                        <Link
+                                            key={post.id}
+                                            href={`/${language}/ranking/${post.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`}
+                                            className="vm-comm-disc-item"
+                                        >
+                                            <span className="vm-comm-disc-avatar" aria-hidden="true">
+                                                {post.title.slice(0, 1).toUpperCase()}
+                                            </span>
+                                            <span className="vm-comm-info">
+                                                <strong className="vm-comm-name">{post.title}</strong>
+                                                <small className="vm-comm-meta">{post.category}</small>
+                                            </span>
+                                            <span className="vm-comm-comment-count">
+                                                <Icon name="comment" size={11} />
+                                                {post.comments}
+                                            </span>
+                                        </Link>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className="vm-comm-footer">
+                                <Link
+                                    href={`/${language}/explore`}
+                                    style={{ border: 0, background: 'transparent', padding: 0, textDecoration: 'none' }}
+                                >
+                                    {language === 'en' ? 'View all activity' : 'Lihat semua aktivitas'} →
+                                </Link>
+                            </div>
                         </section>
                     </aside>
                 </div>

@@ -1,13 +1,10 @@
-import DangerButton from '@/Components/DangerButton';
-import InputError from '@/Components/InputError';
-import InputLabel from '@/Components/InputLabel';
-import Modal from '@/Components/Modal';
-import SecondaryButton from '@/Components/SecondaryButton';
-import TextInput from '@/Components/TextInput';
+import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { useForm } from '@inertiajs/react';
 import { useRef, useState } from 'react';
+import { NavIcon } from '../../Community/Shared';
 
-export default function DeleteUserForm({ className = '' }) {
+export default function DeleteUserForm({ locale = 'id' }) {
+    const isId = locale === 'id';
     const [confirmingUserDeletion, setConfirmingUserDeletion] = useState(false);
     const passwordInput = useRef();
 
@@ -33,88 +30,118 @@ export default function DeleteUserForm({ className = '' }) {
         destroy(route('profile.destroy'), {
             preserveScroll: true,
             onSuccess: () => closeModal(),
-            onError: () => passwordInput.current.focus(),
+            onError: () => passwordInput.current?.focus(),
             onFinish: () => reset(),
         });
     };
 
     const closeModal = () => {
         setConfirmingUserDeletion(false);
-
         clearErrors();
         reset();
     };
 
     return (
-        <section className={`space-y-6 ${className}`}>
-            <header>
-                <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                    Delete Account
-                </h2>
-
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Once your account is deleted, all of its resources and data
-                    will be permanently deleted. Before deleting your account,
-                    please download any data or information that you wish to
-                    retain.
-                </p>
+        <section className="vst-card vst-card-danger">
+            <header className="vst-card-header">
+                <div className="vst-card-heading">
+                    <h2 className="vst-card-title">
+                        {isId ? 'Zona Bahaya: Hapus Akun' : 'Danger Zone: Delete Account'}
+                    </h2>
+                    <p className="vst-card-desc">
+                        {isId
+                            ? 'Penghapusan akun bersifat permanen dan tidak dapat dibatalkan.'
+                            : 'Deleting your account is permanent and cannot be undone.'}
+                    </p>
+                </div>
             </header>
 
-            <DangerButton onClick={confirmUserDeletion}>
-                Delete Account
-            </DangerButton>
+            <div className="vst-danger-banner">
+                <p style={{ margin: 0 }}>
+                    {isId
+                        ? 'Setelah akun Anda dihapus, semua data profil, riwayat peringkat, dan dukungan yang pernah Anda berikan akan dibersihkan dari sistem. Pastikan Anda telah mempertimbangkan keputusan ini secara matang.'
+                        : 'Once your account is deleted, all profile data, ranking submissions, and support history will be permanently wiped. Please ensure you are certain before proceeding.'}
+                </p>
+            </div>
 
-            <Modal show={confirmingUserDeletion} onClose={closeModal}>
-                <form onSubmit={deleteUser} className="p-6">
-                    <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                        Are you sure you want to delete your account?
-                    </h2>
+            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                <button
+                    type="button"
+                    onClick={confirmUserDeletion}
+                    className="vst-btn-danger"
+                >
+                    <NavIcon name="trash" size={14} />
+                    <span>{isId ? 'Hapus Akun Saya' : 'Delete My Account'}</span>
+                </button>
+            </div>
 
-                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        Once your account is deleted, all of its resources and
-                        data will be permanently deleted. Please enter your
-                        password to confirm you would like to permanently delete
-                        your account.
-                    </p>
+            <Dialog
+                open={confirmingUserDeletion}
+                onClose={closeModal}
+                className="vst-modal-overlay"
+            >
+                <div className="vst-modal-backdrop" aria-hidden="true" />
 
-                    <div className="mt-6">
-                        <InputLabel
-                            htmlFor="password"
-                            value="Password"
-                            className="sr-only"
-                        />
+                <DialogPanel className="vst-modal-panel">
+                    <form onSubmit={deleteUser}>
+                        <div className="vst-modal-header">
+                            <div className="vst-modal-icon" aria-hidden="true">
+                                <NavIcon name="alertTriangle" size={22} />
+                            </div>
+                            <div>
+                                <DialogTitle className="vst-modal-title">
+                                    {isId ? 'Konfirmasi Penghapusan Akun' : 'Confirm Account Deletion'}
+                                </DialogTitle>
+                                <p className="vst-modal-desc">
+                                    {isId
+                                        ? 'Apakah Anda yakin ingin menghapus akun Anda? Masukkan kata sandi akun Anda untuk memverifikasi tindakan ini.'
+                                        : 'Are you sure you want to delete your account? Please enter your password to confirm this action.'}
+                                </p>
+                            </div>
+                        </div>
 
-                        <TextInput
-                            id="password"
-                            type="password"
-                            name="password"
-                            ref={passwordInput}
-                            value={data.password}
-                            onChange={(e) =>
-                                setData('password', e.target.value)
-                            }
-                            className="mt-1 block w-3/4"
-                            isFocused
-                            placeholder="Password"
-                        />
+                        <div className="vst-field" style={{ marginTop: 16 }}>
+                            <label htmlFor="confirm_password" className="vst-label">
+                                <span>{isId ? 'Kata Sandi Akun' : 'Account Password'}</span>
+                            </label>
+                            <input
+                                id="confirm_password"
+                                type="password"
+                                ref={passwordInput}
+                                value={data.password}
+                                onChange={(e) => setData('password', e.target.value)}
+                                className={`vst-input ${errors.password ? 'has-error' : ''}`}
+                                placeholder="••••••••"
+                                autoFocus
+                                required
+                            />
+                            {errors.password && (
+                                <p className="vst-error" role="alert">{errors.password}</p>
+                            )}
+                        </div>
 
-                        <InputError
-                            message={errors.password}
-                            className="mt-2"
-                        />
-                    </div>
+                        <div className="vst-modal-footer">
+                            <button
+                                type="button"
+                                className="vst-btn-cancel"
+                                onClick={closeModal}
+                                disabled={processing}
+                            >
+                                {isId ? 'Batal' : 'Cancel'}
+                            </button>
 
-                    <div className="mt-6 flex justify-end">
-                        <SecondaryButton onClick={closeModal}>
-                            Cancel
-                        </SecondaryButton>
-
-                        <DangerButton className="ms-3" disabled={processing}>
-                            Delete Account
-                        </DangerButton>
-                    </div>
-                </form>
-            </Modal>
+                            <button
+                                type="submit"
+                                className="vst-btn-danger"
+                                disabled={processing}
+                            >
+                                <NavIcon name="trash" size={14} />
+                                <span>{processing ? (isId ? 'Menghapus...' : 'Deleting...') : (isId ? 'Ya, Hapus Akun' : 'Yes, Delete Account')}</span>
+                            </button>
+                        </div>
+                    </form>
+                </DialogPanel>
+            </Dialog>
         </section>
     );
 }

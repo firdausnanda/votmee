@@ -12,6 +12,7 @@ export default function ReportDialog({ locale, targetType, onClose, onSubmit }) 
         ranking_post: 'ranking',
         comment: isId ? 'komentar' : 'comment',
         object: isId ? 'objek' : 'object',
+        object_article: isId ? 'artikel' : 'article',
     }[targetType];
     const reasons = [
         isId ? 'Informasi menyesatkan' : 'Misleading information',

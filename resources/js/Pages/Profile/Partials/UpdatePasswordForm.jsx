@@ -1,12 +1,10 @@
-import InputError from '@/Components/InputError';
-import InputLabel from '@/Components/InputLabel';
-import PrimaryButton from '@/Components/PrimaryButton';
-import TextInput from '@/Components/TextInput';
 import { Transition } from '@headlessui/react';
 import { useForm } from '@inertiajs/react';
 import { useRef } from 'react';
+import { NavIcon } from '../../Community/Shared';
 
-export default function UpdatePasswordForm({ className = '' }) {
+export default function UpdatePasswordForm({ locale = 'id' }) {
+    const isId = locale === 'id';
     const passwordInput = useRef();
     const currentPasswordInput = useRef();
 
@@ -30,111 +28,124 @@ export default function UpdatePasswordForm({ className = '' }) {
         put(route('password.update'), {
             preserveScroll: true,
             onSuccess: () => reset(),
-            onError: (errors) => {
-                if (errors.password) {
+            onError: (errs) => {
+                if (errs.password) {
                     reset('password', 'password_confirmation');
-                    passwordInput.current.focus();
+                    passwordInput.current?.focus();
                 }
 
-                if (errors.current_password) {
+                if (errs.current_password) {
                     reset('current_password');
-                    currentPasswordInput.current.focus();
+                    currentPasswordInput.current?.focus();
                 }
             },
         });
     };
 
     return (
-        <section className={className}>
-            <header>
-                <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                    Update Password
-                </h2>
-
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Ensure your account is using a long, random password to stay
-                    secure.
-                </p>
+        <section className="vst-card">
+            <header className="vst-card-header">
+                <div className="vst-card-heading">
+                    <h2 className="vst-card-title">
+                        {isId ? 'Perbarui Kata Sandi' : 'Update Password'}
+                    </h2>
+                    <p className="vst-card-desc">
+                        {isId
+                            ? 'Pastikan akun Anda menggunakan kata sandi yang kuat dan tidak digunakan di layanan lain.'
+                            : 'Ensure your account is using a long, secure password to stay protected.'}
+                    </p>
+                </div>
             </header>
 
-            <form onSubmit={updatePassword} className="mt-6 space-y-6">
-                <div>
-                    <InputLabel
-                        htmlFor="current_password"
-                        value="Current Password"
-                    />
-
-                    <TextInput
+            <form onSubmit={updatePassword} className="vst-form">
+                <div className="vst-field">
+                    <label htmlFor="current_password" className="vst-label">
+                        <span>{isId ? 'Kata Sandi Saat Ini' : 'Current Password'} <span className="vst-label-req">*</span></span>
+                    </label>
+                    <input
                         id="current_password"
                         ref={currentPasswordInput}
                         value={data.current_password}
-                        onChange={(e) =>
-                            setData('current_password', e.target.value)
-                        }
+                        onChange={(e) => setData('current_password', e.target.value)}
                         type="password"
-                        className="mt-1 block w-full"
+                        className={`vst-input ${errors.current_password ? 'has-error' : ''}`}
                         autoComplete="current-password"
+                        placeholder="••••••••"
+                        required
                     />
-
-                    <InputError
-                        message={errors.current_password}
-                        className="mt-2"
-                    />
+                    {errors.current_password && (
+                        <p className="vst-error" role="alert">{errors.current_password}</p>
+                    )}
                 </div>
 
-                <div>
-                    <InputLabel htmlFor="password" value="New Password" />
-
-                    <TextInput
+                <div className="vst-field">
+                    <label htmlFor="password" className="vst-label">
+                        <span>{isId ? 'Kata Sandi Baru' : 'New Password'} <span className="vst-label-req">*</span></span>
+                    </label>
+                    <input
                         id="password"
                         ref={passwordInput}
                         value={data.password}
                         onChange={(e) => setData('password', e.target.value)}
                         type="password"
-                        className="mt-1 block w-full"
+                        className={`vst-input ${errors.password ? 'has-error' : ''}`}
                         autoComplete="new-password"
+                        placeholder="••••••••"
+                        required
                     />
-
-                    <InputError message={errors.password} className="mt-2" />
+                    {errors.password && (
+                        <p className="vst-error" role="alert">{errors.password}</p>
+                    )}
+                    <p className="vst-hint">
+                        {isId
+                            ? 'Gunakan minimal 8 karakter dengan kombinasi huruf, angka, atau simbol.'
+                            : 'Use at least 8 characters with a mix of letters, numbers, or symbols.'}
+                    </p>
                 </div>
 
-                <div>
-                    <InputLabel
-                        htmlFor="password_confirmation"
-                        value="Confirm Password"
-                    />
-
-                    <TextInput
+                <div className="vst-field">
+                    <label htmlFor="password_confirmation" className="vst-label">
+                        <span>{isId ? 'Konfirmasi Kata Sandi Baru' : 'Confirm New Password'} <span className="vst-label-req">*</span></span>
+                    </label>
+                    <input
                         id="password_confirmation"
                         value={data.password_confirmation}
-                        onChange={(e) =>
-                            setData('password_confirmation', e.target.value)
-                        }
+                        onChange={(e) => setData('password_confirmation', e.target.value)}
                         type="password"
-                        className="mt-1 block w-full"
+                        className={`vst-input ${errors.password_confirmation ? 'has-error' : ''}`}
                         autoComplete="new-password"
+                        placeholder="••••••••"
+                        required
                     />
-
-                    <InputError
-                        message={errors.password_confirmation}
-                        className="mt-2"
-                    />
+                    {errors.password_confirmation && (
+                        <p className="vst-error" role="alert">{errors.password_confirmation}</p>
+                    )}
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <PrimaryButton disabled={processing}>Save</PrimaryButton>
-
+                <div className="vst-card-footer">
                     <Transition
                         show={recentlySuccessful}
-                        enter="transition ease-in-out"
-                        enterFrom="opacity-0"
-                        leave="transition ease-in-out"
+                        enter="transition ease-in-out duration-300"
+                        enterFrom="opacity-0 translate-y-1"
+                        enterTo="opacity-100 translate-y-0"
+                        leave="transition ease-in-out duration-200"
+                        leaveFrom="opacity-100"
                         leaveTo="opacity-0"
                     >
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Saved.
-                        </p>
+                        <span className="vst-feedback-success" role="status">
+                            <NavIcon name="check" size={14} />
+                            <span>{isId ? 'Kata sandi diperbarui' : 'Password updated'}</span>
+                        </span>
                     </Transition>
+
+                    <button
+                        type="submit"
+                        className="vst-btn-save"
+                        disabled={processing}
+                    >
+                        <NavIcon name="lock" size={14} />
+                        <span>{processing ? (isId ? 'Memperbarui...' : 'Updating...') : (isId ? 'Perbarui Kata Sandi' : 'Update Password')}</span>
+                    </button>
                 </div>
             </form>
         </section>

@@ -12,19 +12,9 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
-use Inertia\Inertia;
-use Inertia\Response;
 
 class RegisteredUserController extends Controller
 {
-    /**
-     * Display the registration view.
-     */
-    public function create(): Response
-    {
-        return Inertia::render('Auth/Register');
-    }
-
     /**
      * Handle an incoming registration request.
      *
@@ -49,6 +39,15 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        return redirect(route('dashboard', absolute: false));
+        $returnTo = $request->query('return_to');
+        $fallback = is_string($returnTo)
+            && str_starts_with($returnTo, '/')
+            && ! str_starts_with($returnTo, '//')
+            && ! str_contains($returnTo, '\\')
+            && ! preg_match('/[\x00-\x1F]/', $returnTo)
+                ? $returnTo
+                : route('dashboard', absolute: false);
+
+        return redirect()->intended($fallback);
     }
 }

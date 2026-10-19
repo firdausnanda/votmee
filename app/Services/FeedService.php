@@ -31,7 +31,7 @@ class FeedService
             ->when($filters['category_id'] ?? null, fn ($query, $id) => $query->where('category_id', $id));
 
         if (($filters['sort'] ?? 'latest') === 'popular') {
-            $query->orderByDesc('support_points')->orderByDesc('published_at');
+            $query->orderByDesc('support_points')->orderByDesc('published_at')->orderByDesc('ranking_posts.id');
         } else {
             if (($filters['sort'] ?? 'for_you') === 'for_you' && isset($filters['language_code'])) {
                 $query->orderByRaw('CASE WHEN language_code = ? THEN 0 ELSE 1 END', [$filters['language_code']]);
@@ -41,7 +41,7 @@ class FeedService
                 $query->orderByRaw('CASE WHEN region_code = ? OR region_code = ? THEN 0 ELSE 1 END', [$filters['region_code'], 'GLOBAL']);
             }
 
-            $query->orderByDesc('published_at');
+            $query->orderByDesc('published_at')->orderByDesc('ranking_posts.id');
         }
 
         $feed = $query->paginate(20);

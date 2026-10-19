@@ -1,6 +1,7 @@
 import { router } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import AdminLayout from '@/Layouts/AdminLayout';
+import ContentBody from './ContentBody';
 import { api, dictionary, PaginationLinks } from './Shared';
 
 export default function Admin({
@@ -8,6 +9,7 @@ export default function Admin({
     categories = [],
     leaders = [],
     objects,
+    contentQueue,
     reports,
     mergedObjects = [],
     isAdmin = false,
@@ -37,6 +39,7 @@ export default function Admin({
 
     const computedStats = {
         pendingObjects: stats.pendingObjects ?? objects?.total ?? 0,
+        pendingContent: contentQueue?.total ?? 0,
         openReports: stats.openReports ?? reports?.total ?? 0,
         verifiedObjects: stats.verifiedObjects ?? 0,
         totalCategories: stats.totalCategories ?? categories.length,
@@ -50,6 +53,10 @@ export default function Admin({
         objects: {
             title: isId ? 'Antrean objek' : 'Object queue',
             description: isId ? 'Tinjau objek yang diajukan pengguna.' : 'Review objects submitted by users.',
+        },
+        content: {
+            title: isId ? 'Antrean tulisan' : 'Content queue',
+            description: isId ? 'Tinjau ringkasan dan artikel dari pengguna.' : 'Review user summaries and articles.',
         },
         reports: {
             title: isId ? 'Laporan konten' : 'Content reports',
@@ -155,6 +162,27 @@ export default function Admin({
         }
     };
 
+    const reviewContent = async (revision, status) => {
+        if (reason.trim().length < 5) {
+            setMessage(isId ? 'Alasan tindakan minimal 5 karakter.' : 'Reason must be at least 5 characters.');
+            setMessageType('error');
+            return;
+        }
+        setBusy(true);
+        try {
+            await api(`/admin/backend/content-revisions/${revision.id}`, 'PATCH', { status, reason });
+            setReason('');
+            setMessage(isId ? 'Tulisan berhasil ditinjau.' : 'Content reviewed.');
+            setMessageType('success');
+            router.reload();
+        } catch (error) {
+            setMessage(error.message);
+            setMessageType('error');
+        } finally {
+            setBusy(false);
+        }
+    };
+
     const hideTarget = async (report) => {
         if (reason.trim().length < 5) {
             setMessage(isId ? 'Alasan tindakan minimal 5 karakter.' : 'Reason must be at least 5 characters.');
@@ -164,6 +192,8 @@ export default function Admin({
         const endpoint =
             report.target_type === 'ranking_post'
                 ? `/admin/backend/rankings/${report.target_id}/hide`
+                : report.target_type === 'object_article'
+                ? `/admin/backend/articles/${report.target_id}/hide`
                 : report.target_type === 'comment'
                 ? `/admin/backend/comments/${report.target_id}/hide`
                 : `/admin/backend/objects/${report.target_id}`;
@@ -303,7 +333,7 @@ export default function Admin({
                     </div>
                 </div>}
 
-                {['objects', 'reports', 'master'].includes(activeTab) && <div className="vap-reason-card">
+                {['objects', 'content', 'reports', 'master'].includes(activeTab) && <div className="vap-reason-card">
                     <div className="vap-reason-header">
                         <div className="vap-reason-title-row">
                             <span className="vap-reason-icon">
@@ -421,7 +451,6 @@ export default function Admin({
                                                     <th>{isId ? 'Nama Objek' : 'Canonical Name'}</th>
                                                     <th>ID</th>
                                                     <th>{isId ? 'Status' : 'Status'}</th>
-                                                    <th>{isId ? 'Kategori' : 'Category'}</th>
                                                     <th className="text-right">{isId ? 'Tindakan' : 'Actions'}</th>
                                                 </tr>
                                             </thead>
@@ -431,6 +460,11 @@ export default function Admin({
                                                         <td>
                                                             <div className="vap-object-name-col">
                                                                 <strong>{object.canonical_name}</strong>
+                                                                {object.content_revisions?.[0] && <details className="vap-subtext">
+                                                                    <summary>{isId ? 'Baca ringkasan yang diajukan' : 'Read submitted summary'}</summary>
+                                                                    <ContentBody revision={object.content_revisions[0]} />
+                                                                    <ul>{object.content_revisions[0].sources?.map((url) => <li key={url}><a href={url} target="_blank" rel="noopener noreferrer">{url}</a></li>)}</ul>
+                                                                </details>}
                                                                 {object.normalized_name && (
                                                                     <small className="vap-subtext">norm: {object.normalized_name}</small>
                                                                 )}
@@ -442,11 +476,6 @@ export default function Admin({
                                                         <td>
                                                             <span className={`vap-badge status-${object.status}`}>
                                                                 {object.status}
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            <span className="vap-cat-name">
-                                                                {categories.find((c) => c.id === object.category_id)?.name || '-'}
                                                             </span>
                                                         </td>
                                                         <td className="text-right">
@@ -500,6 +529,28 @@ export default function Admin({
                         </div>
                     </div>
                 )}
+
+                {activeTab === 'content' && <div className="vap-tab-section">
+                    <div className="vap-card">
+                        <div className="vap-card-header"><h2>{isId ? 'Ringkasan & artikel menunggu tinjauan' : 'Summaries & articles awaiting review'}</h2></div>
+                        <div className="vap-card-body">
+                            {contentQueue.data.length ? contentQueue.data.map((revision) => <article key={revision.id} className="vap-report-item">
+                                <div className="vap-report-meta">
+                                    <strong>{revision.article_id ? revision.title : (isId ? 'Ringkasan objek' : 'Object summary')}</strong>
+                                    <p>{revision.object?.canonical_name} · {revision.article?.type ?? 'summary'} · {revision.language_code.toUpperCase()} · {revision.author?.name}</p>
+                                    <ContentBody revision={revision} />
+                                    <ul>{revision.sources?.map((url) => <li key={url}><a href={url} target="_blank" rel="noopener noreferrer">{url}</a></li>)}</ul>
+                                </div>
+                                <div className="vap-report-actions">
+                                    <button type="button" className="vap-btn vap-btn-success" disabled={busy} onClick={() => reviewContent(revision, 'published')}>✓ {t.approve}</button>
+                                    <button type="button" className="vap-btn vap-btn-warning" disabled={busy} onClick={() => reviewContent(revision, 'needs_revision')}>✎ {t.needsRevision}</button>
+                                    <button type="button" className="vap-btn vap-btn-danger" disabled={busy} onClick={() => reviewContent(revision, 'rejected')}>✕ {t.reject}</button>
+                                </div>
+                            </article>) : <p>{isId ? 'Tidak ada tulisan menunggu tinjauan.' : 'No content awaits review.'}</p>}
+                        </div>
+                        <div className="vap-card-footer"><PaginationLinks pagination={contentQueue} locale={locale} /></div>
+                    </div>
+                </div>}
 
                 {/* TAB 3: REPORTS QUEUE */}
                 {activeTab === 'reports' && (

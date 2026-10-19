@@ -1,13 +1,13 @@
 <?php
 
 return [
-    'objects_distinct' => 'Pilih minimal dua objek berbeda dari kategori ini.',
+    'objects_distinct' => 'Pilih minimal dua objek berbeda yang tersedia.',
     'key_reused' => 'Kunci ini sudah dipakai untuk transaksi lain.',
     'candidate_unavailable' => 'Kandidat ini belum dapat menerima dukungan.',
     'insufficient_points' => 'Poin tidak mencukupi.',
     'account_ineligible' => 'Akun harus terverifikasi dan tidak dibatasi.',
     'review_invalid' => 'Perubahan status objek tidak valid.',
-    'merge_target_invalid' => 'Pilih objek terverifikasi lain dalam kategori yang sama.',
+    'merge_target_invalid' => 'Pilih objek terverifikasi lain.',
     'not_merged' => 'Objek ini tidak sedang digabung.',
     'merge_history_missing' => 'Riwayat penggabungan tidak ditemukan.',
     'report_status_invalid' => 'Status laporan tidak valid.',

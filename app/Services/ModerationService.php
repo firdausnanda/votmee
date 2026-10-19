@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Comment;
 use App\Models\MasterObject;
+use App\Models\ObjectArticle;
+use App\Models\ObjectContentRevision;
 use App\Models\RankingPost;
 use App\Models\Report;
 use App\Models\User;
@@ -14,19 +16,61 @@ class ModerationService
 {
     public function reviewObject(User $actor, MasterObject $object, string $status, string $reason): void
     {
-        if (! in_array($status, ['verified', 'needs_revision', 'rejected'], true) || $object->status === 'merged') {
+        if (! in_array($status, ['verified', 'needs_revision', 'rejected'], true) || $object->status === 'merged'
+            || ($object->status === 'verified' && $status === 'verified')) {
             throw ValidationException::withMessages(['status' => __('votmee.review_invalid')]);
         }
 
         DB::transaction(function () use ($actor, $object, $status, $reason): void {
+            $pendingSummary = $object->contentRevisions()->whereNull('article_id')->where('status', 'pending')->latest()->first();
+            if ($pendingSummary && ($object->status !== 'verified' || $status !== 'verified')) {
+                $pendingSummary->update([
+                    'status' => $status === 'verified' ? 'published' : $status,
+                    'reviewed_by' => $actor->id,
+                    'review_reason' => $reason,
+                    'published_at' => $status === 'verified' ? now('UTC') : null,
+                ]);
+            }
             $object->update(['status' => $status, 'verified_by' => $status === 'verified' ? $actor->id : null]);
             $this->audit($actor, 'object.review', 'object', $object->id, ['status' => $status, 'reason' => $reason]);
         });
     }
 
+    public function reviewContentRevision(User $actor, ObjectContentRevision $revision, string $status, string $reason): void
+    {
+        if ($revision->status !== 'pending' || ! in_array($status, ['published', 'needs_revision', 'rejected'], true)
+            || $revision->object_id !== ($revision->article?->object_id ?? $revision->object_id)
+            || MasterObject::query()->whereKey($revision->object_id)->value('status') !== 'verified') {
+            throw ValidationException::withMessages(['status' => __('votmee.review_invalid')]);
+        }
+
+        DB::transaction(function () use ($actor, $revision, $status, $reason): void {
+            $revision->update([
+                'status' => $status,
+                'reviewed_by' => $actor->id,
+                'review_reason' => $reason,
+                'published_at' => $status === 'published' ? now('UTC') : null,
+            ]);
+            if ($status === 'published' && $revision->article_id !== null) {
+                $revision->article->update(['published_revision_id' => $revision->id]);
+            }
+            $this->audit($actor, 'content.review', $revision->article_id ? 'object_article' : 'object_summary', $revision->id, [
+                'status' => $status, 'reason' => $reason,
+            ]);
+        });
+    }
+
+    public function hideArticle(User $actor, ObjectArticle $article, string $reason): void
+    {
+        DB::transaction(function () use ($actor, $article, $reason): void {
+            $article->update(['published_revision_id' => null]);
+            $this->audit($actor, 'article.hide', 'object_article', $article->id, ['reason' => $reason]);
+        });
+    }
+
     public function mergeObject(User $actor, MasterObject $source, MasterObject $target, string $reason): void
     {
-        if ($source->id === $target->id || $target->status !== 'verified' || $source->status === 'merged' || $source->category_id !== $target->category_id) {
+        if ($source->id === $target->id || $target->status !== 'verified' || $source->status === 'merged') {
             throw ValidationException::withMessages(['target_id' => __('votmee.merge_target_invalid')]);
         }
 

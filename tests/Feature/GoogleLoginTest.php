@@ -9,13 +9,14 @@ beforeEach(function () {
     config()->set('services.google.redirect', null);
 });
 
-function googleOAuthSession(string $locale = 'id'): array
+function googleOAuthSession(string $locale = 'id', ?string $returnTo = null): array
 {
     return ['google_oauth' => [
         'state' => 'valid-state',
         'code_verifier' => 'valid-code-verifier',
         'locale' => $locale,
         'started_at' => now()->timestamp,
+        'return_to' => $returnTo,
     ]];
 }
 
@@ -28,7 +29,7 @@ function fakeGoogleProfile(array $profile): void
 }
 
 test('google redirect includes a session state and PKCE challenge', function () {
-    $response = $this->get(route('community.google.redirect', ['locale' => 'en']));
+    $response = $this->get(route('community.google.redirect', ['locale' => 'en', 'return_to' => '/en/explore']));
 
     parse_str((string) parse_url((string) $response->headers->get('Location'), PHP_URL_QUERY), $query);
 
@@ -37,7 +38,8 @@ test('google redirect includes a session state and PKCE challenge', function () 
         ->and($query['scope'])->toBe('openid email profile')
         ->and($query['code_challenge_method'])->toBe('S256')
         ->and($query['redirect_uri'])->toBe(route('google.callback'))
-        ->and($query['state'])->toBe(session('google_oauth.state'));
+        ->and($query['state'])->toBe(session('google_oauth.state'))
+        ->and(session('google_oauth.return_to'))->toBe('/en/explore');
 });
 
 test('google redirect reports missing credentials', function () {
@@ -73,9 +75,9 @@ test('google callback creates and verifies a new user', function () {
         'name' => 'New Voter',
     ]);
 
-    $this->withSession(googleOAuthSession('en'))
+    $this->withSession(googleOAuthSession('en', '/en/explore'))
         ->get(route('google.callback', ['state' => 'valid-state', 'code' => 'auth-code']))
-        ->assertRedirect(route('community.home', ['locale' => 'en']));
+        ->assertRedirect('/en/explore');
 
     $user = User::where('email', 'new@example.com')->firstOrFail();
 

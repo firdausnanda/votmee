@@ -71,8 +71,7 @@ class RankingPostSeeder extends Seeder
                 continue;
             }
 
-            $objectIds = MasterObject::where('category_id', $category->id)
-                ->whereIn('canonical_name', $data['objects'])
+            $objectIds = MasterObject::whereIn('canonical_name', $data['objects'])
                 ->pluck('id')
                 ->all();
 

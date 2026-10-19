@@ -14,6 +14,6 @@ class ObjectAliasSeeder extends Seeder
     public function run(): void
     {
         $object = MasterObject::factory()->create();
-        ObjectAlias::factory()->create(['object_id' => $object->id, 'category_id' => $object->category_id]);
+        ObjectAlias::factory()->create(['object_id' => $object->id]);
     }
 }

@@ -1,9 +1,9 @@
-import { router } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { Link, router } from '@inertiajs/react';
+import { useEffect, useRef, useState } from 'react';
 import SelectBox from '../../Components/SelectBox';
 import { api, dictionary, Layout, PageHead, path } from './Shared';
 
-export default function Create({ locale, categories, leaders }) {
+export default function Create({ locale, categories, leaders, myObjects = [] }) {
     const t = dictionary(locale);
     const isId = locale === 'id';
 
@@ -22,6 +22,7 @@ export default function Create({ locale, categories, leaders }) {
     const [similar, setSimilar] = useState([]);
     const [proposing, setProposing] = useState(false);
     const [objectName, setObjectName] = useState('');
+    const [summaryBody, setSummaryBody] = useState('');
     const [referenceUrl, setReferenceUrl] = useState('');
     const [brands, setBrands] = useState([]);
     const [brandId, setBrandId] = useState('');
@@ -30,6 +31,7 @@ export default function Create({ locale, categories, leaders }) {
     const [message, setMessage] = useState('');
     const [messageType, setMessageType] = useState('info');
     const [busy, setBusy] = useState(false);
+    const progressRef = useRef(null);
 
     useEffect(() => {
         api('/backend/brands').then(setBrands).catch(() => setBrands([]));
@@ -58,17 +60,18 @@ export default function Create({ locale, categories, leaders }) {
     }, [title]);
 
     useEffect(() => {
-        if (query.trim().length < 2 || !categoryId) {
+        if (query.trim().length < 2) {
             setOptions([]);
             setIsSearching(false);
             setSearchError(false);
             return;
         }
         let active = true;
+        setOptions([]);
         setIsSearching(true);
         setSearchError(false);
         const timer = window.setTimeout(() => {
-            api(`/backend/objects?q=${encodeURIComponent(query.trim())}&category_id=${categoryId}`)
+            api(`/backend/objects?q=${encodeURIComponent(query.trim())}`)
                 .then((result) => {
                     if (active) setOptions(result);
                 })
@@ -86,7 +89,7 @@ export default function Create({ locale, categories, leaders }) {
             active = false;
             window.clearTimeout(timer);
         };
-    }, [query, categoryId, searchAttempt]);
+    }, [query, searchAttempt]);
 
     const select = (object) => {
         if (selected.length >= 20 || selected.some((item) => item.id === object.id)) return;
@@ -111,16 +114,18 @@ export default function Create({ locale, categories, leaders }) {
         try {
             const object = await api('/backend/objects', 'POST', {
                 canonical_name: objectName,
-                category_id: Number(categoryId),
+                summary_body: summaryBody,
+                language_code: locale,
+                sources: [referenceUrl],
                 ...(brandId ? { brand_id: Number(brandId) } : {}),
                 ...(identityKey.trim() && identityValue.trim()
                     ? { identity_attributes: { [identityKey.trim()]: identityValue.trim() } }
                     : {}),
-                ...(referenceUrl ? { reference_url: referenceUrl } : {}),
             });
             select(object);
             setProposing(false);
             setObjectName('');
+            setSummaryBody('');
             setReferenceUrl('');
             setBrandId('');
             setIdentityKey('');
@@ -189,19 +194,27 @@ export default function Create({ locale, categories, leaders }) {
 
     const selectedCategory = categories.find((item) => item.id === Number(categoryId));
 
+    const goToStep = (nextStep) => {
+        setMessage('');
+        setStep(nextStep);
+        window.requestAnimationFrame(() => {
+            progressRef.current?.scrollIntoView({
+                behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+                block: 'start',
+            });
+        });
+    };
+
     return (
         <Layout locale={locale} categories={categories} leaders={leaders} active="create">
             <PageHead title={t.create} locale={locale} />
             <div className="vcr-page">
-                {/* Header */}
                 <header className="vcr-page-header">
-                    <div className="vcr-eyebrow">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="9" />
-                            <path d="M12 8v8M8 12h8" />
-                        </svg>
-                        <span>{t.community} / {t.create}</span>
-                    </div>
+                    <nav className="vcr-breadcrumb" aria-label={isId ? 'Jejak halaman' : 'Breadcrumb'}>
+                        <Link href={path(locale)}>{t.community}</Link>
+                        <span aria-hidden="true">/</span>
+                        <span aria-current="page">{t.create}</span>
+                    </nav>
                     <h1>{t.create}</h1>
                     <p>
                         {isId
@@ -210,14 +223,21 @@ export default function Create({ locale, categories, leaders }) {
                     </p>
                 </header>
 
-                {/* Interactive Stepper Navigation */}
-                <nav className="vcr-progress" aria-label={isId ? 'Tahapan membuat ranking' : 'Ranking creation steps'}>
-                    <div className="vcr-progress-track" aria-hidden="true">
-                        <div
-                            className="vcr-progress-fill"
-                            style={{ width: step === 1 ? '16%' : step === 2 ? '50%' : '100%' }}
-                        />
-                    </div>
+                {myObjects.some((item) => ['pending', 'needs_revision', 'rejected'].includes(item.status)) && (
+                    <section className="vob-knowledge-panel" aria-label={isId ? 'Pengajuan objek saya' : 'My object submissions'}>
+                        <h2>{isId ? 'Pengajuan objek saya' : 'My object submissions'}</h2>
+                        <ul>
+                            {myObjects.filter((item) => ['pending', 'needs_revision', 'rejected'].includes(item.status)).map((item) => (
+                                <li key={item.id}>
+                                    <Link href={path(locale, `/object/${item.slug}`)}>{item.canonical_name}</Link>
+                                    <span> · {item.status}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </section>
+                )}
+
+                <nav ref={progressRef} className="vcr-progress" aria-label={isId ? 'Tahapan membuat ranking' : 'Ranking creation steps'}>
                     <ol>
                         {stepInfo.map((info, index) => {
                             const stepNumber = index + 1;
@@ -233,8 +253,7 @@ export default function Create({ locale, categories, leaders }) {
                                         disabled={!isAccessible && !isCurrent}
                                         onClick={() => {
                                             if (isAccessible) {
-                                                setMessage('');
-                                                setStep(stepNumber);
+                                                goToStep(stepNumber);
                                             }
                                         }}
                                         aria-current={isCurrent ? 'step' : undefined}
@@ -263,18 +282,16 @@ export default function Create({ locale, categories, leaders }) {
                                 className="vcr-panel"
                                 onSubmit={(event) => {
                                     event.preventDefault();
-                                    setMessage('');
-                                    setStep(2);
+                                    goToStep(2);
                                 }}
                             >
                                 <div className="vcr-panel-header">
-                                    <span className="vcr-panel-index" aria-hidden="true">01</span>
                                     <div>
                                         <h2>{isId ? 'Tentukan Topik & Kategori' : 'Define Topic & Category'}</h2>
                                         <p>
                                             {isId
-                                                ? 'Judul yang tajam dan kriteria yang jelas memudahkan komunitas memahami konteks pembanding.'
-                                                : 'A clear title and criteria help others understand the basis for comparison.'}
+                                                ? 'Beri judul yang jelas, lalu tentukan kategori dan dasar perbandingannya.'
+                                                : 'Choose a clear title, category, and basis for comparison.'}
                                         </p>
                                     </div>
                                 </div>
@@ -298,8 +315,8 @@ export default function Create({ locale, categories, leaders }) {
                                         />
                                         <small>
                                             {isId
-                                                ? 'Gunakan judul yang spesifik, berorientasi nilai, dan mudah dipahami.'
-                                                : 'Use a specific, descriptive, and understandable title.'}
+                                                ? 'Sebutkan apa yang dibandingkan agar mudah ditemukan komunitas.'
+                                                : 'Name what you are comparing so the community can find it.'}
                                         </small>
                                     </label>
 
@@ -326,34 +343,36 @@ export default function Create({ locale, categories, leaders }) {
                                     <div className="vcr-field">
                                         <div className="vcr-field-header">
                                             <span>{t.category} *</span>
-                                            {selectedCategory && (
-                                                <span style={{ color: '#1044bb', fontSize: '11px', fontWeight: 750 }}>
-                                                    #{selectedCategory.slug}
-                                                </span>
-                                            )}
+                                            {selectedCategory && <span className="vcr-category-tag">#{selectedCategory.slug}</span>}
                                         </div>
                                         <SelectBox
                                             value={categoryId}
-                                            onChange={(val) => {
-                                                setCategoryId(val);
-                                                if (val !== categoryId) {
-                                                    setSelected([]);
-                                                }
-                                            }}
+                                            onChange={setCategoryId}
                                             options={categoryOptions}
                                             placeholder={isId ? 'Pilih kategori...' : 'Select category...'}
                                             searchable={true}
                                             searchPlaceholder={isId ? 'Cari kategori...' : 'Search category...'}
+                                            searchLabels={isId ? {
+                                                all: 'Kategori tersedia',
+                                                results: 'Hasil pencarian',
+                                                of: 'dari',
+                                                empty: 'Tidak ada kategori yang cocok',
+                                                hint: 'Coba kata kunci lain atau hapus pencarian.',
+                                                clear: 'Hapus pencarian',
+                                            } : {
+                                                all: 'Available categories',
+                                                results: 'Search results',
+                                                of: 'of',
+                                                empty: 'No matching categories',
+                                                hint: 'Try another keyword or clear your search.',
+                                                clear: 'Clear search',
+                                            }}
                                             clearable={true}
                                             showBadgeInTrigger={true}
                                             align="left"
                                             className="vcr-select-box"
                                         />
-                                        {!categoryId && (
-                                            <small style={{ color: '#b45309' }}>
-                                                {isId ? 'Pilih salah satu kategori untuk melanjutkan.' : 'Select a category to proceed.'}
-                                            </small>
-                                        )}
+                                        {!categoryId && <small>{isId ? 'Kategori mengelompokkan ranking yang Anda buat.' : 'The category groups the ranking you create.'}</small>}
                                     </div>
 
                                     {/* Criteria Textarea (Clean, without prompt pills) */}
@@ -422,36 +441,31 @@ export default function Create({ locale, categories, leaders }) {
                         {step === 2 && (
                             <div className="vcr-panel">
                                 <div className="vcr-panel-header">
-                                    <span className="vcr-panel-index" aria-hidden="true">02</span>
                                     <div>
                                         <h2>{isId ? 'Pilih & Susun Kandidat' : 'Choose & Order Candidates'}</h2>
                                         <p>
                                             {isId
-                                                ? 'Cari dan tambahkan objek dalam kategori. Gunakan tombol panah untuk mengatur urutan awal.'
-                                                : 'Search and add objects in the category. Use the arrow buttons to arrange the starting order.'}
+                                                ? 'Cari objek master dari seluruh database. Gunakan tombol panah untuk mengatur urutan awal.'
+                                                : 'Search master objects across the database. Use the arrow buttons to arrange the starting order.'}
                                         </p>
                                     </div>
                                 </div>
 
-                                <div className="vcr-panel-body">
-                                    {/* Candidate Meter Bar */}
-                                    <div className="vcr-candidate-meter">
-                                        <div className="vcr-meter-row">
-                                            <span>
-                                                {isId ? 'Kandidat Terpilih' : 'Selected Candidates'}: {selected.length} / 20
-                                            </span>
-                                            <span>
-                                                {selected.length < 2
-                                                    ? (isId ? `Kurang ${2 - selected.length} lagi` : `Need ${2 - selected.length} more`)
-                                                    : (isId ? 'Syarat minimum terpenuhi' : 'Minimum requirement met')}
-                                            </span>
+                                <div className="vcr-panel-body vcr-candidates-body">
+                                    <div className="vcr-candidate-summary" role="status">
+                                        <div>
+                                            <strong>{isId ? 'Kandidat untuk ranking ini' : 'Candidates for this ranking'}</strong>
+                                            {selectedCategory && (
+                                                <span className="vcr-candidate-category">
+                                                    {isId ? 'Kategori' : 'Category'}: {selectedCategory.name}
+                                                </span>
+                                            )}
+                                            <p>{selected.length < 2
+                                                ? (isId ? `Pilih ${2 - selected.length} lagi untuk melanjutkan. Maksimal 20 kandidat.` : `Choose ${2 - selected.length} more to continue. Up to 20 candidates.`)
+                                                : (isId ? 'Syarat minimum terpenuhi. Urutan awal dapat diubah di bawah.' : 'Minimum met. You can adjust the starting order below.')}
+                                            </p>
                                         </div>
-                                        <div className="vcr-meter-bar">
-                                            <div
-                                                className={`vcr-meter-fill ${selected.length >= 2 ? 'is-valid' : ''} ${selected.length === 20 ? 'is-full' : ''}`}
-                                                style={{ width: `${Math.min(100, (selected.length / 20) * 100)}%` }}
-                                            />
-                                        </div>
+                                        <span>{selected.length} / 20</span>
                                     </div>
 
                                     {/* Search Candidate Input */}
@@ -537,9 +551,8 @@ export default function Create({ locale, categories, leaders }) {
                                         <div className="vcr-selected-heading">
                                             <div>
                                                 <h3 id="vcr-selected-title">{t.selectedCandidates}</h3>
-                                                <p>{isId ? 'Urutan awal ranking (dapat diubah dengan tombol ↑ ↓):' : 'Starting order (reorder with ↑ ↓ buttons):'}</p>
+                                                <p>{isId ? 'Atur urutan awal dengan tombol panah.' : 'Use the arrow buttons to set the starting order.'}</p>
                                             </div>
-                                            <span style={{ fontWeight: 800 }}>{selected.length} / 20</span>
                                         </div>
 
                                         {selected.length ? (
@@ -591,8 +604,8 @@ export default function Create({ locale, categories, leaders }) {
                                                     <path d="M12 8v8M8 12h8" />
                                                 </svg>
                                                 {isId
-                                                    ? 'Belum ada kandidat terpilih. Gunakan pencarian di atas untuk menambahkan minimal 2 kandidat.'
-                                                    : 'No candidates selected yet. Use the search above to add at least 2 candidates.'}
+                                                    ? 'Belum ada kandidat. Gunakan pencarian untuk menambahkan minimal 2 kandidat.'
+                                                    : 'No candidates yet. Use search to add at least 2 candidates.'}
                                             </div>
                                         )}
                                     </section>
@@ -669,12 +682,26 @@ export default function Create({ locale, categories, leaders }) {
                                             </div>
 
                                             <label className="vcr-field">
-                                                <span>{t.referenceUrl}</span>
+                                                <span>{isId ? 'Ringkasan ensiklopedia *' : 'Encyclopedia summary *'}</span>
+                                                <textarea
+                                                    value={summaryBody}
+                                                    minLength={30}
+                                                    maxLength={15000}
+                                                    onChange={(event) => setSummaryBody(event.target.value)}
+                                                    placeholder={isId ? 'Jelaskan objek ini secara netral dan ringkas.' : 'Describe this object briefly and neutrally.'}
+                                                    required
+                                                />
+                                            </label>
+
+                                            <label className="vcr-field">
+                                                <span>{isId ? 'URL sumber ringkasan *' : 'Summary source URL *'}</span>
                                                 <input
                                                     type="url"
                                                     value={referenceUrl}
                                                     onChange={(event) => setReferenceUrl(event.target.value)}
                                                     placeholder="https://..."
+                                                    pattern="https://.*"
+                                                    required
                                                 />
                                             </label>
 
@@ -682,7 +709,7 @@ export default function Create({ locale, categories, leaders }) {
                                                 <button type="button" onClick={() => setProposing(false)}>
                                                     {t.cancel}
                                                 </button>
-                                                <button type="submit" disabled={busy || selected.length >= 20 || !objectName.trim()}>
+                                                <button type="submit" disabled={busy || selected.length >= 20 || !objectName.trim() || summaryBody.trim().length < 30 || !referenceUrl.trim()}>
                                                     {busy ? (isId ? 'Mengirim...' : 'Submitting...') : t.submitObject}
                                                 </button>
                                             </div>
@@ -701,7 +728,7 @@ export default function Create({ locale, categories, leaders }) {
                                         type="button"
                                         className="vcr-secondary"
                                         disabled={busy}
-                                        onClick={() => setStep(1)}
+                                        onClick={() => goToStep(1)}
                                     >
                                         <span aria-hidden="true">←</span>
                                         <span>{t.back}</span>
@@ -719,8 +746,7 @@ export default function Create({ locale, categories, leaders }) {
                                             className="vcr-primary"
                                             disabled={selected.length < 2 || busy}
                                             onClick={() => {
-                                                setMessage('');
-                                                setStep(3);
+                                                goToStep(3);
                                             }}
                                         >
                                             <span>{t.next}</span>
@@ -735,7 +761,6 @@ export default function Create({ locale, categories, leaders }) {
                         {step === 3 && (
                             <div className="vcr-panel">
                                 <div className="vcr-panel-header">
-                                    <span className="vcr-panel-index" aria-hidden="true">03</span>
                                     <div>
                                         <h2>{isId ? 'Tinjau & Konfirmasi Publikasi' : 'Review & Confirm Publication'}</h2>
                                         <p>
@@ -747,7 +772,6 @@ export default function Create({ locale, categories, leaders }) {
                                 </div>
 
                                 <div className="vcr-panel-body">
-                                    {/* Realistic Ranking Card Mockup */}
                                     <div className="vcr-review-card">
                                         <div className="vcr-review-header">
                                             <span className="vcr-review-cat-tag">
@@ -772,13 +796,12 @@ export default function Create({ locale, categories, leaders }) {
                                             </div>
                                         </dl>
 
-                                        {/* Candidate Ladder with Medals */}
                                         <section className="vcr-review-candidates" aria-labelledby="vcr-review-candidates-title">
                                             <div className="vcr-review-candidates-head">
                                                 <h3 id="vcr-review-candidates-title">
                                                     {isId ? 'Urutan Awal Kandidat' : 'Starting Candidate Order'}
                                                 </h3>
-                                                <span style={{ fontSize: 12, fontWeight: 800, color: '#1044bb' }}>
+                                                <span className="vcr-review-count">
                                                     {selected.length} {isId ? 'kandidat' : 'candidates'}
                                                 </span>
                                             </div>
@@ -787,12 +810,10 @@ export default function Create({ locale, categories, leaders }) {
                                                 {selected.map((object, index) => {
                                                     const pos = index + 1;
                                                     const posClass = pos === 1 ? 'vcr-pos-1' : pos === 2 ? 'vcr-pos-2' : pos === 3 ? 'vcr-pos-3' : 'vcr-pos-other';
-                                                    const medal = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : null;
-
                                                     return (
                                                         <li key={object.id} className="vcr-review-item">
                                                             <span className={`vcr-rank-pos ${posClass}`}>
-                                                                {medal || String(pos).padStart(2, '0')}
+                                                                {String(pos).padStart(2, '0')}
                                                             </span>
                                                             <span className="vcr-review-item-name">{object.canonical_name}</span>
                                                         </li>
@@ -800,29 +821,6 @@ export default function Create({ locale, categories, leaders }) {
                                                 })}
                                             </ol>
                                         </section>
-                                    </div>
-
-                                    {/* Pre-Publish Checklist */}
-                                    <div className="vcr-checklist">
-                                        <span className="vcr-checklist-title">
-                                            {isId ? 'Pemeriksaan Kesiapan Publikasi' : 'Publication Readiness Checklist'}
-                                        </span>
-                                        <div className="vcr-check-item">
-                                            <span>✓</span>
-                                            <span>{isId ? 'Judul spesifik dan memenuhi panjang minimal' : 'Title is descriptive and meets length requirements'}</span>
-                                        </div>
-                                        <div className="vcr-check-item">
-                                            <span>✓</span>
-                                            <span>{isId ? `Kategori dipilih (${selectedCategory?.name})` : `Category chosen (${selectedCategory?.name})`}</span>
-                                        </div>
-                                        <div className="vcr-check-item">
-                                            <span>✓</span>
-                                            <span>{isId ? 'Kriteria perbandingan telah diisi dengan jelas' : 'Evaluation criteria clearly detailed'}</span>
-                                        </div>
-                                        <div className="vcr-check-item">
-                                            <span>✓</span>
-                                            <span>{isId ? `${selected.length} kandidat siap bersaing di voting komunitas` : `${selected.length} candidates ready for community voting`}</span>
-                                        </div>
                                     </div>
 
                                     {message && (
@@ -837,7 +835,7 @@ export default function Create({ locale, categories, leaders }) {
                                         type="button"
                                         className="vcr-secondary"
                                         disabled={busy}
-                                        onClick={() => setStep(2)}
+                                        onClick={() => goToStep(2)}
                                     >
                                         <span aria-hidden="true">←</span>
                                         <span>{isId ? 'Ubah Kandidat' : 'Edit Candidates'}</span>
@@ -853,11 +851,7 @@ export default function Create({ locale, categories, leaders }) {
                                                 <span className="vcr-spinner" aria-hidden="true" />
                                                 <span>{isId ? 'Menerbitkan...' : 'Publishing...'}</span>
                                             </>
-                                        ) : (
-                                            <>
-                                                <span>🚀 {t.publish}</span>
-                                            </>
-                                        )}
+                                        ) : <><span>{t.publish}</span><span aria-hidden="true">→</span></>}
                                     </button>
                                 </div>
                             </div>

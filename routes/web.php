@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\GoogleLoginController;
 use App\Http\Controllers\Backend\CategoryController;
 use App\Http\Controllers\Backend\LeaderboardController;
 use App\Http\Controllers\Backend\ModerationController;
+use App\Http\Controllers\Backend\ObjectContentController;
 use App\Http\Controllers\Backend\ObjectController;
 use App\Http\Controllers\Backend\RankingController;
 use App\Http\Controllers\Backend\SocialController;
@@ -12,7 +13,6 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Web\CommunityController;
 use App\Http\Middleware\SetRequestLocale;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 Route::get('/', [CommunityController::class, 'home'])->middleware(SetRequestLocale::class);
 
@@ -28,16 +28,16 @@ Route::prefix('{locale}')->where(['locale' => 'id|en'])->middleware(SetRequestLo
     Route::get('/ranking/{post:slug}', [CommunityController::class, 'ranking'])->name('ranking');
     Route::get('/object/{object:slug}', [CommunityController::class, 'object'])->name('object');
     Route::get('/profile/{user:username}', [CommunityController::class, 'profile'])->name('profile');
-    Route::get('/login', fn () => Inertia::render('Auth/Login', [
-        'canResetPassword' => Route::has('password.request'),
-        'status' => session('status'),
-        'googleAuthError' => session('google_auth_error'),
-    ]))->middleware('guest')->name('login');
+    Route::get('/login', [CommunityController::class, 'home'])->middleware('guest')->name('login');
     Route::get('/auth/google', [GoogleLoginController::class, 'redirect'])
         ->middleware(['guest', 'throttle:10,1'])->name('google.redirect');
-    Route::get('/register', fn () => Inertia::render('Auth/Register'))->middleware('guest')->name('register');
+    Route::get('/register', [CommunityController::class, 'home'])->middleware('guest')->name('register');
     Route::middleware('auth')->group(function () {
         Route::get('/create', [CommunityController::class, 'create'])->name('create');
+        Route::get('/object/{object:slug}/write', [CommunityController::class, 'writeObjectArticle'])->name('object.write');
+        Route::get('/object/{object:slug}/summary/edit', [CommunityController::class, 'editObjectSummary'])->name('object.summary.edit');
+        Route::get('/object/{object:slug}/submission/edit', [CommunityController::class, 'editObjectSubmission'])->name('object.submission.edit');
+        Route::get('/article/{article}/edit', [CommunityController::class, 'editObjectArticle'])->name('article.edit');
         Route::get('/wallet', [CommunityController::class, 'wallet'])->name('wallet');
     });
 });
@@ -61,11 +61,17 @@ Route::prefix('backend')->middleware(SetRequestLocale::class)->name('backend.')-
     Route::get('rankings', [RankingController::class, 'index'])->name('rankings.index');
     Route::get('rankings/{post:slug}', [RankingController::class, 'show'])->name('rankings.show');
     Route::get('rankings/{post:slug}/comments', [SocialController::class, 'getComments'])->name('comments.index');
+    Route::get('objects/{object:slug}/comments', [SocialController::class, 'getObjectComments'])->name('objects.comments.index');
     Route::get('leaderboard', [LeaderboardController::class, 'index'])->name('leaderboard');
     Route::get('profile/{user:username}', [SocialController::class, 'profile'])->name('profile');
 
     Route::middleware(['auth', 'throttle:30,1'])->group(function () {
         Route::post('objects', [ObjectController::class, 'store'])->name('objects.store');
+        Route::patch('objects/{object}/submission', [ObjectController::class, 'resubmit'])->name('objects.resubmit');
+        Route::post('objects/{object:slug}/summary-revisions', [ObjectContentController::class, 'storeSummary'])->name('objects.summary.store');
+        Route::post('objects/{object:slug}/articles', [ObjectContentController::class, 'storeArticle'])->name('objects.articles.store');
+        Route::patch('articles/{article}', [ObjectContentController::class, 'reviseArticle'])->name('articles.revise');
+        Route::post('objects/{object:slug}/comments', [SocialController::class, 'objectComment'])->name('objects.comments.store');
         Route::post('rankings', [RankingController::class, 'store'])->name('rankings.store');
         Route::get('wallet', [WalletController::class, 'show'])->name('wallet.show');
         Route::post('wallet/claim', [WalletController::class, 'claim'])->name('wallet.claim');
@@ -83,6 +89,8 @@ Route::prefix('admin/backend')->middleware(['auth', SetRequestLocale::class, 'ca
     Route::put('objects/{object}/translations', [ModerationController::class, 'setTranslation'])->name('objects.translations.store');
     Route::patch('rankings/{post}/hide', [ModerationController::class, 'hidePost'])->name('rankings.hide');
     Route::patch('comments/{comment}/hide', [ModerationController::class, 'hideComment'])->name('comments.hide');
+    Route::patch('content-revisions/{revision}', [ObjectContentController::class, 'review'])->name('content-revisions.review');
+    Route::patch('articles/{article}/hide', [ObjectContentController::class, 'hideArticle'])->name('articles.hide');
     Route::patch('reports/{report}', [ModerationController::class, 'resolveReport'])->name('reports.resolve');
 });
 

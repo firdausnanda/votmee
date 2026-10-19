@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Comment;
 use App\Models\MasterObject;
 use App\Models\ObjectAlias;
+use App\Models\ObjectContentRevision;
 use App\Models\PointLedger;
 use App\Models\RankingPost;
 use App\Models\Report;
@@ -25,6 +26,8 @@ class ModerationController extends Controller
     {
         return response()->json([
             'objects' => MasterObject::query()->whereIn('status', ['pending', 'needs_revision'])->oldest()->paginate(20),
+            'content' => ObjectContentRevision::query()->where('status', 'pending')->whereHas('object', fn ($query) => $query->where('status', 'verified'))
+                ->with(['author:id,name,username', 'article:id,type', 'object:id,canonical_name,slug'])->oldest()->paginate(20),
             'reports' => Report::query()->where('status', 'open')->oldest()->paginate(20),
         ]);
     }
@@ -47,7 +50,7 @@ class ModerationController extends Controller
         }
 
         $alias = DB::transaction(function () use ($request, $object, $moderation, $data, $normalized): ObjectAlias {
-            $alias = ObjectAlias::create(['object_id' => $object->id, 'category_id' => $object->category_id, 'alias' => $data['alias'], 'normalized_alias' => $normalized]);
+            $alias = ObjectAlias::create(['object_id' => $object->id, 'alias' => $data['alias'], 'normalized_alias' => $normalized]);
             $moderation->audit($request->user(), 'object.alias.add', 'object', $object->id, ['alias' => $data['alias'], 'reason' => $data['reason']]);
 
             return $alias;

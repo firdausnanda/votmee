@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Comment;
 use App\Models\CommentLike;
 use App\Models\MasterObject;
+use App\Models\ObjectArticle;
 use App\Models\RankingPost;
 use App\Models\Report;
 use App\Models\User;
@@ -26,7 +27,7 @@ class SocialController extends Controller
         ]);
 
         $targetParent = isset($data['parent_id']) ? Comment::findOrFail($data['parent_id']) : null;
-        if ($targetParent && $targetParent->ranking_post_id !== $post->id) {
+        if ($targetParent && ($targetParent->ranking_post_id !== $post->id || $targetParent->status !== 'visible')) {
             throw ValidationException::withMessages(['parent_id' => __('votmee.parent_mismatch')]);
         }
 
@@ -95,10 +96,67 @@ class SocialController extends Controller
         ]);
     }
 
+    public function objectComment(Request $request, MasterObject $object): JsonResponse
+    {
+        abort_unless($object->status === 'verified' && $request->user()->canParticipate(), 403);
+        $data = $request->validate([
+            'body' => ['required', 'string', 'min:2', 'max:3000'],
+            'parent_id' => ['nullable', 'integer', 'exists:comments,id'],
+        ]);
+        $objectIds = $object->mergedFamilyIds();
+        $parent = isset($data['parent_id']) ? Comment::findOrFail($data['parent_id']) : null;
+        if ($parent && (! $objectIds->contains($parent->object_id) || $parent->status !== 'visible')) {
+            throw ValidationException::withMessages(['parent_id' => __('votmee.parent_mismatch')]);
+        }
+
+        return response()->json(Comment::create([
+            'object_id' => $parent?->object_id ?? $object->id,
+            'user_id' => $request->user()->id,
+            'parent_id' => $parent ? ($parent->parent_id ?: $parent->id) : null,
+            'body' => $data['body'],
+            'status' => 'visible',
+        ]), 201);
+    }
+
+    public function getObjectComments(Request $request, MasterObject $object): JsonResponse
+    {
+        abort_unless($object->status === 'verified', 404);
+        $objectIds = $object->mergedFamilyIds();
+        $offset = max(0, (int) $request->input('offset', 0));
+        $limit = min(max(1, (int) $request->input('limit', 15)), 50);
+        $sort = $request->input('sort', 'latest');
+        $query = DB::table('comments')
+            ->join('users', 'users.id', '=', 'comments.user_id')
+            ->leftJoin('comment_likes', 'comment_likes.comment_id', '=', 'comments.id')
+            ->whereIn('comments.object_id', $objectIds)
+            ->where('comments.status', 'visible')
+            ->selectRaw('comments.id, comments.parent_id, comments.body, comments.created_at, users.name, users.username, COUNT(comment_likes.id) as likes_count')
+            ->groupBy('comments.id', 'comments.parent_id', 'comments.body', 'comments.created_at', 'users.name', 'users.username');
+
+        if ($sort === 'popular') {
+            $query->orderByDesc('likes_count')->orderByDesc('comments.created_at');
+        } else {
+            $query->orderByDesc('comments.created_at')->orderByDesc('comments.id');
+        }
+        $comments = $query->skip($offset)->take($limit)->get();
+        $likedCommentIds = $request->user()
+            ? DB::table('comment_likes')->where('user_id', $request->user()->id)->whereIn('comment_id', $comments->pluck('id'))->pluck('comment_id')->flip()->toArray()
+            : [];
+        $comments->transform(function ($comment) use ($likedCommentIds) {
+            $comment->liked = isset($likedCommentIds[$comment->id]);
+            $comment->likes_count = (int) $comment->likes_count;
+
+            return $comment;
+        });
+        $total = Comment::query()->whereIn('object_id', $objectIds)->where('status', 'visible')->count();
+
+        return response()->json(['comments' => $comments, 'total' => $total, 'has_more' => $offset + $comments->count() < $total]);
+    }
+
     public function report(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'target_type' => ['required', 'in:ranking_post,comment,object'],
+            'target_type' => ['required', 'in:ranking_post,comment,object,object_article'],
             'target_id' => ['required', 'string', 'max:40'],
             'reason' => ['required', 'string', 'min:10', 'max:2000'],
         ]);
@@ -106,6 +164,7 @@ class SocialController extends Controller
             'ranking_post' => RankingPost::class,
             'comment' => Comment::class,
             'object' => MasterObject::class,
+            'object_article' => ObjectArticle::class,
         };
 
         if (! $model::query()->whereKey($data['target_id'])->exists()) {

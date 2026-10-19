@@ -22,7 +22,6 @@ class ObjectAliasFactory extends Factory
 
         return [
             'object_id' => MasterObject::factory(),
-            'category_id' => fn (array $attributes): int => MasterObject::findOrFail($attributes['object_id'])->category_id,
             'alias' => $alias,
             'normalized_alias' => mb_strtolower($alias),
         ];

@@ -17,7 +17,7 @@ class ObjectMatchingService
     }
 
     /** @return Collection<int, MasterObject> */
-    public function search(string $query, ?int $categoryId = null, array $identityAttributes = [], ?int $brandId = null): Collection
+    public function search(string $query, array $identityAttributes = [], ?int $brandId = null): Collection
     {
         $normalized = $this->normalize($query);
 
@@ -27,7 +27,6 @@ class ObjectMatchingService
 
         $matches = MasterObject::query()
             ->whereIn('status', ['verified', 'pending'])
-            ->when($categoryId, fn ($builder) => $builder->where('category_id', $categoryId))
             ->where(function ($builder) use ($normalized) {
                 $builder->where('normalized_name', 'like', $normalized.'%')
                     ->orWhereHas('aliases', fn ($aliases) => $aliases->where('normalized_alias', 'like', $normalized.'%'));
@@ -40,7 +39,6 @@ class ObjectMatchingService
             $booleanQuery = implode(' ', array_map(fn (string $token): string => $token.'*', explode(' ', $normalized)));
             $fulltextMatches = MasterObject::query()
                 ->whereIn('status', ['verified', 'pending'])
-                ->when($categoryId, fn ($builder) => $builder->where('category_id', $categoryId))
                 ->where(function ($builder) use ($booleanQuery): void {
                     $builder->whereRaw('MATCH(canonical_name) AGAINST (? IN BOOLEAN MODE)', [$booleanQuery])
                         ->orWhereHas('aliases', fn ($aliases) => $aliases->whereRaw('MATCH(alias) AGAINST (? IN BOOLEAN MODE)', [$booleanQuery]));

@@ -23,4 +23,9 @@ return [
     'string' => ':attribute harus berupa teks.',
     'ulid' => ':attribute harus berupa ULID yang valid.',
     'url' => ':attribute harus berupa URL yang valid.',
+    'attributes' => [
+        'name' => 'Nama',
+        'password' => 'Kata sandi',
+        'password_confirmation' => 'Konfirmasi kata sandi',
+    ],
 ];

@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Category;
 use App\Models\MasterObject;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -23,7 +22,6 @@ class MasterObjectFactory extends Factory
         $name = fake()->unique()->words(3, true);
 
         return [
-            'category_id' => Category::factory(),
             'submitted_by' => User::factory(),
             'created_by' => fn (array $attributes) => $attributes['submitted_by'] ?? User::factory(),
             'updated_by' => fn (array $attributes) => $attributes['submitted_by'] ?? User::factory(),

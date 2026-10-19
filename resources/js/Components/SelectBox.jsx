@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 
 /**
  * Professional SelectBox Component with Custom Animated Dropdown
@@ -14,6 +14,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
  * @param {Function} [props.onClear] - Clear event callback (defaults to onChange(''))
  * @param {boolean} [props.searchable=false] - Whether to show search filter inside dropdown
  * @param {string} [props.searchPlaceholder='Cari...'] - Search input placeholder
+ * @param {Object} [props.searchLabels] - Text for the searchable dropdown
  * @param {boolean} [props.showBadgeInTrigger=false] - Whether to display option badge in trigger
  * @param {string} [props.className=''] - Additional CSS class for the wrapper
  * @param {string} [props.triggerClassName=''] - Additional CSS class for the trigger button
@@ -37,6 +38,7 @@ export default function SelectBox({
     onClear,
     searchable = false,
     searchPlaceholder = 'Cari...',
+    searchLabels = {},
     showBadgeInTrigger = false,
     className = '',
     triggerClassName = '',
@@ -54,6 +56,7 @@ export default function SelectBox({
     const containerRef = useRef(null);
     const triggerRef = useRef(null);
     const searchInputRef = useRef(null);
+    const optionsListId = useId();
 
     // Normalize options into consistent object structure
     const normalizedOptions = useMemo(() => {
@@ -155,6 +158,28 @@ export default function SelectBox({
     };
 
     const hasFilter = selectedOption && selectedOption.value !== '' && selectedOption.value !== 'Semua Kategori';
+    const optionCount = normalizedOptions.filter((option) => !option.isDivider).length;
+    const resultCount = displayedOptions.filter((option) => !option.isDivider).length;
+    const labels = {
+        all: 'Pilihan tersedia',
+        results: 'Hasil pencarian',
+        of: 'dari',
+        empty: 'Tidak ada hasil yang cocok',
+        hint: 'Coba kata kunci lain atau hapus pencarian.',
+        clear: 'Hapus pencarian',
+        ...searchLabels,
+    };
+
+    const renderHighlightedLabel = (label) => {
+        const query = searchQuery.trim();
+        const matchIndex = query ? label.toLowerCase().indexOf(query.toLowerCase()) : -1;
+
+        if (matchIndex === -1) {
+            return label;
+        }
+
+        return <>{label.slice(0, matchIndex)}<mark className="vm-select-match">{label.slice(matchIndex, matchIndex + query.length)}</mark>{label.slice(matchIndex + query.length)}</>;
+    };
 
     return (
         <div ref={containerRef} className={`vm-select-box-wrapper ${className}`}>
@@ -176,6 +201,7 @@ export default function SelectBox({
                     onClick={() => !disabled && setIsOpen(!isOpen)}
                     aria-haspopup="listbox"
                     aria-expanded={isOpen}
+                    aria-controls={isOpen ? optionsListId : undefined}
                 >
                     <span className="vm-select-trigger-content">
                         {selectedOption?.icon ? (
@@ -230,7 +256,6 @@ export default function SelectBox({
 
                 {isOpen && (
                     <div
-                        role="listbox"
                         className={`vm-select-dropdown ${align === 'left' ? 'align-left' : 'align-right'} ${dropdownClassName}`}
                     >
                         {headerTitle && (
@@ -250,7 +275,7 @@ export default function SelectBox({
 
                         {searchable && (
                             <div className="vm-select-search-box">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <circle cx="11" cy="11" r="8"></circle>
                                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                                 </svg>
@@ -268,6 +293,7 @@ export default function SelectBox({
                                         }
                                     }}
                                     placeholder={searchPlaceholder}
+                                    aria-label={searchPlaceholder}
                                     onClick={(e) => e.stopPropagation()}
                                 />
                                 {searchQuery && (
@@ -279,23 +305,38 @@ export default function SelectBox({
                                             setSearchQuery('');
                                             searchInputRef.current?.focus();
                                         }}
-                                        aria-label="Hapus pencarian"
+                                        aria-label={labels.clear}
                                     >
-                                        ✕
+                                        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M18 6 6 18M6 6l12 12" />
+                                        </svg>
                                     </button>
                                 )}
                             </div>
                         )}
 
-                        <div className="vm-select-options-list">
-                            {displayedOptions.length === 0 ? (
+                        {searchable && (
+                            <div className="vm-select-results-meta" role="status" aria-live="polite">
+                                <span>{searchQuery.trim() ? labels.results : labels.all}</span>
+                                <span>{resultCount} {labels.of} {optionCount}</span>
+                            </div>
+                        )}
+
+                        <div id={optionsListId} className="vm-select-options-list" role={resultCount > 0 ? 'listbox' : undefined} aria-label={placeholder}>
+                            {resultCount === 0 ? (
                                 <div className="vm-select-empty-state">
-                                    Tidak ada hasil
+                                    <strong>{labels.empty}</strong>
+                                    <span>{labels.hint}</span>
+                                    {searchQuery && (
+                                        <button type="button" onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }}>
+                                            {labels.clear}
+                                        </button>
+                                    )}
                                 </div>
                             ) : (
                                 displayedOptions.map((opt, idx) => {
                                     if (opt.isDivider) {
-                                        return <div key={`divider-${idx}`} className="vm-select-divider" />;
+                                        return <div key={`divider-${idx}`} className="vm-select-divider" role="presentation" />;
                                     }
 
                                     const isSelected = opt.value === value;
@@ -317,7 +358,7 @@ export default function SelectBox({
                                                 )}
                                                 <div className="vm-select-option-text">
                                                     <span className="vm-select-option-label">
-                                                        {opt.label}
+                                                        {renderHighlightedLabel(opt.label)}
                                                     </span>
                                                     {opt.description && (
                                                         <span className="vm-select-option-desc">

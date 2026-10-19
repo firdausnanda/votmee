@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Category;
 use App\Models\Comment;
 use App\Models\MasterObject;
@@ -7,6 +8,9 @@ use App\Models\PointLedger;
 use App\Models\RankingPost;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Services\SupportService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
 
@@ -20,6 +24,30 @@ test('localized feed shows the same published content in Indonesian and English'
             ->where('feed.data.0.id', $post->id)
             ->etc());
     }
+});
+
+test('home feed serves the next page without repeating rankings', function () {
+    $posts = RankingPost::factory()->count(21)->create(['published_at' => now('UTC')]);
+
+    $this->get('/id')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('Community/Feed')
+        ->has('feed.data', 20)
+        ->where('feed.data.0.id', $posts->last()->id)
+        ->etc());
+
+    $this->get('/id?page=2')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('Community/Feed')
+        ->has('feed.data', 1)
+        ->where('feed.data.0.id', $posts->first()->id)
+        ->etc());
+
+    $this->withHeaders([
+        'X-Inertia' => 'true',
+        'X-Inertia-Version' => app(HandleInertiaRequests::class)->version(Request::create('/id')),
+        'X-Requested-With' => 'XMLHttpRequest',
+    ])->get('/id')->assertOk()
+        ->assertJsonPath('scrollProps.feed.nextPage', 2)
+        ->assertJsonPath('scrollProps.feed.currentPage', 1);
 });
 
 test('explore filters ranking titles and returns matching objects', function () {
@@ -133,6 +161,47 @@ test('merged object URL redirects to its current master', function () {
     ]);
 
     $this->get('/id/object/'.$source->slug)->assertRedirect('/id/object/'.$target->slug);
+});
+
+test('profile shows received support and owned wallet points', function () {
+    $creator = User::factory()->create();
+    Wallet::factory()->create(['user_id' => $creator->id, 'balance' => 17]);
+    $post = RankingPost::factory()->create(['creator_id' => $creator->id]);
+    $object = MasterObject::factory()->create(['category_id' => $post->category_id]);
+    $entry = $post->entries()->create(['object_id' => $object->id, 'position' => 1]);
+    $hiddenPost = RankingPost::factory()->create(['creator_id' => $creator->id, 'category_id' => $post->category_id]);
+    $hiddenEntry = $hiddenPost->entries()->create(['object_id' => $object->id, 'position' => 1]);
+    [$firstSupporter, $secondSupporter, $reversedSupporter, $hiddenSupporter] = User::factory()->count(4)->create()->all();
+    $support = app(SupportService::class);
+
+    foreach ([$firstSupporter, $secondSupporter, $reversedSupporter, $hiddenSupporter] as $supporter) {
+        $support->claimDaily($supporter);
+    }
+
+    $support->support($firstSupporter, $entry, 1, (string) Str::uuid());
+    $support->support($firstSupporter, $entry, 2, (string) Str::uuid());
+    $support->support($secondSupporter, $entry, 3, (string) Str::uuid());
+    $reversedEvent = $support->support($reversedSupporter, $entry, 1, (string) Str::uuid());
+    $support->reverse($reversedEvent);
+    $support->support($hiddenSupporter, $hiddenEntry, 1, (string) Str::uuid());
+    $hiddenPost->update(['status' => 'hidden']);
+
+    $this->get('/id/profile/'.$creator->username)->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('Community/Profile')
+        ->where('profile.stats.support_points_received', 6)
+        ->where('profile.stats.wallet_balance', 17)
+        ->where('rankings.total', 1)
+        ->where('rankings.data.0.support_points', 6)
+        ->etc());
+});
+
+test('profile shows zero owned points when no wallet exists', function () {
+    $user = User::factory()->create();
+
+    $this->get('/id/profile/'.$user->username)->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('Community/Profile')
+        ->where('profile.stats.wallet_balance', 0)
+        ->etc());
 });
 
 test('moderator can open the review queue', function () {

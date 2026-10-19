@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Models\Category;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,7 +19,12 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): Response
     {
+        $locale = $request->user()->locale ?? app()->getLocale();
+
         return Inertia::render('Profile/Edit', [
+            'locale' => $locale,
+            'categories' => Category::query()->withCount(['rankingPosts' => fn ($query) => $query->where('status', 'published')])
+                ->orderBy('name')->get(['id', 'name', 'slug']),
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => session('status'),
         ]);

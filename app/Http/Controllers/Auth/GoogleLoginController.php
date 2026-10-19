@@ -23,11 +23,20 @@ class GoogleLoginController extends Controller
 
         $state = Str::random(64);
         $codeVerifier = Str::random(96);
+        $returnTo = $request->query('return_to');
+        $returnTo = is_string($returnTo)
+            && str_starts_with($returnTo, '/')
+            && ! str_starts_with($returnTo, '//')
+            && ! str_contains($returnTo, '\\')
+            && ! preg_match('/[\x00-\x1F]/', $returnTo)
+                ? $returnTo
+                : null;
         $request->session()->put('google_oauth', [
             'state' => $state,
             'code_verifier' => $codeVerifier,
             'locale' => $locale,
             'started_at' => now()->timestamp,
+            'return_to' => $returnTo,
         ]);
 
         $query = http_build_query([
@@ -147,7 +156,7 @@ class GoogleLoginController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        return redirect()->intended(route('community.home', ['locale' => $locale]));
+        return redirect()->intended($flow['return_to'] ?? route('community.home', ['locale' => $locale]));
     }
 
     private function redirectUri(): string

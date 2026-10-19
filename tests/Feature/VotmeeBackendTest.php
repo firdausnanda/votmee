@@ -9,6 +9,7 @@ use App\Models\SupportEvent;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Services\LeaderboardService;
+use App\Services\ModerationService;
 use App\Services\ObjectMatchingService;
 use App\Services\RankingService;
 use App\Services\SupportService;
@@ -18,32 +19,27 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 test('alias search resolves one master and respects identity conflicts', function () {
-    $category = Category::factory()->create();
     $object = MasterObject::factory()->create([
-        'category_id' => $category->id,
         'canonical_name' => 'Samsung Galaxy A26',
         'normalized_name' => 'samsung galaxy a26',
         'identity_attributes' => ['model' => 'A26'],
     ]);
     ObjectAlias::factory()->create([
         'object_id' => $object->id,
-        'category_id' => $category->id,
         'alias' => 'Samsung A26',
         'normalized_alias' => 'samsung a26',
     ]);
 
-    $this->getJson(route('backend.objects.index', ['q' => 'Samsung A26', 'category_id' => $category->id]))
+    $this->getJson(route('backend.objects.index', ['q' => 'Samsung A26']))
         ->assertOk()->assertJsonCount(1)->assertJsonPath('0.id', $object->id);
 
-    expect(app(ObjectMatchingService::class)->search('Samsung A26', $category->id, ['model' => 'A25']))->toBeEmpty();
+    expect(app(ObjectMatchingService::class)->search('Samsung A26', ['model' => 'A25']))->toBeEmpty();
 });
 
 test('same name with conflicting brand can be proposed separately', function () {
-    $category = Category::factory()->create();
     $firstBrand = DB::table('brands')->insertGetId(['name' => 'Brand One', 'normalized_name' => 'brand one', 'created_at' => now(), 'updated_at' => now()]);
     $secondBrand = DB::table('brands')->insertGetId(['name' => 'Brand Two', 'normalized_name' => 'brand two', 'created_at' => now(), 'updated_at' => now()]);
     MasterObject::factory()->create([
-        'category_id' => $category->id,
         'brand_id' => $firstBrand,
         'canonical_name' => 'Model X',
         'normalized_name' => 'model x',
@@ -51,16 +47,18 @@ test('same name with conflicting brand can be proposed separately', function () 
 
     $this->actingAs(User::factory()->create())->postJson(route('backend.objects.store'), [
         'canonical_name' => 'Model X',
-        'category_id' => $category->id,
         'brand_id' => $secondBrand,
-    ])->assertCreated()->assertJsonPath('status', 'pending');
+        'summary_body' => 'Model X is a distinct product offered by Brand Two with its own specifications.',
+        'language_code' => 'en',
+        'sources' => ['https://example.com/model-x'],
+    ])->assertCreated()->assertJsonPath('status', 'pending')->assertJsonPath('category_id', null);
 });
 
-test('publishing requires two distinct objects in the chosen category', function () {
+test('publishing accepts objects across categories and rejects duplicates', function () {
     $user = User::factory()->create();
     $category = Category::factory()->create();
     $first = MasterObject::factory()->create(['category_id' => $category->id]);
-    $second = MasterObject::factory()->create(['category_id' => $category->id]);
+    $second = MasterObject::factory()->create(['category_id' => Category::factory()->create()->id]);
     $payload = [
         'title' => 'Which candidate is better?',
         'criteria' => 'Choose the strongest candidate overall.',
@@ -78,6 +76,15 @@ test('publishing requires two distinct objects in the chosen category', function
 
     $this->getJson(route('backend.rankings.index', ['sort' => 'popular']))
         ->assertOk()->assertJsonPath('data.0.title', $payload['title']);
+});
+
+test('duplicate masters can be merged across legacy categories', function () {
+    $source = MasterObject::factory()->create(['category_id' => Category::factory()->create()->id]);
+    $target = MasterObject::factory()->create(['category_id' => Category::factory()->create()->id]);
+
+    app(ModerationService::class)->mergeObject(User::factory()->create(), $source, $target, 'Same master object.');
+
+    expect($source->refresh()->merged_into_id)->toBe($target->id);
 });
 
 test('daily bonus follows Jakarta calendar and remains idempotent', function () {
@@ -125,6 +132,45 @@ test('support is idempotent and cannot overdraw the wallet', function () {
     expect(SupportEvent::count())->toBe(1)
         ->and(Wallet::query()->where('user_id', $user->id)->value('balance'))->toBe(1)
         ->and(PointLedger::query()->where('type', 'support')->count())->toBe(1);
+});
+
+test('objects cannot receive support until they are verified', function () {
+    $user = User::factory()->create();
+    $category = Category::factory()->create();
+    $pending = MasterObject::factory()->pending()->create(['category_id' => $category->id]);
+    $verified = MasterObject::factory()->create(['category_id' => $category->id]);
+    $post = app(RankingService::class)->publish($user, [
+        'title' => 'Verification gate comparison',
+        'criteria' => 'Compare an object awaiting verification.',
+        'category_id' => $category->id,
+        'language_code' => 'id',
+        'region_code' => 'GLOBAL',
+        'object_ids' => [$pending->id, $verified->id],
+    ]);
+    app(SupportService::class)->claimDaily($user);
+    $entry = $post->entries->first();
+
+    foreach (['pending', 'needs_revision', 'rejected'] as $status) {
+        $pending->update(['status' => $status]);
+        $this->actingAs($user)->postJson(route('backend.support.store'), [
+            'ranking_entry_id' => $entry->id,
+            'amount' => 1,
+            'idempotency_key' => (string) Str::uuid(),
+        ])->assertUnprocessable()->assertJsonValidationErrors('ranking_entry_id');
+    }
+
+    expect(SupportEvent::query()->count())->toBe(0)
+        ->and(Wallet::query()->where('user_id', $user->id)->value('balance'))->toBe(5);
+
+    $pending->update(['status' => 'verified']);
+    $this->actingAs($user)->postJson(route('backend.support.store'), [
+        'ranking_entry_id' => $entry->id,
+        'amount' => 1,
+        'idempotency_key' => (string) Str::uuid(),
+    ])->assertCreated();
+
+    expect(SupportEvent::query()->count())->toBe(1)
+        ->and(Wallet::query()->where('user_id', $user->id)->value('balance'))->toBe(4);
 });
 
 test('feed returns supporter count and top two candidates', function () {
@@ -205,6 +251,120 @@ test('leaderboard uses Jakarta day and Monday week boundaries', function () {
         ->and($leaders->leaders('all_time', 'support')[0]['score'])->toBe(5);
 });
 
+test('creator leaderboard counts supporters once across published rankings and excludes hidden or reversed support', function () {
+    $creator = User::factory()->create();
+    $otherCreator = User::factory()->create();
+    $firstSupporter = User::factory()->create();
+    $secondSupporter = User::factory()->create();
+    $category = Category::factory()->create();
+    $objects = MasterObject::factory()->count(2)->create(['category_id' => $category->id]);
+    $payload = [
+        'title' => 'First creator comparison',
+        'criteria' => 'Compare the same two candidates.',
+        'category_id' => $category->id,
+        'language_code' => 'id',
+        'region_code' => 'GLOBAL',
+        'object_ids' => $objects->modelKeys(),
+    ];
+    $rankingService = app(RankingService::class);
+    $first = $rankingService->publish($creator, $payload);
+    $second = $rankingService->publish($creator, [...$payload, 'title' => 'Second creator comparison']);
+    $other = $rankingService->publish($otherCreator, [...$payload, 'title' => 'Other creator comparison']);
+    $support = app(SupportService::class);
+    $support->claimDaily($firstSupporter);
+    $support->claimDaily($secondSupporter);
+    $firstEvent = $support->support($firstSupporter, $first->entries->first(), 1, (string) Str::uuid());
+    $support->support($firstSupporter, $second->entries->first(), 1, (string) Str::uuid());
+    $support->support($secondSupporter, $second->entries->first(), 1, (string) Str::uuid());
+    $support->support($secondSupporter, $other->entries->first(), 1, (string) Str::uuid());
+
+    $this->getJson(route('backend.leaderboard', ['board' => 'creators', 'period' => 'all_time']))
+        ->assertOk()
+        ->assertJsonPath('leaders.0.user_id', $creator->id)
+        ->assertJsonPath('leaders.0.username', $creator->username)
+        ->assertJsonPath('leaders.0.supporters', 2)
+        ->assertJsonPath('leaders.0.support_points', 3)
+        ->assertJsonPath('leaders.1.supporters', 1)
+        ->assertJsonPath('leaders.1.support_points', 1);
+
+    $second->update(['status' => 'hidden']);
+    expect(app(LeaderboardService::class)->creators('all_time')[0]['supporters'])->toBe(1)
+        ->and(app(LeaderboardService::class)->creators('all_time')[0]['support_points'])->toBe(1);
+
+    $support->reverse($firstEvent);
+    expect(app(LeaderboardService::class)->creators('all_time'))
+        ->toHaveCount(1)
+        ->and(app(LeaderboardService::class)->creators('all_time')[0]['user_id'])->toBe($otherCreator->id);
+});
+
+test('creator leaderboard weights unique supporters at forty percent and support points at sixty percent', function () {
+    $firstCreator = User::factory()->create();
+    $secondCreator = User::factory()->create();
+    $supporters = User::factory()->count(6)->create();
+    $category = Category::factory()->create();
+    $objects = MasterObject::factory()->count(2)->create(['category_id' => $category->id]);
+    $payload = [
+        'title' => 'First weighted comparison',
+        'criteria' => 'Compare the same two candidates.',
+        'category_id' => $category->id,
+        'language_code' => 'id',
+        'region_code' => 'GLOBAL',
+        'object_ids' => $objects->modelKeys(),
+    ];
+    $rankingService = app(RankingService::class);
+    $first = $rankingService->publish($firstCreator, $payload);
+    $second = $rankingService->publish($secondCreator, [...$payload, 'title' => 'Second weighted comparison']);
+    $support = app(SupportService::class);
+
+    foreach ($supporters as $index => $supporter) {
+        $support->claimDaily($supporter);
+        $entry = $index < 4 ? $first->entries->first() : $second->entries->first();
+        $amount = $index < 4 ? 1 : 5;
+        $support->support($supporter, $entry, $amount, (string) Str::uuid());
+    }
+
+    $leaders = app(LeaderboardService::class)->creators('all_time');
+    expect($leaders[0]['user_id'])->toBe($secondCreator->id)
+        ->and($leaders[0]['supporters'])->toBe(2)
+        ->and($leaders[0]['support_points'])->toBe(10)
+        ->and($leaders[0]['score'])->toBe(80.0)
+        ->and($leaders[1]['user_id'])->toBe($firstCreator->id)
+        ->and($leaders[1]['supporters'])->toBe(4)
+        ->and($leaders[1]['support_points'])->toBe(4)
+        ->and($leaders[1]['score'])->toBe(64.0);
+});
+
+test('creator leaderboard uses Jakarta support date for daily and weekly periods', function () {
+    $creator = User::factory()->create();
+    $firstSupporter = User::factory()->create();
+    $secondSupporter = User::factory()->create();
+    $category = Category::factory()->create();
+    $objects = MasterObject::factory()->count(2)->create(['category_id' => $category->id]);
+    $post = app(RankingService::class)->publish($creator, [
+        'title' => 'Creator period comparison',
+        'criteria' => 'Compare candidates across the week.',
+        'category_id' => $category->id,
+        'language_code' => 'id',
+        'region_code' => 'GLOBAL',
+        'object_ids' => $objects->modelKeys(),
+    ]);
+    $support = app(SupportService::class);
+
+    $this->travelTo(CarbonImmutable::parse('2026-10-18 23:59:00', 'Asia/Jakarta')->utc());
+    $support->claimDaily($firstSupporter);
+    $support->support($firstSupporter, $post->entries->first(), 1, (string) Str::uuid());
+
+    $this->travelTo(CarbonImmutable::parse('2026-10-19 00:01:00', 'Asia/Jakarta')->utc());
+    $support->claimDaily($secondSupporter);
+    $support->support($secondSupporter, $post->entries->first(), 1, (string) Str::uuid());
+
+    $leaders = app(LeaderboardService::class);
+    expect($leaders->creators('daily')[0]['supporters'])->toBe(1)
+        ->and($leaders->creators('weekly')[0]['supporters'])->toBe(1)
+        ->and($leaders->creators('all_time')[0]['supporters'])->toBe(2)
+        ->and($leaders->creators('all_time')[0]['support_points'])->toBe(2);
+});
+
 test('moderation routes reject ordinary users and audit reviews', function () {
     $category = Category::factory()->create();
     $object = MasterObject::factory()->pending()->create(['category_id' => $category->id]);
@@ -230,7 +390,7 @@ test('merge redirects scores to one master and undo restores original attributio
     $moderator = User::factory()->create(['role' => 'moderator']);
     $category = Category::factory()->create();
     $source = MasterObject::factory()->create(['category_id' => $category->id]);
-    $target = MasterObject::factory()->create(['category_id' => $category->id]);
+    $target = MasterObject::factory()->create(['category_id' => Category::factory()->create()->id]);
     $post = app(RankingService::class)->publish($user, [
         'title' => 'A comparison before merging',
         'criteria' => 'Compare these two master objects.',

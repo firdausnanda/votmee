@@ -136,6 +136,13 @@ export default function AdminLayout({
             badgeVariant: 'warning',
         },
         {
+            id: 'content',
+            label: isId ? 'Artikel & Ringkasan' : 'Articles & Summaries',
+            icon: 'fileText',
+            badge: stats.pendingContent > 0 ? stats.pendingContent : null,
+            badgeVariant: 'warning',
+        },
+        {
             id: 'reports',
             label: isId ? 'Laporan Konten' : 'Reports Queue',
             icon: 'flag',

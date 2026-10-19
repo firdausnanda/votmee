@@ -1,13 +1,13 @@
 <?php
 
 return [
-    'objects_distinct' => 'Choose at least two distinct objects from this category.',
+    'objects_distinct' => 'Choose at least two distinct available objects.',
     'key_reused' => 'This key has already been used for another transaction.',
     'candidate_unavailable' => 'This candidate cannot receive support.',
     'insufficient_points' => 'Insufficient points.',
     'account_ineligible' => 'A verified, unrestricted account is required.',
     'review_invalid' => 'Invalid object review transition.',
-    'merge_target_invalid' => 'Choose a different verified object in the same category.',
+    'merge_target_invalid' => 'Choose a different verified object.',
     'not_merged' => 'This object is not merged.',
     'merge_history_missing' => 'Merge history is missing.',
     'report_status_invalid' => 'Invalid report status.',

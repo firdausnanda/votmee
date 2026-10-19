@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Models\Comment;
 use App\Models\MasterObject;
+use App\Models\ObjectArticle;
+use App\Models\ObjectContentRevision;
 use App\Models\PointLedger;
 use App\Models\RankingPost;
 use App\Models\Report;
@@ -27,7 +30,11 @@ class CommunityController extends Controller
 
         return Inertia::render('Community/Feed', [
             ...$this->shared($request),
-            'feed' => $feed->paginate($filters)->withQueryString(),
+            'loginModal' => $request->routeIs('community.login'),
+            'registerModal' => $request->routeIs('community.register'),
+            'loginStatus' => session('status'),
+            'googleAuthError' => session('google_auth_error'),
+            'feed' => Inertia::scroll(fn () => $feed->paginate($filters)->withQueryString()),
             'filters' => $filters,
             'leaders' => $leaderboard->leaders('weekly', 'support'),
         ]);
@@ -41,7 +48,7 @@ class CommunityController extends Controller
             ...$this->shared($request),
             'feed' => $feed->paginate($filters)->withQueryString(),
             'filters' => $filters,
-            'objects' => isset($filters['q']) ? $matching->search($filters['q'], $filters['category_id'] ?? null) : [],
+            'objects' => isset($filters['q']) ? $matching->search($filters['q']) : [],
             'leaders' => $leaderboard->leaders('weekly', 'support'),
         ]);
     }
@@ -103,17 +110,37 @@ class CommunityController extends Controller
             return redirect()->route('community.object', [$locale, $target->slug]);
         }
 
-        abort_if($object->status === 'rejected', 404);
-        $object->load('category', 'aliases');
+        abort_if($object->status === 'rejected' && $object->submitted_by !== $request->user()?->id, 404);
+        $object->load('aliases');
         $object->setAttribute('translations', DB::table('object_translations')->where('object_id', $object->id)->get(['locale', 'name']));
+        $objectIds = $object->mergedFamilyIds();
+        $summary = $object->status === 'verified'
+            ? ObjectContentRevision::query()->where('object_id', $object->id)->whereNull('article_id')->where('status', 'published')
+                ->with('author:id,name,username')->latest('published_at')->first()
+            : null;
+        $articles = $object->status === 'verified'
+            ? ObjectArticle::query()->whereIn('object_id', $objectIds)->whereNotNull('published_revision_id')
+                ->with(['author:id,name,username', 'publishedRevision'])->latest()->paginate(10, ['*'], 'articles_page')
+            : null;
+        $myRevisions = $request->user()
+            ? ObjectContentRevision::query()->where('object_id', $object->id)->where('author_id', $request->user()->id)
+                ->with('article:id,type,published_revision_id')->latest()->limit(20)->get()
+            : collect();
         $stats = DB::table('support_events')->where('object_id', $object->id)->where('status', 'valid')
             ->selectRaw('COALESCE(SUM(amount), 0) as points, COUNT(DISTINCT user_id) as supporters')->first();
         $rankings = RankingPost::query()->where('status', 'published')->whereHas('entries', fn ($query) => $query->where('object_id', $object->id))
-            ->with('creator:id,name,username')->latest('published_at')->limit(12)->get();
+            ->with(['creator:id,name,username', 'category:id,name,slug'])->latest('published_at')->limit(12)->get();
 
         return Inertia::render('Community/Object', [
             ...$this->shared($request),
             'object' => $object,
+            'summary' => $summary,
+            'articles' => $articles,
+            'myRevisions' => $myRevisions,
+            'reviewFeedback' => $object->submitted_by === $request->user()?->id
+                ? DB::table('audit_logs')->where('target_type', 'object')->where('target_id', $object->id)
+                    ->where('action', 'object.review')->latest('id')->value('details')
+                : null,
             'stats' => $stats,
             'rankings' => $rankings,
             'leaders' => $leaderboard->leaders(),
@@ -122,16 +149,127 @@ class CommunityController extends Controller
 
     public function create(Request $request, LeaderboardService $leaderboard): Response
     {
-        return Inertia::render('Community/Create', [...$this->shared($request), 'leaders' => $leaderboard->leaders()]);
+        return Inertia::render('Community/Create', [
+            ...$this->shared($request),
+            'leaders' => $leaderboard->leaders(),
+            'myObjects' => MasterObject::query()->where('submitted_by', $request->user()->id)
+                ->whereIn('status', ['pending', 'needs_revision', 'rejected'])->latest()
+                ->get(['id', 'slug', 'canonical_name', 'status']),
+        ]);
+    }
+
+    public function writeObjectArticle(Request $request, string $locale, MasterObject $object, LeaderboardService $leaderboard): Response
+    {
+        abort_unless($object->status === 'verified' && $request->user()->canParticipate(), 403);
+
+        return Inertia::render('Community/ContentEditor', [
+            ...$this->shared($request),
+            'leaders' => $leaderboard->leaders(),
+            'object' => $object->only('id', 'slug', 'canonical_name'),
+            'mode' => 'article',
+        ]);
+    }
+
+    public function editObjectSummary(Request $request, string $locale, MasterObject $object, LeaderboardService $leaderboard): Response
+    {
+        abort_unless($object->status === 'verified' && $request->user()->canParticipate(), 403);
+
+        $draft = $object->contentRevisions()->whereNull('article_id')->where('author_id', $request->user()->id)
+            ->whereIn('status', ['pending', 'needs_revision', 'rejected'])->latest()->first();
+        $published = $object->contentRevisions()->whereNull('article_id')->where('status', 'published')->latest('published_at')->first();
+        $reviewPending = $object->contentRevisions()->whereNull('article_id')->where('status', 'pending')->exists();
+
+        return Inertia::render('Community/ContentEditor', [
+            ...$this->shared($request),
+            'leaders' => $leaderboard->leaders(),
+            'object' => $object->only('id', 'slug', 'canonical_name'),
+            'mode' => 'summary',
+            'initial' => $draft ?? $published,
+            'reviewPending' => $reviewPending,
+        ]);
+    }
+
+    public function editObjectArticle(Request $request, string $locale, ObjectArticle $article, LeaderboardService $leaderboard): Response
+    {
+        abort_unless($article->author_id === $request->user()->id && $article->object->status === 'verified' && $request->user()->canParticipate(), 403);
+
+        $initial = $article->revisions()->whereIn('status', ['pending', 'needs_revision', 'rejected'])->latest()->first()
+            ?? $article->publishedRevision;
+
+        return Inertia::render('Community/ContentEditor', [
+            ...$this->shared($request),
+            'leaders' => $leaderboard->leaders(),
+            'object' => $article->object->only('id', 'slug', 'canonical_name'),
+            'mode' => 'article_revision',
+            'article' => $article->only('id', 'type'),
+            'initial' => $initial,
+            'reviewPending' => $article->revisions()->where('status', 'pending')->exists(),
+        ]);
+    }
+
+    public function editObjectSubmission(Request $request, string $locale, MasterObject $object, LeaderboardService $leaderboard): Response
+    {
+        abort_unless($object->submitted_by === $request->user()->id && in_array($object->status, ['needs_revision', 'rejected'], true) && $request->user()->canParticipate(), 403);
+
+        $initial = $object->contentRevisions()->whereNull('article_id')->where('author_id', $request->user()->id)->latest()->first();
+        $feedback = DB::table('audit_logs')->where('target_type', 'object')->where('target_id', $object->id)
+            ->where('action', 'object.review')->latest('id')->value('details');
+
+        return Inertia::render('Community/ContentEditor', [
+            ...$this->shared($request),
+            'leaders' => $leaderboard->leaders(),
+            'object' => $object->only('id', 'slug', 'canonical_name'),
+            'mode' => 'submission',
+            'initial' => $initial,
+            'reviewFeedback' => $feedback ? json_decode($feedback, true) : null,
+        ]);
     }
 
     public function profile(Request $request, string $locale, User $user, LeaderboardService $leaderboard): Response
     {
+        $publishedRankingsQuery = RankingPost::query()
+            ->where('creator_id', $user->id)
+            ->where('status', 'published');
+
+        $walletBalance = (int) (Wallet::query()->where('user_id', $user->id)->value('balance') ?? 0);
+
+        $supportPointsReceived = (int) DB::table('support_events')
+            ->join('ranking_entries', 'ranking_entries.id', '=', 'support_events.ranking_entry_id')
+            ->join('ranking_posts', 'ranking_posts.id', '=', 'ranking_entries.ranking_post_id')
+            ->where('ranking_posts.creator_id', $user->id)
+            ->where('ranking_posts.status', 'published')
+            ->where('support_events.status', 'valid')
+            ->sum('support_events.amount');
+
+        $scoresForPost = DB::table('support_events')
+            ->join('ranking_entries', 'ranking_entries.id', '=', 'support_events.ranking_entry_id')
+            ->whereColumn('ranking_entries.ranking_post_id', 'ranking_posts.id')
+            ->where('support_events.status', 'valid');
+
+        $rankings = $publishedRankingsQuery
+            ->with([
+                'category:id,name,slug',
+                'entries.object:id,canonical_name,slug,status',
+            ])
+            ->withCount(['comments' => fn ($comments) => $comments->where('status', 'visible')])
+            ->addSelect([
+                'support_points' => (clone $scoresForPost)->selectRaw('COALESCE(SUM(support_events.amount), 0)'),
+            ])
+            ->latest('published_at')
+            ->paginate(12)
+            ->withQueryString();
+
         return Inertia::render('Community/Profile', [
             ...$this->shared($request),
-            'profile' => $user->only('name', 'username', 'locale', 'region_code'),
-            'rankings' => RankingPost::query()->where('creator_id', $user->id)->where('status', 'published')
-                ->with('category:id,name,slug')->latest('published_at')->paginate(20),
+            'profile' => [
+                ...$user->only('id', 'name', 'username', 'role', 'locale', 'region_code'),
+                'created_at' => $user->created_at?->toIso8601String(),
+                'stats' => [
+                    'support_points_received' => $supportPointsReceived,
+                    'wallet_balance' => $walletBalance,
+                ],
+            ],
+            'rankings' => $rankings,
             'leaders' => $leaderboard->leaders(),
         ]);
     }
@@ -163,9 +301,14 @@ class CommunityController extends Controller
         return Inertia::render('Community/Admin', [
             ...$this->shared($request),
             'leaders' => $leaderboard->leaders(),
-            'objects' => MasterObject::query()->whereIn('status', ['pending', 'needs_revision'])->oldest()->paginate(20, ['*'], 'objects_page'),
+            'objects' => MasterObject::query()->whereIn('status', ['pending', 'needs_revision'])
+                ->with(['contentRevisions' => fn ($query) => $query->whereNull('article_id')->latest()])
+                ->oldest()->paginate(20, ['*'], 'objects_page'),
+            'contentQueue' => ObjectContentRevision::query()->where('status', 'pending')
+                ->whereHas('object', fn ($query) => $query->where('status', 'verified'))
+                ->with(['author:id,name,username', 'article:id,type', 'object:id,canonical_name,slug'])->oldest()->paginate(20, ['*'], 'content_page'),
             'reports' => Report::query()->where('status', 'open')->oldest()->paginate(20, ['*'], 'reports_page'),
-            'mergedObjects' => MasterObject::query()->where('status', 'merged')->latest()->limit(20)->get(['id', 'canonical_name', 'status', 'category_id']),
+            'mergedObjects' => MasterObject::query()->where('status', 'merged')->latest()->limit(20)->get(['id', 'canonical_name', 'status']),
             'isAdmin' => $request->user()->can('administer'),
             'stats' => [
                 'pendingObjects' => MasterObject::query()->whereIn('status', ['pending', 'needs_revision'])->count(),
@@ -183,6 +326,16 @@ class CommunityController extends Controller
             'locale' => $this->locale($request),
             'categories' => Category::query()->withCount(['rankingPosts' => fn ($query) => $query->where('status', 'published')])
                 ->orderBy('name')->get(['id', 'name', 'slug']),
+            'recentComments' => Comment::query()
+                ->with([
+                    'user:id,name,username',
+                    'rankingPost:id,title,slug',
+                ])
+                ->where('status', 'visible')
+                ->whereHas('rankingPost', fn ($query) => $query->where('status', 'published'))
+                ->latest()
+                ->limit(5)
+                ->get(['id', 'ranking_post_id', 'user_id', 'body', 'created_at']),
         ];
     }
 

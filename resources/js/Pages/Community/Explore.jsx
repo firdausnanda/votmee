@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { categoryHashtag, dictionary, EmptyState, Layout, numberLabel, PageHead, PaginationLinks, RankingCard, path } from './Shared';
+import { categoryHashtag, dictionary, EmptyState, Layout, Leaderboard, numberLabel, PageHead, PaginationLinks, RankingCard, path } from './Shared';
 
 export default function Explore({ locale, categories, leaders, feed, filters, objects }) {
     const t = dictionary(locale);
@@ -31,6 +31,8 @@ export default function Explore({ locale, categories, leaders, feed, filters, ob
                     {categoryHashtag(category)}
                 </Link>)}
             </nav>
+
+            <div className="vm-mobile-leaderboard"><Leaderboard locale={locale} initialLeaders={leaders} /></div>
 
             {hasActiveFilters && <div className="vx-active-filters" aria-label={isId ? 'Filter aktif' : 'Active filters'}>
                 <span>{isId ? 'Menampilkan hasil untuk' : 'Showing results for'}</span>

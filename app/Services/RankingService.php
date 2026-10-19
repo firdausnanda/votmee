@@ -17,7 +17,6 @@ class RankingService
         $objectIds = $data['object_ids'];
         $objects = MasterObject::query()
             ->whereIn('id', $objectIds)
-            ->where('category_id', $data['category_id'])
             ->whereIn('status', ['pending', 'verified'])
             ->get();
 

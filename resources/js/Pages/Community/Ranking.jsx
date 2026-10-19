@@ -1,7 +1,8 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
-import { api, categoryHashtag, dateLabel, dictionary, Layout, numberLabel, PageHead, path } from './Shared';
+import { api, categoryHashtag, dateLabel, dictionary, Layout, numberLabel, openLoginModal, PageHead, path } from './Shared';
 import ReportDialog from './ReportDialog';
+import ShareModal from './ShareModal';
 
 function RankingIcon({ name, size = 16, className = '', fill = 'none' }) {
     const icons = {
@@ -147,6 +148,7 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
     const [toastType, setToastType] = useState('info');
     const [saved, setSaved] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [shareOpen, setShareOpen] = useState(false);
 
     // Comments interactive states: sort, likes, active reply, collapsed threads, and pagination
     const [commentSort, setCommentSort] = useState('latest');
@@ -272,7 +274,7 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
 
     const toggleLike = async (commentId) => {
         if (!user) {
-            router.visit(path(locale, '/login'));
+            openLoginModal();
             return;
         }
 
@@ -337,8 +339,9 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
     };
 
     const beginSupport = async (entry) => {
+        if (!['verified', 'merged'].includes(entry.object?.status)) return;
         if (!user) {
-            router.visit(path(locale, '/login'));
+            openLoginModal();
             return;
         }
         setIsSupportClosing(false);
@@ -459,32 +462,10 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
         showToast(isId ? 'Laporan berhasil dikirim.' : 'Report submitted.', 'success');
     };
 
-    const share = async () => {
-        try {
-            if (navigator.share) {
-                await navigator.share({
-                    title: post.title,
-                    url: window.location.href,
-                });
-            } else {
-                await navigator.clipboard.writeText(window.location.href);
-                setCopied(true);
-                window.setTimeout(() => setCopied(false), 2000);
-                showToast(isId ? 'Tautan disalin ke clipboard!' : 'Link copied to clipboard!', 'success');
-            }
-        } catch (err) {
-            if (err?.name !== 'AbortError') {
-                try {
-                    await navigator.clipboard.writeText(window.location.href);
-                    setCopied(true);
-                    window.setTimeout(() => setCopied(false), 2000);
-                    showToast(isId ? 'Tautan disalin ke clipboard!' : 'Link copied to clipboard!', 'success');
-                } catch {
-                    showToast(window.location.href, 'info');
-                }
-            }
-        }
-    };
+    const rankingUrl = typeof window !== 'undefined' ? window.location.href : '';
+    const shareText = isId
+        ? `Lihat ranking "${post.title}" di Votmee!`
+        : `Check out the ranking "${post.title}" on Votmee!`;
 
     const totalPoints = post.entries.reduce(
         (sum, entry) => sum + Number(localScores[entry.id]?.points ?? 0),
@@ -559,7 +540,6 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                                     className="vr-creator-badge"
                                     title={isId ? 'Pembuat ranking ini' : 'Author of this ranking'}
                                 >
-                                    <RankingIcon name="sparkle" size={11} />
                                     <span>{isId ? 'Pembuat Utas' : 'Author'}</span>
                                 </span>
                             )}
@@ -577,7 +557,7 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                                           target_type: 'comment',
                                           target_id: String(item.id),
                                       })
-                                    : router.visit(path(locale, '/login'))
+                                    : openLoginModal()
                             }
                             title={t.report}
                             aria-label="Report comment"
@@ -627,7 +607,7 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                             }`}
                             onClick={() => {
                                 if (!user) {
-                                    router.visit(path(locale, '/login'));
+                                    openLoginModal();
                                     return;
                                 }
                                 if (replyingTo?.id === item.id) {
@@ -748,12 +728,12 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
 
                         <button
                             type="button"
-                            className={`vr-action-btn ${copied ? 'is-copied' : ''}`}
-                            onClick={share}
-                            title={copied ? (isId ? 'Tautan disalin!' : 'Link copied!') : t.share}
-                            aria-label="Share"
+                            className={`vr-action-btn vr-btn-share-trigger ${shareOpen ? 'active' : ''}`}
+                            onClick={() => setShareOpen(true)}
+                            title={isId ? 'Bagikan ranking' : 'Share ranking'}
+                            aria-label={isId ? 'Bagikan ranking' : 'Share ranking'}
                         >
-                            <RankingIcon name={copied ? 'check' : 'share'} size={14} />
+                            <RankingIcon name="share" size={14} />
                         </button>
 
                         <button
@@ -762,7 +742,7 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                             onClick={() =>
                                 user
                                     ? setReporting({ target_type: 'ranking_post', target_id: post.id })
-                                    : router.visit(path(locale, '/login'))
+                                    : openLoginModal()
                             }
                             title={t.report}
                             aria-label="Report"
@@ -842,6 +822,10 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                         const rank = index + 1;
                         const imageIndex = ((Number(entry.position ?? rank) - 1) % 5) + 1;
                         const isBoosted = boostedEntryId === entry.id;
+                        const canReceiveSupport = ['verified', 'merged'].includes(entry.object?.status);
+                        const unavailableLabel = entry.object?.status === 'rejected'
+                            ? (isId ? 'Tidak tersedia' : 'Unavailable')
+                            : (isId ? 'Menunggu verifikasi' : 'Awaiting verification');
 
                         return (
                             <div
@@ -914,6 +898,7 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                                             <span className={isBoosted ? 'stat-popping' : ''}>
                                                 <strong>{numberLabel(points, locale)}</strong> {t.points}
                                             </span>
+                                            {!canReceiveSupport && <span className="vr-candidate-status">{unavailableLabel}</span>}
                                         </div>
                                     </div>
                                 </div>
@@ -922,10 +907,11 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                                     type="button"
                                     className="vr-btn-support vr-btn-support-pill"
                                     onClick={() => beginSupport(entry)}
-                                    title={`${t.support} ${entry.object.canonical_name}`}
+                                    disabled={!canReceiveSupport}
+                                    title={canReceiveSupport ? `${t.support} ${entry.object.canonical_name}` : unavailableLabel}
                                 >
                                     <RankingIcon name="heart" size={14} />
-                                    <span className="vr-pill-label">{t.support}</span>
+                                    <span className="vr-pill-label">{canReceiveSupport ? t.support : unavailableLabel}</span>
                                 </button>
                             </div>
                         );
@@ -1037,9 +1023,9 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                 ) : (
                     <div className="vr-guest-inline">
                         <span>{isId ? 'Ingin bergabung dalam diskusi?' : 'Want to join the conversation?'}</span>
-                        <Link href={path(locale, '/login')} className="vr-link-bold">
+                        <button type="button" onClick={openLoginModal} className="vr-link-bold">
                             {t.login} →
-                        </Link>
+                        </button>
                     </div>
                 )}
 
@@ -1315,6 +1301,23 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                     onSubmit={submitReport}
                 />
             )}
+
+            {/* Ranking Share Modal */}
+            <ShareModal
+                isOpen={shareOpen}
+                onClose={() => setShareOpen(false)}
+                locale={locale}
+                title={isId ? 'Bagikan Ranking' : 'Share Ranking'}
+                description={isId ? 'Bagikan ranking ini ke teman atau media sosial' : 'Share this ranking with friends or social media'}
+                shareUrl={rankingUrl}
+                shareText={shareText}
+                copyLabel={isId ? 'Salin Tautan Ranking' : 'Copy Ranking Link'}
+                preview={{
+                    avatar: <RankingIcon name="trophy" size={20} />,
+                    title: post.title,
+                    subtitle: `${post.category?.name || (isId ? 'Ranking' : 'Category')} · ${numberLabel(totalPoints, locale)} ${t.points} · ${post.entries?.length || 0} ${isId ? 'kandidat' : 'candidates'}`,
+                }}
+            />
 
             {/* Subtle Toast Notification */}
             {toastMessage && (
