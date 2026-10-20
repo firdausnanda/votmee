@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Comment;
+use App\Models\CommentImage;
 use App\Models\MasterObject;
 use App\Models\ObjectArticle;
 use App\Models\ObjectContentRevision;
@@ -20,6 +21,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -35,7 +37,7 @@ class CommunityController extends Controller
             'registerModal' => $request->routeIs('community.register'),
             'loginStatus' => session('status'),
             'googleAuthError' => session('google_auth_error'),
-            'feed' => Inertia::scroll(fn () => $feed->paginate($filters)->withQueryString()),
+            'feed' => Inertia::scroll(fn () => $feed->paginate($filters, $request->user())->withQueryString()),
             'filters' => $filters,
             'leaders' => $leaderboard->leaders('weekly', 'support'),
         ]);
@@ -43,12 +45,18 @@ class CommunityController extends Controller
 
     public function explore(Request $request, FeedService $feed, LeaderboardService $leaderboard, ObjectMatchingService $matching): Response
     {
-        $filters = $this->feedFilters($request);
+        $filters = [...$this->feedFilters($request), 'sort' => 'latest'];
+        $browsing = ! isset($filters['q']) && ! isset($filters['category_id']);
+        $spotlight = $browsing && (int) $request->query('page', 1) === 1
+            ? $feed->paginate([...$filters, 'sort' => 'popular', 'period' => 'week'], $request->user(), 1)->getCollection()->first()
+            : null;
 
         return Inertia::render('Community/Explore', [
             ...$this->shared($request),
-            'feed' => $feed->paginate($filters)->withQueryString(),
+            'feed' => Inertia::scroll(fn () => $feed->paginate($filters, $request->user())->withQueryString()),
             'filters' => $filters,
+            'spotlight' => $spotlight,
+            'rising' => $browsing ? $leaderboard->rising() : [],
             'objects' => isset($filters['q']) ? $matching->search($filters['q']) : [],
             'leaders' => $leaderboard->leaders('weekly', 'support'),
         ]);
@@ -57,9 +65,9 @@ class CommunityController extends Controller
     public function ranking(Request $request, string $locale, RankingPost $post, LeaderboardService $leaderboard): Response
     {
         abort_unless($post->status === 'published', 404);
-        $post->load(['creator:id,name,username', 'category:id,name,slug', 'entries.object:id,canonical_name,slug,status,image_path']);
+        $post->load(['creator:id,name,username,avatar_path', 'category:id,name,slug', 'entries.object:id,canonical_name,slug,status,image_path']);
         $scores = DB::table('support_events')->where('status', 'valid')->whereIn('ranking_entry_id', $post->entries->pluck('id'))
-            ->selectRaw('ranking_entry_id, SUM(amount) as points, COUNT(DISTINCT user_id) as supporters')
+            ->selectRaw("ranking_entry_id, SUM(amount) as points, COUNT(DISTINCT CASE WHEN source = 'support' THEN user_id END) as supporters, SUM(CASE WHEN source = 'quick_vote' THEN amount ELSE 0 END) as quick_points")
             ->groupBy('ranking_entry_id')->get()->keyBy('ranking_entry_id');
         $comments = DB::table('comments')->join('users', 'users.id', '=', 'comments.user_id')
             ->leftJoin('comment_likes', 'comment_likes.comment_id', '=', 'comments.id')
@@ -87,6 +95,7 @@ class CommunityController extends Controller
 
             return $c;
         });
+        CommentImage::attachToComments($comments);
 
         $totalCommentsCount = DB::table('comments')
             ->where('comments.ranking_post_id', $post->id)
@@ -143,7 +152,7 @@ class CommunityController extends Controller
             $revision->makeHidden(['body', 'body_format', 'sources']);
         });
         $stats = DB::table('support_events')->where('object_id', $object->id)->where('status', 'valid')
-            ->selectRaw('COALESCE(SUM(amount), 0) as points, COUNT(DISTINCT user_id) as supporters')->first();
+            ->selectRaw("COALESCE(SUM(amount), 0) as points, COUNT(DISTINCT CASE WHEN source = 'support' THEN user_id END) as supporters")->first();
         $rankingSearchInput = $request->query('ranking_q', '');
         $rankingSearch = is_string($rankingSearchInput) ? Str::limit(trim($rankingSearchInput), 100, '') : '';
         $rankingSort = $request->query('ranking_sort') === 'oldest' ? 'oldest' : 'latest';
@@ -157,7 +166,7 @@ class CommunityController extends Controller
                 ->orWhereHas('creator', fn ($creatorQuery) => $creatorQuery->where('name', 'like', '%'.$rankingSearch.'%')));
         }
 
-        $rankings = $rankingsQuery->with(['creator:id,name,username', 'category:id,name,slug'])
+        $rankings = $rankingsQuery->with(['creator:id,name,username,avatar_path', 'category:id,name,slug'])
             ->orderBy('published_at', $rankingSort === 'oldest' ? 'asc' : 'desc')
             ->orderBy('id', $rankingSort === 'oldest' ? 'asc' : 'desc')
             ->paginate(10, ['id', 'creator_id', 'category_id', 'slug', 'title', 'published_at'], 'rankings_page')
@@ -308,7 +317,7 @@ class CommunityController extends Controller
         $rankings = $publishedRankingsQuery
             ->with([
                 'category:id,name,slug',
-                'entries.object:id,canonical_name,slug,status',
+                'entries.object:id,canonical_name,slug,status,image_path',
             ])
             ->withCount(['comments' => fn ($comments) => $comments->where('status', 'visible')])
             ->addSelect([
@@ -321,7 +330,7 @@ class CommunityController extends Controller
         return Inertia::render('Community/Profile', [
             ...$this->shared($request),
             'profile' => [
-                ...$user->only('id', 'name', 'username', 'role', 'locale', 'region_code'),
+                ...$user->only('id', 'name', 'username', 'role', 'locale', 'region_code', 'avatar_url', 'cover_url'),
                 'created_at' => $user->created_at?->toIso8601String(),
                 'stats' => [
                     'support_points_received' => $supportPointsReceived,
@@ -389,7 +398,7 @@ class CommunityController extends Controller
                 ->orderBy('name')->get(['id', 'name', 'slug']),
             'recentComments' => Comment::query()
                 ->with([
-                    'user:id,name,username',
+                    'user:id,name,username,avatar_path',
                     'rankingPost:id,title,slug',
                 ])
                 ->where('status', 'visible')
@@ -420,12 +429,21 @@ class CommunityController extends Controller
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:120'],
             'sort' => ['nullable', 'in:for_you,popular,latest'],
+            'period' => ['nullable', Rule::in(array_keys(FeedService::POPULAR_PERIODS))],
+            'category' => ['nullable', 'string', 'exists:categories,slug'],
             'category_id' => ['nullable', 'integer', 'exists:categories,id'],
             'region_code' => ['nullable', 'string', 'max:16'],
         ]);
+
+        if (isset($filters['category'])) {
+            $filters['category_id'] = Category::query()->where('slug', $filters['category'])->value('id');
+        }
+
+        unset($filters['category']);
         $filters['language_code'] = $this->locale($request);
         $filters['region_code'] = $filters['region_code'] ?? $request->user()?->region_code;
         $filters['sort'] = $filters['sort'] ?? 'for_you';
+        $filters['period'] = $filters['period'] ?? 'week';
 
         return $filters;
     }

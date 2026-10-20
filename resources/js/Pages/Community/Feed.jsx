@@ -1,10 +1,16 @@
 import { InfiniteScroll, Link } from '@inertiajs/react';
-import { dictionary, EmptyState, Layout, Leaderboard, PageHead, RankingCard, path, useCommunityAccess } from './Shared';
+import { dictionary, EmptyState, Layout, Leaderboard, MobileQuickDuel, PageHead, RankingCard, path, useCommunityAccess } from './Shared';
+
+const periodLabels = {
+    id: { today: 'Hari ini', week: 'Minggu ini', all: 'Sepanjang masa' },
+    en: { today: 'Today', week: 'This week', all: 'All time' },
+};
 
 export default function Feed({ locale, categories, leaders, feed, filters, loginModal = false, registerModal = false }) {
     const t = dictionary(locale);
     const access = useCommunityAccess();
     const activeSort = filters.sort || 'for_you';
+    const activePeriod = filters.period || 'week';
     const sortUrl = (sort) => sort === 'for_you' ? path(locale) : `${path(locale)}?sort=${sort}`;
 
     return <Layout locale={locale} categories={categories} leaders={leaders} searchPosts={feed.data} active="home" loginModal={loginModal} registerModal={registerModal}>
@@ -21,11 +27,13 @@ export default function Feed({ locale, categories, leaders, feed, filters, login
             </div>
         </section>
         <div className="vm-mobile-leaderboard"><Leaderboard locale={locale} initialLeaders={leaders} /></div>
+        <MobileQuickDuel locale={locale} />
         <div className="vt-feed-toolbar vm-feed-toolbar">
             <div className="vt-tabs vm-tabs" role="group" aria-label={t.rankings}>
-                {['for_you', 'popular', 'latest'].map(sort => <a key={sort} href={sortUrl(sort)} className={`vt-sort-tab${activeSort === sort ? ' active' : ''}`} aria-current={activeSort === sort ? 'page' : undefined}>{sort === 'for_you' ? t.forYou : t[sort]}</a>)}
-                <Link className="vt-global-tab" href={path(locale, '/explore')}>{locale === 'id' ? 'Peringkat Global' : 'Global Rankings'}</Link>
-            </div>
+                {['for_you', 'popular', 'latest'].map(sort => <a key={sort} href={sortUrl(sort)} className={`vt-sort-tab${activeSort === sort ? ' active' : ''}`} aria-current={activeSort === sort ? 'page' : undefined}>{sort === 'for_you' ? t.forYou : t[sort]}</a>)}            </div>
+            {activeSort === 'popular' && <div className="vt-tabs vm-tabs vm-period-tabs" role="group" aria-label={locale === 'id' ? 'Periode populer' : 'Popular period'}>
+                {Object.entries(periodLabels[locale] || periodLabels.en).map(([period, label]) => <a key={period} href={`${path(locale)}?sort=popular&period=${period}`} className={`vt-sort-tab${activePeriod === period ? ' active' : ''}`} aria-current={activePeriod === period ? 'page' : undefined}>{label}</a>)}
+            </div>}
         </div>
         {feed.data.length ? <InfiniteScroll
             data="feed"

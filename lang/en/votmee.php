@@ -4,6 +4,9 @@ return [
     'objects_distinct' => 'Choose at least two distinct available objects.',
     'key_reused' => 'This key has already been used for another transaction.',
     'candidate_unavailable' => 'This candidate cannot receive support.',
+    'quick_vote_done' => 'You have already used your quick vote today. Come back tomorrow.',
+    'quick_vote_closed' => 'This duel is closed.',
+    'quick_vote_invalid_entry' => 'This choice is not part of the duel.',
     'insufficient_points' => 'Insufficient points.',
     'account_ineligible' => 'A verified, unrestricted account is required.',
     'review_invalid' => 'Invalid object review transition.',
@@ -17,5 +20,8 @@ return [
     'object_exists' => 'A verified object with this identity already exists.',
     'category_exists' => 'A category with this name already exists or is invalid.',
     'brand_exists' => 'A brand with this name already exists.',
+    'content_image_external' => 'Images in the text must be uploaded with the Votmee editor.',
+    'content_image_invalid' => 'One of the images is unavailable. Remove it and upload it again.',
+    'content_image_limit' => 'Use at most :max images in one text.',
     'image_too_large' => 'The image is too large. Use an image of at most 8000 px per side and 24 megapixels.',
 ];

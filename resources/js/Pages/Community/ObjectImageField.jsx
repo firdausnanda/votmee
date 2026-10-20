@@ -2,16 +2,19 @@ import { useEffect, useRef, useState } from 'react';
 import { NavIcon } from './Shared';
 
 const MAX_EDGE = 1600;
-const MAX_BYTES = 4 * 1024 * 1024;
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+export const MAX_BYTES = 4 * 1024 * 1024;
+export const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const canvasToBlob = (canvas, type, quality) => new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 
-async function optimizeImage(file) {
+/**
+ * Downscale and re-encode an image in the browser to keep uploads small; the server re-encodes it again.
+ */
+export async function optimizeImage(file, maxEdge = MAX_EDGE) {
     const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
 
     try {
-        const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+        const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
         const canvas = document.createElement('canvas');
         canvas.width = Math.max(1, Math.round(bitmap.width * scale));
         canvas.height = Math.max(1, Math.round(bitmap.height * scale));

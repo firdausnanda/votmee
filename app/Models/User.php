@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Services\ProfileImageProcessor;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -16,7 +19,8 @@ use Mattiverse\Userstamps\Traits\Userstamps;
 use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['name', 'email', 'password', 'username', 'role', 'locale', 'region_code', 'restricted_until', 'deleted_by'])]
-#[Hidden(['password', 'remember_token', 'google_id'])]
+#[Hidden(['password', 'remember_token', 'google_id', 'avatar_path', 'cover_path'])]
+#[Appends(['avatar_url', 'cover_url'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
@@ -40,6 +44,30 @@ class User extends Authenticatable implements MustVerifyEmail
             'restricted_until' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * @return Attribute<string|null, never>
+     */
+    protected function avatarUrl(): Attribute
+    {
+        return Attribute::get(fn (): ?string => $this->profileImageUrl('avatar'));
+    }
+
+    /**
+     * @return Attribute<string|null, never>
+     */
+    protected function coverUrl(): Attribute
+    {
+        return Attribute::get(fn (): ?string => $this->profileImageUrl('cover'));
+    }
+
+    /**
+     * Versioned, immutable-cacheable URL of a profile image, or null when none is set.
+     */
+    private function profileImageUrl(string $type): ?string
+    {
+        return ProfileImageProcessor::url($this->id, $type, $this->attributes[ProfileImageProcessor::column($type)] ?? null);
     }
 
     public function canParticipate(): bool

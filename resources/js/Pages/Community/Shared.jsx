@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import SearchMenu from '../../Components/SearchMenu';
 import LanguageSelect from '../../Components/LanguageSelect';
 import ProfileDropdown from '../../Components/ProfileDropdown';
@@ -81,6 +81,7 @@ export function NavIcon({ name, size = 18, className = '' }) {
         award: <><circle cx="12" cy="8" r="7" /><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" /></>,
         arrowRight: <path d="M5 12h14M12 5l7 7-7 7" />,
         arrowLeft: <path d="M19 12H5M12 19l-7-7 7-7" />,
+        image: <><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></>,
         camera: <><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></>,
         settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></>,
         lock: <><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>,
@@ -210,7 +211,28 @@ export function PageHead({ title, locale, description }) {
     </Head>;
 }
 
+/** True once the right-hand ranking panel is hidden (mobile and narrow tablets). */
+function useCompactLayout() {
+    const [compact, setCompact] = useState(false);
+
+    useEffect(() => {
+        const media = window.matchMedia('(max-width: 1080px)');
+        const update = () => setCompact(media.matches);
+        update();
+        media.addEventListener('change', update);
+        return () => media.removeEventListener('change', update);
+    }, []);
+
+    return compact;
+}
+
+/** The quick vote duel, shown inline where the ranking panel is not available. */
+export function MobileQuickDuel({ locale }) {
+    return useCompactLayout() ? <div className="vm-mobile-leaderboard"><QuickDuelWidget locale={locale} /></div> : null;
+}
+
 export function Layout({ locale, categories = [], leaders = [], children, active = '', searchPosts = [], loginModal = false, registerModal = false, recentComments: propRecentComments }) {
+    const compactLayout = useCompactLayout();
     const t = dictionary(locale);
     const showRankingPanel = active === 'home' || active === 'explore';
     const useWideContent = ['create', 'wallet', 'profile', 'object', 'ranking', 'settings'].includes(active);
@@ -299,7 +321,7 @@ export function Layout({ locale, categories = [], leaders = [], children, active
                 </nav>
                 <div className="vt-nav-section vm-side-categories">
                     <p className="vt-rail-label">{locale === 'id' ? 'KATEGORI POPULER' : 'POPULAR CATEGORIES'}</p>
-                    {orderedCategories.map(category => <Link key={category.id} href={path(locale, `/explore?category_id=${category.id}`)}>{categoryHashtag(category)}</Link>)}
+                    {orderedCategories.map(category => <Link key={category.id} href={path(locale, `/explore?category=${category.slug}`)}>{categoryHashtag(category)}</Link>)}
                 </div>
                 <div className="vt-mobile-account-links">
                     {!user && <><button type="button" onClick={() => { setMenuOpen(false); setAuthMode('login'); }}>{t.login}</button><button type="button" onClick={() => { setMenuOpen(false); setAuthMode('register'); }}>{locale === 'id' ? 'Daftar' : 'Sign up'}</button></>}
@@ -309,7 +331,7 @@ export function Layout({ locale, categories = [], leaders = [], children, active
             <main className="vt-main vm-main" id="main-content">{children}</main>
             {showRankingPanel && <aside className="vm-rightbar vm-ranking-sidebar" aria-label={locale === 'id' ? 'Panel ranking' : 'Ranking panel'}>
                 <Leaderboard locale={locale} initialLeaders={leaders} />
-                <QuickDuelWidget locale={locale} leaders={leaders} />
+                {!compactLayout && <QuickDuelWidget locale={locale} />}
                 <DiscussionPanel locale={locale} posts={searchPosts} categories={categories} recentComments={recentComments} />
             </aside>}
         </div>
@@ -456,7 +478,11 @@ export function Leaderboard({ locale, initialLeaders = [] }) {
                                     {rankNumber}
                                 </span>
                                 <span className="vm-rank-avatar" aria-hidden="true">
-                                    {leader.name.slice(0, 1).toUpperCase()}
+                                    {board === 'objects' && leader.image_path
+                                        ? <img src={objectImageUrl({ id: leader.object_id, image_path: leader.image_path }, 'small')} alt="" loading="lazy" decoding="async" />
+                                        : board === 'creators' && leader.avatar_url
+                                            ? <img src={`${leader.avatar_url}&size=small`} alt="" loading="lazy" decoding="async" />
+                                            : leader.name.slice(0, 1).toUpperCase()}
                                 </span>
                                 <span className="vm-leader-name">
                                     <strong>
@@ -498,49 +524,162 @@ export function Leaderboard({ locale, initialLeaders = [] }) {
     );
 }
 
-function QuickDuelWidget({ locale, leaders = [] }) {
-    const isId = locale === 'id';
-    const topTwo = leaders.length >= 2 ? leaders.slice(0, 2) : [
-        { object_id: 'default-1', name: 'iPhone 16 Pro Max', slug: 'iphone-16-pro-max', score: 1420 },
-        { object_id: 'default-2', name: 'Samsung Galaxy S25', slug: 'samsung-galaxy-s25', score: 1280 }
-    ];
-    const [voteChoice, setVoteChoice] = useState(null);
-    const [votesA, setVotesA] = useState(58);
-    const [votesB, setVotesB] = useState(42);
+const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+
+function useCountUp(target, duration = 900) {
+    const [value, setValue] = useState(() => (prefersReducedMotion() ? target : 0));
 
     useEffect(() => {
-        try {
-            const savedChoice = localStorage.getItem('votmee.sidebarDuelVote');
-            if (savedChoice === 'a' || savedChoice === 'b') {
-                setVoteChoice(savedChoice);
-            }
-        } catch {}
+        if (prefersReducedMotion()) {
+            setValue(target);
+            return undefined;
+        }
+        let frame;
+        const start = performance.now();
+        const tick = (now) => {
+            const progress = Math.min(1, (now - start) / duration);
+            setValue(Math.round(target * (1 - Math.pow(1 - progress, 3))));
+            if (progress < 1) frame = requestAnimationFrame(tick);
+        };
+        frame = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(frame);
+    }, [target, duration]);
+
+    return value;
+}
+
+/** Time left until the next Jakarta midnight, when the duels (and the free vote) reset. */
+function DuelCountdown({ isId }) {
+    const jakartaOffset = 7 * 3600 * 1000;
+    const dayLength = 24 * 3600 * 1000;
+    const remaining = () => {
+        const now = Date.now();
+        return Math.max(0, (Math.floor((now + jakartaOffset) / dayLength) + 1) * dayLength - jakartaOffset - now);
+    };
+    const [left, setLeft] = useState(remaining);
+
+    useEffect(() => {
+        const timer = setInterval(() => setLeft(remaining()), 1000);
+        return () => clearInterval(timer);
     }, []);
 
-    const castVote = (choice) => {
-        setVoteChoice(choice);
+    const pad = (value) => String(Math.floor(value)).padStart(2, '0');
+    const clock = `${pad(left / 3600000)}:${pad((left % 3600000) / 60000)}:${pad((left % 60000) / 1000)}`;
+
+    return (
+        <p className="vm-duel-note vm-duel-countdown">
+            <NavIcon name="latest" size={11} /> {isId ? 'Duel baru dalam' : 'New duel in'} <strong>{clock}</strong>
+        </p>
+    );
+}
+
+const burstHues = [221, 38, 142, 48, 0, 280];
+
+/** Confetti sparks and a floating "+1" shown on the card the viewer just picked. */
+function DuelBurst() {
+    const sparks = useMemo(() => Array.from({ length: 14 }, (_, index) => {
+        const angle = (index / 14) * Math.PI * 2 + Math.random() * 0.4;
+        const distance = 34 + Math.random() * 26;
+        return {
+            x: Math.round(Math.cos(angle) * distance),
+            y: Math.round(Math.sin(angle) * distance),
+            hue: burstHues[index % burstHues.length],
+            delay: Math.round(Math.random() * 80),
+        };
+    }), []);
+
+    return (
+        <span className="vm-duel-burst" aria-hidden="true">
+            {sparks.map((spark, index) => (
+                <i key={index} style={{ '--x': `${spark.x}px`, '--y': `${spark.y}px`, '--hue': spark.hue, animationDelay: `${spark.delay}ms` }} />
+            ))}
+            <b className="vm-duel-plus">+1</b>
+        </span>
+    );
+}
+
+function DuelResult({ duel, locale, isId, celebrate }) {
+    const { results, entries } = duel;
+    const firstId = entries[0].id;
+    const secondId = entries[1].id;
+    const firstPercent = useCountUp(results.enough ? results.percents[firstId] : 0);
+    const secondPercent = useCountUp(results.enough ? results.percents[secondId] : 0);
+
+    return (
+        <div className="vm-duel-result-wrap" aria-live="polite">
+            {results.enough ? (
+                <>
+                    <div className="vm-duel-bar-track">
+                        <div className="vm-duel-bar-a" style={{ '--w': `${results.percents[firstId]}%` }} />
+                        <div className="vm-duel-bar-b" style={{ '--w': `${results.percents[secondId]}%` }} />
+                    </div>
+                    <div className="vm-duel-stats">
+                        <span className={`vm-duel-percent a${results.percents[firstId] >= results.percents[secondId] ? ' lead' : ''}`}>{firstPercent}%</span>
+                        <span>{numberLabel(results.total, locale)} {isId ? 'suara' : 'votes'}</span>
+                        <span className={`vm-duel-percent b${results.percents[secondId] > results.percents[firstId] ? ' lead' : ''}`}>{secondPercent}%</span>
+                    </div>
+                </>
+            ) : null}
+            <Link className={`vm-duel-cta${celebrate ? ' attention' : ''}`} href={path(locale, `/ranking/${duel.ranking.slug}`)}>
+                {isId ? 'Dukung dengan poin' : 'Support with points'} <span aria-hidden="true">→</span>
+            </Link>
+            <DuelCountdown isId={isId} />
+        </div>
+    );
+}
+
+function QuickDuelWidget({ locale }) {
+    const isId = locale === 'id';
+    const user = usePage().props.auth?.user;
+    const [duel, setDuel] = useState(undefined);
+    const [pickingId, setPickingId] = useState(null);
+    const [celebrate, setCelebrate] = useState(false);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        let active = true;
+        setCelebrate(false);
+        api('/backend/quick-duel')
+            .then(result => { if (active) setDuel(result.duel); })
+            .catch(() => { if (active) setDuel(null); });
+        return () => { active = false; };
+    }, [user?.id]);
+
+    if (duel === undefined) {
+        return (
+            <section className="vm-panel vm-duel-panel vm-duel-skeleton" aria-busy="true" aria-label={isId ? 'Memuat duel' : 'Loading duel'}>
+                <span className="sk-line short" />
+                <span className="sk-line" />
+                <div className="sk-arena"><span /><span /></div>
+            </section>
+        );
+    }
+
+    if (!duel) return null;
+
+    const castVote = async (entry, event) => {
+        if (event?.target.closest?.('a')) return;
+        if (!user) return openLoginModal();
+        if (duel.my_vote !== null || pickingId !== null) return;
+        setPickingId(entry.id);
+        setError('');
         try {
-            localStorage.setItem('votmee.sidebarDuelVote', choice);
-        } catch {}
-        if (choice === 'a') {
-            setVotesA(64);
-            setVotesB(36);
-        } else {
-            setVotesB(64);
-            setVotesA(36);
+            const result = await api(`/backend/quick-duel/${duel.id}/vote`, 'POST', { ranking_entry_id: entry.id });
+            setCelebrate(true);
+            navigator.vibrate?.(30);
+            setDuel(result.duel);
+        } catch (failure) {
+            setError(failure.message);
+        } finally {
+            setPickingId(null);
         }
     };
 
-    const resetVote = (e) => {
-        e.stopPropagation();
-        setVoteChoice(null);
-        try {
-            localStorage.removeItem('votmee.sidebarDuelVote');
-        } catch {}
-    };
+    const voted = duel.my_vote !== null;
+    const accents = [{}, { background: '#fff7ed', color: '#c2410c' }];
 
     return (
-        <section className="vm-panel vm-duel-panel" aria-labelledby="vm-duel-title">
+        <section className={`vm-panel vm-duel-panel${voted ? ' is-voted' : ''}`} aria-labelledby="vm-duel-title">
             <div className="vm-duel-header">
                 <span className="vm-duel-badge-label">
                     <NavIcon name="zap" size={12} /> {isId ? 'VOTE CEPAT' : 'QUICK VOTE'}
@@ -549,89 +688,65 @@ function QuickDuelWidget({ locale, leaders = [] }) {
                     {isId ? 'Duel Pilihan Komunitas' : 'Community Faceoff'}
                 </h3>
                 <p className="vm-duel-subtitle">
-                    {isId ? 'Mana jagoan favoritmu minggu ini?' : 'Which contender gets your support?'}
+                    <Link href={path(locale, `/ranking/${duel.ranking.slug}`)}>{duel.ranking.title}</Link>
                 </p>
             </div>
-            <div className="vm-duel-arena">
-                <div className={`vm-duel-card ${voteChoice === 'a' ? 'voted' : ''}`}>
-                    <Link
-                        href={path(locale, `/object/${topTwo[0].slug}`)}
-                        className="vm-duel-avatar-link"
-                        title={`${isId ? 'Lihat detail' : 'View details'} ${topTwo[0].name}`}
-                    >
-                        <span className="vm-duel-avatar" aria-hidden="true">
-                            {topTwo[0].name.slice(0, 1).toUpperCase()}
-                        </span>
-                    </Link>
-                    <strong className="vm-duel-name">
-                        <Link
-                            href={path(locale, `/object/${topTwo[0].slug}`)}
-                            title={`${isId ? 'Lihat detail' : 'View details'} ${topTwo[0].name}`}
-                        >
-                            {topTwo[0].name}
-                        </Link>
-                    </strong>
-                    <button
-                        type="button"
-                        className="vm-duel-btn"
-                        onClick={() => castVote('a')}
-                    >
-                        {voteChoice === 'a' ? (
-                            <><NavIcon name="check" size={12} /> {isId ? 'Didukung' : 'Supported'}</>
-                        ) : (
-                            <>{isId ? 'Dukung' : 'Support'}</>
-                        )}
-                    </button>
-                </div>
-                <div className="vm-duel-vs" aria-hidden="true">VS</div>
-                <div className={`vm-duel-card ${voteChoice === 'b' ? 'voted' : ''}`}>
-                    <Link
-                        href={path(locale, `/object/${topTwo[1].slug}`)}
-                        className="vm-duel-avatar-link"
-                        title={`${isId ? 'Lihat detail' : 'View details'} ${topTwo[1].name}`}
-                    >
-                        <span className="vm-duel-avatar" aria-hidden="true" style={{ background: '#fff7ed', color: '#c2410c' }}>
-                            {topTwo[1].name.slice(0, 1).toUpperCase()}
-                        </span>
-                    </Link>
-                    <strong className="vm-duel-name">
-                        <Link
-                            href={path(locale, `/object/${topTwo[1].slug}`)}
-                            title={`${isId ? 'Lihat detail' : 'View details'} ${topTwo[1].name}`}
-                        >
-                            {topTwo[1].name}
-                        </Link>
-                    </strong>
-                    <button
-                        type="button"
-                        className="vm-duel-btn"
-                        onClick={() => castVote('b')}
-                    >
-                        {voteChoice === 'b' ? (
-                            <><NavIcon name="check" size={12} /> {isId ? 'Didukung' : 'Supported'}</>
-                        ) : (
-                            <>{isId ? 'Dukung' : 'Support'}</>
-                        )}
-                    </button>
-                </div>
+            <div className={`vm-duel-arena${pickingId !== null ? ' is-picking' : ''}`}>
+                {duel.entries.map((entry, index) => {
+                    const chosen = duel.my_vote === entry.id;
+                    const picking = pickingId === entry.id;
+                    const classes = ['vm-duel-card', index === 0 ? 'from-left' : 'from-right'];
+                    if (chosen) classes.push('voted', celebrate ? 'pop' : '');
+                    if (voted && !chosen) classes.push('dimmed');
+                    if (picking) classes.push('picking');
+                    if (!voted) classes.push('can-pick');
+
+                    return (
+                        <Fragment key={entry.id}>
+                            {index === 1 && <div className="vm-duel-vs" aria-hidden="true">VS</div>}
+                            <div className={classes.filter(Boolean).join(' ')} onClick={(event) => castVote(entry, event)}>
+                                {chosen && celebrate && <DuelBurst />}
+                                <Link
+                                    href={path(locale, `/object/${entry.slug}`)}
+                                    className="vm-duel-avatar-link"
+                                    title={`${isId ? 'Lihat detail' : 'View details'} ${entry.name}`}
+                                >
+                                    <span className="vm-duel-avatar" aria-hidden="true" style={accents[index]}>
+                                        {entry.name.slice(0, 1).toUpperCase()}
+                                    </span>
+                                </Link>
+                                <strong className="vm-duel-name">
+                                    <Link
+                                        href={path(locale, `/object/${entry.slug}`)}
+                                        title={`${isId ? 'Lihat detail' : 'View details'} ${entry.name}`}
+                                    >
+                                        {entry.name}
+                                    </Link>
+                                </strong>
+                                <button
+                                    type="button"
+                                    className="vm-duel-btn"
+                                    onClick={(event) => { event.stopPropagation(); castVote(entry); }}
+                                    disabled={pickingId !== null || (voted && !chosen)}
+                                    aria-pressed={chosen}
+                                >
+                                    {picking
+                                        ? <span className="vm-duel-spinner" role="status" aria-label={isId ? 'Menyimpan' : 'Saving'} />
+                                        : chosen
+                                            ? <><NavIcon name="check" size={12} /> {isId ? 'Pilihanmu' : 'Your pick'}</>
+                                            : (isId ? 'Pilih' : 'Pick')}
+                                </button>
+                            </div>
+                        </Fragment>
+                    );
+                })}
             </div>
-            {voteChoice ? (
-                <div className="vm-duel-result-wrap">
-                    <div className="vm-duel-bar-track">
-                        <div className="vm-duel-bar-a" style={{ width: `${votesA}%` }} />
-                        <div className="vm-duel-bar-b" style={{ width: `${votesB}%` }} />
-                    </div>
-                    <div className="vm-duel-stats">
-                        <span style={{ color: '#1044bb' }}>{votesA}% suara</span>
-                        <button type="button" onClick={resetVote} style={{ border: 0, background: 'transparent', color: '#64748b', fontSize: '10px', cursor: 'pointer', textDecoration: 'none' }}>
-                            {isId ? 'Ganti pilihan' : 'Change vote'}
-                        </button>
-                        <span style={{ color: '#d97706' }}>{votesB}% suara</span>
-                    </div>
-                </div>
+            {error && <p className="vm-duel-error" role="alert">{error}</p>}
+            {voted ? (
+                <DuelResult duel={duel} locale={locale} isId={isId} celebrate={celebrate} />
             ) : (
-                <p style={{ margin: '4px 0 0', textAlign: 'center', fontSize: '10.5px', color: '#94a3b8' }}>
-                    {isId ? 'Klik tombol dukung untuk melihat hasil langsung!' : 'Click support to see live results!'}
+                <p className="vm-duel-note">
+                    {isId ? '1 vote gratis per hari. Hasil tampil setelah kamu memilih.' : '1 free vote per day. Results show after you pick.'}
                 </p>
             )}
         </section>
@@ -732,7 +847,9 @@ function DiscussionPanel({ locale, posts = [], categories = [], recentComments =
                                 <Link href={linkUrl} className="vm-comm-comment-link">
                                     <div className="vm-comm-comment-top">
                                         <span className="vm-comm-comment-avatar" aria-hidden="true">
-                                            {initial}
+                                            {comment.user?.avatar_url
+                                                ? <img src={`${comment.user.avatar_url}&size=small`} alt="" loading="lazy" decoding="async" />
+                                                : initial}
                                         </span>
                                         <div className="vm-comm-comment-user">
                                             <strong className="vm-comm-comment-name">{authorName}</strong>
@@ -742,13 +859,11 @@ function DiscussionPanel({ locale, posts = [], categories = [], recentComments =
                                             {commentTimeAgo(comment.created_at, locale)}
                                         </span>
                                     </div>
-                                    <p className="vm-comm-comment-text">"{comment.body}"</p>
+                                    <p className="vm-comm-comment-text">{comment.body}</p>
                                     {postTitle && (
-                                        <div className="vm-comm-comment-target">
-                                            <span className="vm-comm-comment-target-badge" title={postTitle}>
-                                                ↳ {postTitle}
-                                            </span>
-                                        </div>
+                                        <p className="vm-comm-target" title={postTitle}>
+                                            {isId ? 'di' : 'on'} <strong>{postTitle}</strong>
+                                        </p>
                                     )}
                                 </Link>
                             </li>
@@ -760,6 +875,7 @@ function DiscussionPanel({ locale, posts = [], categories = [], recentComments =
                     <div className="vm-comm-list">
                         {discussions.map((post) => {
                             const category = categories.find((item) => item.id === post.category_id);
+                            const coverObject = post.entries?.find((entry) => entry.object?.image_path && ['verified', 'merged'].includes(entry.object.status))?.object;
                             return (
                                 <Link
                                     key={post.id}
@@ -767,7 +883,9 @@ function DiscussionPanel({ locale, posts = [], categories = [], recentComments =
                                     className="vm-comm-disc-item"
                                 >
                                     <span className="vm-comm-disc-avatar" aria-hidden="true">
-                                        {post.title.slice(0, 1).toUpperCase()}
+                                        {coverObject
+                                            ? <img src={objectImageUrl(coverObject, 'small')} alt="" loading="lazy" decoding="async" />
+                                            : post.title.slice(0, 1).toUpperCase()}
                                     </span>
                                     <span className="vm-comm-info">
                                         <strong className="vm-comm-name">{post.title}</strong>
@@ -797,10 +915,40 @@ function DiscussionPanel({ locale, posts = [], categories = [], recentComments =
     );
 }
 
+/**
+ * Cover built from the leading candidates: both photos side by side when the top two have
+ * one, a single photo otherwise, and a category-coloured placeholder when none does.
+ */
+function FeedCover({ entries, categorySlug }) {
+    const leaders = entries.slice(0, 2);
+    const pictured = leaders.filter(entry => entry.object?.image_path && ['verified', 'merged'].includes(entry.object.status));
+
+    if (pictured.length === 0) {
+        const initial = (leaders[0]?.object?.canonical_name ?? '').slice(0, 1).toUpperCase();
+
+        return <span className={`vm-cover-ph vm-cover-ph-${categorySlug || 'default'}`} aria-hidden="true">
+            <NavIcon name="trophy" size={26} />
+            {initial && <b>{initial}</b>}
+        </span>;
+    }
+
+    return <span className={`vm-cover vm-cover-${pictured.length}`}>
+        {pictured.map(entry => <img
+            key={entry.id}
+            src={objectImageUrl(entry.object, 'thumb')}
+            srcSet={objectImageSrcSet(entry.object)}
+            sizes="(max-width: 767px) 96px, 140px"
+            alt={entry.object.canonical_name}
+            loading="lazy"
+            decoding="async"
+        />)}
+        {pictured.length === 2 && <span className="vm-cover-vs" aria-hidden="true">VS</span>}
+    </span>;
+}
+
 export function RankingCard({ post, locale, category }) {
     const t = dictionary(locale);
     const categorySlug = post.category?.slug ?? category?.slug ?? '';
-    const imageNumber = categorySlug === 'wisata' ? 2 : categorySlug === 'kuliner' ? 3 : categorySlug === 'otomotif' ? 4 : categorySlug === 'hiburan' ? 5 : 1;
     const rankingUrl = path(locale, `/ranking/${post.slug}`);
     const author = post.creator?.username ? `@${post.creator.username}` : post.creator?.name ?? 'Votmee';
     const authorUsername = post.creator?.username ?? (typeof post.author === 'string' && post.author.startsWith('@') ? post.author.slice(1) : null);
@@ -829,13 +977,19 @@ export function RankingCard({ post, locale, category }) {
         setSaved(updated.includes(post.id));
     };
 
+    const avatarImage = post.creator?.avatar_url;
+    const avatarBadge = (
+        <span className="vm-avatar">
+            {avatarImage
+                ? <img src={`${avatarImage}&size=small`} alt="" loading="lazy" decoding="async" />
+                : author.replace('@', '').slice(0, 1).toUpperCase()}
+        </span>
+    );
     const avatarElement = profileUrl ? (
         <Link href={profileUrl} className="vm-author-avatar-link" aria-hidden="true" tabIndex={-1}>
-            <span className="vm-avatar">{author.replace('@', '').slice(0, 1).toUpperCase()}</span>
+            {avatarBadge}
         </Link>
-    ) : (
-        <span className="vm-avatar">{author.replace('@', '').slice(0, 1).toUpperCase()}</span>
-    );
+    ) : avatarBadge;
 
     const authorLink = profileUrl ? (
         <Link href={profileUrl} className="vm-author-link">
@@ -852,7 +1006,7 @@ export function RankingCard({ post, locale, category }) {
             <NavIcon name="chevronDown" size={18} />
         </Link>
         <Link className="vm-feed-image" href={rankingUrl} aria-label={`${t.viewRanking}: ${post.title}`}>
-            <picture><source media="(max-width: 767px)" srcSet={`/images/stitch/feed-mobile-${imageNumber}.jpg`} /><img src={`/images/stitch/feed-desktop-${imageNumber}.jpg`} alt="" loading="lazy" /></picture>
+            <FeedCover entries={post.entries ?? []} categorySlug={categorySlug} />
         </Link>
         <div className="vm-feed-content">
             <div className="vm-feed-title-row">

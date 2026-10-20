@@ -1,38 +1,69 @@
-import { Link } from '@inertiajs/react';
-import { categoryHashtag, dictionary, EmptyState, Layout, Leaderboard, numberLabel, objectImageSrcSet, objectImageUrl, PageHead, PaginationLinks, RankingCard, path } from './Shared';
+import { InfiniteScroll, Link } from '@inertiajs/react';
+import { useEffect, useRef, useState } from 'react';
+import { categoryHashtag, dictionary, EmptyState, Layout, Leaderboard, MobileQuickDuel, NavIcon, numberLabel, objectImageSrcSet, objectImageUrl, PageHead, RankingCard, path } from './Shared';
 
-export default function Explore({ locale, categories, leaders, feed, filters, objects }) {
+export default function Explore({ locale, categories, leaders, feed, filters, objects, spotlight = null, rising = [] }) {
     const t = dictionary(locale);
     const isId = locale === 'id';
     const activeCategory = categories.find((category) => String(category.id) === String(filters.category_id));
     const hasActiveFilters = Boolean(filters.q || filters.category_id);
-    const featuredPost = !filters.q && feed.current_page === 1 ? feed.data[0] : null;
-    const regularPosts = featuredPost ? feed.data.slice(1) : feed.data;
-    const exploreUrl = ({ q = filters.q, category_id = filters.category_id, sort = filters.sort } = {}) => {
+    const risingRef = useRef(null);
+    const [risingColumns, setRisingColumns] = useState(null);
+    const visibleRising = risingColumns ? rising.slice(0, risingColumns) : rising;
+
+    useEffect(() => {
+        const list = risingRef.current;
+        if (!list) return undefined;
+
+        const fitToOneRow = () => {
+            if (window.matchMedia('(max-width: 767px)').matches) {
+                setRisingColumns(null);
+                return;
+            }
+            const style = getComputedStyle(list);
+            const gap = parseFloat(style.columnGap) || 0;
+            const minimum = 128;
+            setRisingColumns(Math.max(1, Math.floor((list.clientWidth + gap) / (minimum + gap))));
+        };
+
+        fitToOneRow();
+        const observer = new ResizeObserver(fitToOneRow);
+        observer.observe(list);
+
+        return () => observer.disconnect();
+    }, [rising.length]);
+
+    const regularPosts = spotlight ? feed.data.filter((post) => post.id !== spotlight.id) : feed.data;
+    const categoryOf = (post) => categories.find((category) => category.id === post.category_id);
+    const exploreUrl = ({ q = filters.q, category = activeCategory } = {}) => {
         const params = new URLSearchParams();
         if (q) params.set('q', q);
-        if (category_id) params.set('category_id', category_id);
-        if (sort && sort !== 'for_you') params.set('sort', sort);
+        if (category) params.set('category', category.slug);
         const search = params.toString();
         return `${path(locale, '/explore')}${search ? `?${search}` : ''}`;
     };
+    const pageTitle = filters.q
+        ? `${isId ? 'Hasil untuk' : 'Results for'} "${filters.q}"`
+        : activeCategory ? `${categoryHashtag(activeCategory)} · ${t.explore}` : t.explore;
 
     return <Layout locale={locale} categories={categories} leaders={leaders} searchPosts={feed.data} active="explore">
         <PageHead
-            title={t.explore}
+            title={pageTitle}
             locale={locale}
             description={isId ? 'Cari ranking dan objek komunitas berdasarkan kata kunci dan kategori.' : 'Find community rankings and objects by keyword and category.'}
         />
         <div className="vx-explore">
             <h1 className="vm-sr-only">{t.explore}</h1>
-            <nav className="vx-category-rail" aria-label={isId ? 'Jelajahi berdasarkan kategori' : 'Browse by category'}>
-                <Link href={exploreUrl({ category_id: null })} preserveScroll className={!activeCategory ? 'is-active' : ''} aria-current={!activeCategory ? 'page' : undefined}>{isId ? 'Semua topik' : 'All topics'}</Link>
-                {categories.map((category) => <Link key={category.id} href={exploreUrl({ category_id: category.id })} preserveScroll className={activeCategory?.id === category.id ? 'is-active' : ''} aria-current={activeCategory?.id === category.id ? 'page' : undefined}>
+
+            {hasActiveFilters && <nav className="vx-category-rail" aria-label={isId ? 'Jelajahi berdasarkan kategori' : 'Browse by category'}>
+                <Link href={exploreUrl({ category: null })} preserveScroll className={!activeCategory ? 'is-active' : ''} aria-current={!activeCategory ? 'page' : undefined}>{isId ? 'Semua topik' : 'All topics'}</Link>
+                {categories.map((category) => <Link key={category.id} href={exploreUrl({ category })} preserveScroll className={activeCategory?.id === category.id ? 'is-active' : ''} aria-current={activeCategory?.id === category.id ? 'page' : undefined}>
                     {categoryHashtag(category)}
                 </Link>)}
-            </nav>
+            </nav>}
 
             <div className="vm-mobile-leaderboard"><Leaderboard locale={locale} initialLeaders={leaders} /></div>
+            <MobileQuickDuel locale={locale} />
 
             {hasActiveFilters && <div className="vx-active-filters" aria-label={isId ? 'Filter aktif' : 'Active filters'}>
                 <span>{isId ? 'Menampilkan hasil untuk' : 'Showing results for'}</span>
@@ -68,44 +99,90 @@ export default function Explore({ locale, categories, leaders, feed, filters, ob
                 </div>}
             </section>}
 
-            {featuredPost && <section className="vx-featured" aria-labelledby="explore-featured-heading">
+            {rising.length > 0 && <section className="vx-rising" aria-labelledby="explore-rising-heading">
+                <div className="vx-section-heading">
+                    <div>
+                        <span className="vx-section-kicker">{isId ? 'MINGGU INI' : 'THIS WEEK'}</span>
+                        <h2 id="explore-rising-heading">{isId ? 'Objek sedang naik' : 'Rising objects'}</h2>
+                        <p>{isId ? 'Kenaikan poin terbesar dibanding minggu lalu' : 'Biggest point gains compared with last week'}</p>
+                    </div>
+                </div>
+                <ol className="vx-rising-list" ref={risingRef}>
+                    {visibleRising.map((object, index) => <li key={object.object_id}>
+                        <Link href={path(locale, `/object/${object.slug}`)} title={object.name}>
+                            <span className="vx-rising-photo" aria-hidden="true">
+                                {object.image_path
+                                    ? <img src={objectImageUrl(object, 'small')} srcSet={objectImageSrcSet(object)} sizes="68px" alt="" loading="lazy" decoding="async" />
+                                    : object.name.slice(0, 1).toUpperCase()}
+                                <b>{index + 1}</b>
+                            </span>
+                            <strong className="vx-rising-name">{object.name}</strong>
+                            <span className="vx-rising-gain is-up">▲ {numberLabel(object.delta, locale)} {t.points}</span>
+                        </Link>
+                    </li>)}
+                </ol>
+            </section>}
+
+            {!hasActiveFilters && <section className="vx-categories" aria-labelledby="explore-categories-heading">
+                <div className="vx-section-heading">
+                    <div>
+                        <span className="vx-section-kicker">{isId ? 'TOPIK' : 'TOPICS'}</span>
+                        <h2 id="explore-categories-heading">{isId ? 'Jelajahi kategori' : 'Browse categories'}</h2>
+                    </div>
+                </div>
+                <div className="vx-category-cards">
+                    {categories.map((category) => <Link key={category.id} href={exploreUrl({ category })}>
+                        <span className={`vx-cat-icon vm-cover-ph-${category.slug}`} aria-hidden="true"><NavIcon name="trophy" size={18} /></span>
+                        <strong>{category.name}</strong>
+                        <small>{numberLabel(category.ranking_posts_count ?? 0, locale)} {t.rankings}</small>
+                    </Link>)}
+                </div>
+            </section>}
+
+            {spotlight && <section className="vx-featured" aria-labelledby="explore-featured-heading">
                 <div className="vx-section-heading">
                     <div>
                         <span className="vx-section-kicker">{isId ? 'MULAI DARI SINI' : 'START HERE'}</span>
                         <h2 id="explore-featured-heading">{isId ? 'Sorotan komunitas' : 'Community spotlight'}</h2>
                     </div>
-                    <span className="vx-section-side-note">{isId ? 'Pilihan untuk dijelajahi' : 'A ranking to explore'}</span>
+                    <span className="vx-section-side-note">{isId ? 'Paling ramai minggu ini' : 'Busiest this week'}</span>
                 </div>
-                <RankingCard post={featuredPost} locale={locale} category={categories.find((category) => category.id === featuredPost.category_id)} />
+                <RankingCard post={spotlight} locale={locale} category={categoryOf(spotlight)} />
             </section>}
 
             <section className="vx-results-section vx-ranking-section" aria-labelledby="explore-rankings-heading">
                 <div className="vx-section-heading">
                     <div>
                         <span className="vx-section-kicker">{isId ? 'TEMUKAN LEBIH BANYAK' : 'DISCOVER MORE'}</span>
-                        <h2 id="explore-rankings-heading">{t.rankings}</h2>
+                        <h2 id="explore-rankings-heading">{hasActiveFilters ? t.rankings : (isId ? 'Ranking terbaru' : 'Latest rankings')}</h2>
                         <p>{hasActiveFilters
                             ? (isId ? 'Ranking sesuai filter Anda' : 'Rankings matching your filters')
-                            : (isId ? 'Ide dan pilihan dari komunitas' : 'Ideas and picks from the community')}
+                            : (isId ? 'Baru dipublikasikan oleh komunitas' : 'Freshly published by the community')}
                         </p>
                     </div>
                 </div>
-                <nav className="vx-sort-tabs" aria-label={isId ? 'Urutkan ranking' : 'Sort rankings'}>
-                    {[['for_you', isId ? 'Untukmu' : 'For you'], ['popular', isId ? 'Populer' : 'Popular'], ['latest', isId ? 'Terbaru' : 'Latest']].map(([value, label]) =>
-                        <Link key={value} href={exploreUrl({ sort: value })} preserveScroll className={filters.sort === value ? 'is-active' : ''} aria-current={filters.sort === value ? 'page' : undefined}>{label}</Link>)}
-                </nav>
-                <div className="vt-feed-list vm-feed-list vx-explore-feed">
-                    {regularPosts.length
-                        ? regularPosts.map((post) => <RankingCard key={post.id} post={post} locale={locale} category={categories.find((category) => category.id === post.category_id)} />)
-                        : featuredPost ? null
-                          : hasActiveFilters
-                          ? <div className="vx-empty-result" role="status">
-                                <strong>{t.noResults}</strong>
-                                <p>{isId ? 'Coba kata kunci atau kategori lain.' : 'Try another keyword or category.'}</p>
+                {regularPosts.length ? <InfiniteScroll
+                    data="feed"
+                    buffer={360}
+                    className="vt-feed-list vm-feed-list vx-explore-feed"
+                    loading={() => <p className="vt-feed-scroll-status" role="status">{isId ? 'Memuat ranking...' : 'Loading rankings...'}</p>}
+                    next={({ loading, fetch, hasMore }) => <div className="vt-feed-scroll-footer">
+                        {loading ? <span role="status">{isId ? 'Memuat ranking...' : 'Loading rankings...'}</span>
+                            : hasMore ? <button type="button" onClick={fetch}>{t.loadMore}</button>
+                                : <span role="status">{isId ? 'Semua ranking sudah ditampilkan.' : 'You have seen all rankings.'}</span>}
+                    </div>}
+                >
+                    {regularPosts.map((post) => <RankingCard key={post.id} post={post} locale={locale} category={categoryOf(post)} />)}
+                </InfiniteScroll> : spotlight ? null
+                    : hasActiveFilters
+                        ? <div className="vx-empty-result" role="status">
+                            <strong>{t.noResults}</strong>
+                            <p>{isId ? 'Coba kata kunci lain, atau jelajahi kategori berikut.' : 'Try another keyword, or browse these categories.'}</p>
+                            <div className="vx-empty-links">
+                                {categories.slice(0, 5).map((category) => <Link key={category.id} href={exploreUrl({ q: null, category })}>{categoryHashtag(category)}</Link>)}
                             </div>
-                          : <EmptyState locale={locale} />}
-                </div>
-                <PaginationLinks pagination={feed} locale={locale} />
+                        </div>
+                        : <EmptyState locale={locale} />}
             </section>
         </div>
     </Layout>;

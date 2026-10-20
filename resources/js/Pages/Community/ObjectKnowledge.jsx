@@ -1,6 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 import { api, dateLabel, NavIcon, openLoginModal, path } from './Shared';
+import { CommentImageAttachButton, CommentImageGallery, CommentImagePreviews, commentPayload, useCommentImages } from './CommentImages';
 import ReportDialog from './ReportDialog';
 import ContentBody from './ContentBody';
 import ArticleSources from './ArticleSources';
@@ -17,6 +18,7 @@ export function CommunityDiscussion({ object, article, locale }) {
     const [hasMore, setHasMore] = useState(false);
     const [sort, setSort] = useState('latest');
     const [body, setBody] = useState('');
+    const attachments = useCommentImages(locale);
     const [replyTo, setReplyTo] = useState(null);
     const [replyBody, setReplyBody] = useState('');
     const [busy, setBusy] = useState(false);
@@ -37,21 +39,21 @@ export function CommunityDiscussion({ object, article, locale }) {
     const submit = async (event, parentId = null, content = body) => {
         if (event) event.preventDefault();
         const text = (content || '').trim();
-        if (!text || text.length < 2) return;
+        if (!text || text.length < 2 || attachments.processing) return;
         if (!user) return openLoginModal();
 
         setBusy(true);
         setError('');
         try {
-            await api(commentsEndpoint, 'POST', {
-                body: text,
-                ...(parentId ? { parent_id: parentId } : {}),
-            });
+            await api(commentsEndpoint, 'POST', parentId
+                ? { body: text, parent_id: parentId }
+                : commentPayload({ body: text }, attachments.images));
             if (parentId) {
                 setReplyTo(null);
                 setReplyBody('');
             } else {
                 setBody('');
+                attachments.clear();
             }
             await load(0, sort);
         } catch (failure) {
@@ -152,6 +154,7 @@ export function CommunityDiscussion({ object, article, locale }) {
                     )}
 
                     <p className="vr-comment-text">{item.body}</p>
+                    <CommentImageGallery images={item.images} locale={locale} authorName={item.name} />
 
                     <div className="vr-comment-actions">
                         <button
@@ -304,15 +307,17 @@ export function CommunityDiscussion({ object, article, locale }) {
                                 <NavIcon name="x" size={13} />
                             </button>
                         )}
+                        <CommentImageAttachButton attachments={attachments} locale={locale} disabled={busy} />
                         <button
                             type="submit"
                             className="vr-chat-send-btn"
-                            disabled={busy || body.trim().length < 2}
+                            disabled={busy || attachments.processing || body.trim().length < 2}
                             title={isArticle ? (isId ? 'Kirim Komentar' : 'Send comment') : (isId ? 'Kirim Pesan' : 'Send message')}
                         >
                             <NavIcon name="send" size={15} />
                         </button>
                     </div>
+                    <CommentImagePreviews attachments={attachments} locale={locale} />
                 </form>
             ) : (
                 <div className="vr-guest-inline" style={{ marginBottom: 20 }}>

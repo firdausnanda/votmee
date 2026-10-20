@@ -2,10 +2,13 @@
 
 use App\Http\Controllers\Auth\GoogleLoginController;
 use App\Http\Controllers\Backend\CategoryController;
+use App\Http\Controllers\Backend\ContentImageController;
 use App\Http\Controllers\Backend\LeaderboardController;
 use App\Http\Controllers\Backend\ModerationController;
 use App\Http\Controllers\Backend\ObjectContentController;
 use App\Http\Controllers\Backend\ObjectController;
+use App\Http\Controllers\Backend\ProfileImageController;
+use App\Http\Controllers\Backend\QuickDuelController;
 use App\Http\Controllers\Backend\RankingController;
 use App\Http\Controllers\Backend\SocialController;
 use App\Http\Controllers\Backend\WalletController;
@@ -60,28 +63,36 @@ Route::prefix('backend')->middleware(SetRequestLocale::class)->name('backend.')-
     Route::get('objects', [ObjectController::class, 'index'])->name('objects.index');
     Route::get('objects/{object:slug}', [ObjectController::class, 'show'])->name('objects.show');
     Route::get('objects/{object}/image', [ObjectController::class, 'image'])->name('objects.image');
+    Route::get('users/{user}/{type}', [ProfileImageController::class, 'show'])->whereIn('type', ['avatar', 'cover'])->name('users.image');
     Route::get('rankings', [RankingController::class, 'index'])->name('rankings.index');
     Route::get('rankings/{post:slug}', [RankingController::class, 'show'])->name('rankings.show');
     Route::get('rankings/{post:slug}/comments', [SocialController::class, 'getComments'])->name('comments.index');
     Route::get('objects/{object:slug}/comments', [SocialController::class, 'getObjectComments'])->name('objects.comments.index');
     Route::get('articles/{article}/comments', [SocialController::class, 'getArticleComments'])->name('articles.comments.index');
+    Route::get('comment-images/{image}', [SocialController::class, 'commentImage'])->name('comment-images.show');
+    Route::get('content-images/{image}', [ContentImageController::class, 'show'])->name('content-images.show');
     Route::get('leaderboard', [LeaderboardController::class, 'index'])->name('leaderboard');
+    Route::get('quick-duel', [QuickDuelController::class, 'show'])->name('quick-duel.show');
     Route::get('profile/{user:username}', [SocialController::class, 'profile'])->name('profile');
 
     Route::middleware(['auth', 'throttle:30,1'])->group(function () {
         Route::post('objects', [ObjectController::class, 'store'])->name('objects.store')->middleware('throttle:object-uploads');
         Route::patch('objects/{object}/submission', [ObjectController::class, 'resubmit'])->name('objects.resubmit')->middleware('throttle:object-uploads');
+        Route::post('profile/{type}', [ProfileImageController::class, 'update'])->whereIn('type', ['avatar', 'cover'])->name('profile.image.update')->middleware('throttle:profile-uploads');
+        Route::delete('profile/{type}', [ProfileImageController::class, 'destroy'])->whereIn('type', ['avatar', 'cover'])->name('profile.image.destroy');
         Route::post('objects/{object}/image', [ObjectController::class, 'proposeImage'])->name('objects.image.propose')->middleware('throttle:object-uploads');
+        Route::post('content-images', [ContentImageController::class, 'store'])->name('content-images.store')->middleware('throttle:content-uploads');
         Route::post('objects/{object:slug}/summary-revisions', [ObjectContentController::class, 'storeSummary'])->name('objects.summary.store');
         Route::post('objects/{object:slug}/articles', [ObjectContentController::class, 'storeArticle'])->name('objects.articles.store');
         Route::patch('articles/{article}', [ObjectContentController::class, 'reviseArticle'])->name('articles.revise');
-        Route::post('objects/{object:slug}/comments', [SocialController::class, 'objectComment'])->name('objects.comments.store');
-        Route::post('articles/{article}/comments', [SocialController::class, 'articleComment'])->name('articles.comments.store');
+        Route::post('objects/{object:slug}/comments', [SocialController::class, 'objectComment'])->name('objects.comments.store')->middleware('throttle:comment-uploads');
+        Route::post('articles/{article}/comments', [SocialController::class, 'articleComment'])->name('articles.comments.store')->middleware('throttle:comment-uploads');
         Route::post('rankings', [RankingController::class, 'store'])->name('rankings.store');
         Route::get('wallet', [WalletController::class, 'show'])->name('wallet.show');
         Route::post('wallet/claim', [WalletController::class, 'claim'])->name('wallet.claim');
         Route::post('support', [WalletController::class, 'support'])->name('support.store');
-        Route::post('rankings/{post:slug}/comments', [SocialController::class, 'comment'])->name('comments.store');
+        Route::post('quick-duel/{duel}/vote', [QuickDuelController::class, 'vote'])->name('quick-duel.vote');
+        Route::post('rankings/{post:slug}/comments', [SocialController::class, 'comment'])->name('comments.store')->middleware('throttle:comment-uploads');
         Route::post('comments/{comment}/like', [SocialController::class, 'toggleCommentLike'])->name('comments.like');
         Route::post('reports', [SocialController::class, 'report'])->name('reports.store');
     });

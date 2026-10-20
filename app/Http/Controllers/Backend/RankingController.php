@@ -9,6 +9,7 @@ use App\Services\RankingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class RankingController extends Controller
 {
@@ -16,19 +17,20 @@ class RankingController extends Controller
     {
         $data = $request->validate([
             'q' => ['nullable', 'string', 'max:120'],
-            'sort' => ['nullable', 'in:latest,popular'],
+            'sort' => ['nullable', 'in:for_you,latest,popular'],
+            'period' => ['nullable', Rule::in(array_keys(FeedService::POPULAR_PERIODS))],
             'category_id' => ['nullable', 'integer', 'exists:categories,id'],
             'language_code' => ['nullable', 'in:id,en'],
             'region_code' => ['nullable', 'string', 'max:16'],
         ]);
 
-        return response()->json($feed->paginate($data));
+        return response()->json($feed->paginate($data, $request->user()));
     }
 
     public function show(RankingPost $post): JsonResponse
     {
         abort_unless($post->status === 'published', 404);
-        $post->load(['creator:id,name,username', 'entries.object', 'comments' => fn ($query) => $query->where('status', 'visible')->with('user:id,name,username')->withCount('likes')->latest()->limit(50)]);
+        $post->load(['creator:id,name,username,avatar_path', 'entries.object', 'comments' => fn ($query) => $query->where('status', 'visible')->with('user:id,name,username,avatar_path')->withCount('likes')->latest()->limit(50)]);
         $scores = DB::table('support_events')
             ->selectRaw('ranking_entry_id, SUM(amount) as points, COUNT(DISTINCT user_id) as supporters')
             ->where('status', 'valid')

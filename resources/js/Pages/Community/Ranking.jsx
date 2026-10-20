@@ -1,6 +1,7 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { api, categoryHashtag, dateLabel, dictionary, Layout, numberLabel, objectImageSrcSet, objectImageUrl, openLoginModal, PageHead, path } from './Shared';
+import { CommentImageAttachButton, CommentImageGallery, CommentImagePreviews, commentPayload, useCommentImages } from './CommentImages';
 import ReportDialog from './ReportDialog';
 import ShareModal from './ShareModal';
 
@@ -142,6 +143,7 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
         setLocalScores(scores);
     }, [scores]);
     const [comment, setComment] = useState('');
+    const commentAttachments = useCommentImages(locale);
     const [reporting, setReporting] = useState(null);
     const [busy, setBusy] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
@@ -421,11 +423,12 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
 
     const submitComment = async (event) => {
         event.preventDefault();
-        if (busy || comment.trim().length < 2) return;
+        if (busy || commentAttachments.processing || comment.trim().length < 2) return;
         setBusy(true);
         try {
-            await api(`/backend/rankings/${post.slug}/comments`, 'POST', { body: comment });
+            await api(`/backend/rankings/${post.slug}/comments`, 'POST', commentPayload({ body: comment }, commentAttachments.images));
             setComment('');
+            commentAttachments.clear();
             showToast(isId ? 'Komentar terkirim!' : 'Comment posted!', 'success');
             router.reload();
         } catch (error) {
@@ -578,6 +581,7 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                     )}
 
                     <p className="vr-comment-text">{item.body}</p>
+                    <CommentImageGallery images={item.images} locale={locale} authorName={item.name} />
 
                     {/* Like & Reply Action Row with Micro-Interactions */}
                     <div className="vr-comment-actions">
@@ -694,7 +698,7 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                 </Link>
                 <span className="vr-nav-separator">/</span>
                 <Link
-                    href={path(locale, `/explore?category_id=${post.category_id}`)}
+                    href={path(locale, `/explore?category=${post.category?.slug}`)}
                     className="vr-nav-category"
                 >
                     {post.category?.name || (isId ? 'Kategori' : 'Category')}
@@ -706,7 +710,7 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                 <div className="vr-header-meta">
                     <div className="vr-meta-left">
                         <Link
-                            href={path(locale, `/explore?category_id=${post.category_id}`)}
+                            href={path(locale, `/explore?category=${post.category?.slug}`)}
                             className="vr-badge-category"
                         >
                             {categoryHashtag(post.category)}
@@ -894,6 +898,11 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                                             <span className={isBoosted ? 'stat-popping' : ''}>
                                                 <strong>{numberLabel(points, locale)}</strong> {t.points}
                                             </span>
+                                            {Number(score?.quick_points ?? 0) > 0 && (
+                                                <span className="vr-candidate-status">
+                                                    {isId ? `termasuk ${numberLabel(score.quick_points, locale)} dari vote cepat` : `includes ${numberLabel(score.quick_points, locale)} from quick votes`}
+                                                </span>
+                                            )}
                                             {!canReceiveSupport && <span className="vr-candidate-status">{unavailableLabel}</span>}
                                         </div>
                                     </div>
@@ -1006,15 +1015,17 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                                     <RankingIcon name="x" size={14} />
                                 </button>
                             )}
+                            <CommentImageAttachButton attachments={commentAttachments} locale={locale} disabled={busy} />
                             <button
                                 type="submit"
                                 className="vr-chat-send-btn"
-                                disabled={busy || comment.trim().length < 2}
+                                disabled={busy || commentAttachments.processing || comment.trim().length < 2}
                                 title={t.sendComment}
                             >
                                 <RankingIcon name="send" size={15} />
                             </button>
                         </div>
+                        <CommentImagePreviews attachments={commentAttachments} locale={locale} />
                     </form>
                 ) : (
                     <div className="vr-guest-inline">

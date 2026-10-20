@@ -19,6 +19,7 @@ class LeaderboardService
                 $join->on('destination.id', '=', DB::raw('COALESCE(source.merged_into_id, support_events.object_id)'));
             })
             ->where('destination.status', 'verified')
+            ->when($rankType !== 'support', fn (Builder $query) => $query->where('support_events.source', 'support'))
             ->when($categoryId, fn (Builder $query) => $query->where('destination.category_id', $categoryId))
             ->when($regionCode, function (Builder $query) use ($regionCode): void {
                 $query->join('ranking_entries', 'ranking_entries.id', '=', 'support_events.ranking_entry_id')
@@ -27,8 +28,8 @@ class LeaderboardService
             })
             ->when($start, fn (Builder $query) => $query->where('support_events.occurred_at', '>=', $start))
             ->when($end, fn (Builder $query) => $query->where('support_events.occurred_at', '<', $end))
-            ->selectRaw("destination.id as object_id, destination.canonical_name as name, destination.slug, {$scoreSql} as score")
-            ->groupBy('destination.id', 'destination.canonical_name', 'destination.slug')
+            ->selectRaw("destination.id as object_id, destination.canonical_name as name, destination.slug, destination.image_path, {$scoreSql} as score")
+            ->groupBy('destination.id', 'destination.canonical_name', 'destination.slug', 'destination.image_path')
             ->orderByDesc('score')
             ->orderBy('destination.id')
             ->limit(50)
@@ -36,10 +37,53 @@ class LeaderboardService
 
         return $query->map(fn ($row): array => [
             'object_id' => $row->object_id,
+            'id' => $row->object_id,
             'name' => $row->name,
             'slug' => $row->slug,
+            'image_path' => $row->image_path,
             'score' => (int) $row->score,
         ])->all();
+    }
+
+    /**
+     * Objects whose support points grew the most over the last 7 days compared with the 7 days before.
+     *
+     * @return array<int, array{object_id: string, id: string, name: string, slug: string, image_path: ?string, score: int, delta: int}>
+     */
+    public function rising(int $limit = 8): array
+    {
+        $current = CarbonImmutable::now('UTC')->subDays(7)->toDateTimeString();
+        $previous = CarbonImmutable::now('UTC')->subDays(14)->toDateTimeString();
+
+        return $this->validEvents()
+            ->join('objects as destination', function ($join): void {
+                $join->on('destination.id', '=', DB::raw('COALESCE(source.merged_into_id, support_events.object_id)'));
+            })
+            ->where('destination.status', 'verified')
+            ->where('support_events.occurred_at', '>=', $previous)
+            ->selectRaw(
+                'destination.id as object_id, destination.canonical_name as name, destination.slug, destination.image_path, '
+                .'SUM(CASE WHEN support_events.occurred_at >= ? THEN support_events.amount ELSE 0 END) as current_points, '
+                .'SUM(CASE WHEN support_events.occurred_at >= ? THEN support_events.amount ELSE -support_events.amount END) as delta',
+                [$current, $current],
+            )
+            ->groupBy('destination.id', 'destination.canonical_name', 'destination.slug', 'destination.image_path')
+            ->havingRaw('SUM(CASE WHEN support_events.occurred_at >= ? THEN support_events.amount ELSE -support_events.amount END) > 0', [$current])
+            ->orderByDesc('delta')
+            ->orderByDesc('current_points')
+            ->orderBy('destination.id')
+            ->limit($limit)
+            ->get()
+            ->map(fn ($row): array => [
+                'object_id' => $row->object_id,
+                'id' => $row->object_id,
+                'name' => $row->name,
+                'slug' => $row->slug,
+                'image_path' => $row->image_path,
+                'score' => (int) $row->current_points,
+                'delta' => (int) $row->delta,
+            ])
+            ->all();
     }
 
     /** @return array<int, array{user_id: int, name: string, username: string, supporters: int, support_points: int, score: float}> */
@@ -56,8 +100,8 @@ class LeaderboardService
             ->whereNull('users.deleted_at')
             ->when($start, fn (Builder $query) => $query->where('support_events.occurred_at', '>=', $start))
             ->when($end, fn (Builder $query) => $query->where('support_events.occurred_at', '<', $end))
-            ->selectRaw('users.id as user_id, users.name, users.username, COUNT(DISTINCT support_events.user_id) as supporters, SUM(support_events.amount) as support_points')
-            ->groupBy('users.id', 'users.name', 'users.username');
+            ->selectRaw('users.id as user_id, users.name, users.username, users.avatar_path, COUNT(DISTINCT CASE WHEN support_events.source = \'support\' THEN support_events.user_id END) as supporters, SUM(support_events.amount) as support_points')
+            ->groupBy('users.id', 'users.name', 'users.username', 'users.avatar_path');
 
         $maximums = DB::query()->fromSub($totals, 'creator_totals')
             ->selectRaw('MAX(supporters) as supporters, MAX(support_points) as support_points')
@@ -71,7 +115,7 @@ class LeaderboardService
 
         return DB::query()->fromSub($totals, 'creator_totals')
             ->select('creator_totals.*')
-            ->selectRaw("{$scoreSql} as score", [(int) $maximums->supporters, (int) $maximums->support_points])
+            ->selectRaw("{$scoreSql} as score", [max(1, (int) $maximums->supporters), max(1, (int) $maximums->support_points)])
             ->orderByDesc('score')
             ->orderByDesc('support_points')
             ->orderByDesc('supporters')
@@ -82,6 +126,7 @@ class LeaderboardService
                 'user_id' => (int) $row->user_id,
                 'name' => $row->name,
                 'username' => $row->username,
+                'avatar_url' => ProfileImageProcessor::url((int) $row->user_id, 'avatar', $row->avatar_path),
                 'supporters' => (int) $row->supporters,
                 'support_points' => (int) $row->support_points,
                 'score' => round((float) $row->score, 1),

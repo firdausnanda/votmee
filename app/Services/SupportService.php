@@ -99,12 +99,19 @@ class SupportService
     public function reverse(SupportEvent $event): void
     {
         DB::transaction(function () use ($event): void {
-            $wallet = $this->lockedWallet(User::findOrFail($event->user_id));
             $lockedEvent = SupportEvent::query()->whereKey($event->id)->lockForUpdate()->firstOrFail();
 
             if ($lockedEvent->status === 'reversed') {
                 return;
             }
+
+            if ($lockedEvent->ledger_id === null) {
+                $lockedEvent->update(['status' => 'reversed']);
+
+                return;
+            }
+
+            $wallet = $this->lockedWallet(User::findOrFail($event->user_id));
 
             PointLedger::create([
                 'wallet_id' => $wallet->id,

@@ -4,26 +4,32 @@ namespace App\Http\Controllers\Backend;
 
 use App\Http\Controllers\Controller;
 use App\Models\Comment;
+use App\Models\CommentImage;
 use App\Models\CommentLike;
 use App\Models\MasterObject;
 use App\Models\ObjectArticle;
 use App\Models\RankingPost;
 use App\Models\Report;
 use App\Models\User;
+use App\Services\CommentImageProcessor;
+use DateTimeImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SocialController extends Controller
 {
-    public function comment(Request $request, RankingPost $post): JsonResponse
+    public function comment(Request $request, RankingPost $post, CommentImageProcessor $images): JsonResponse
     {
         abort_unless($post->status === 'published', 404);
         abort_unless($request->user()->canParticipate(), 403);
         $data = $request->validate([
             'body' => ['required', 'string', 'min:2', 'max:3000'],
             'parent_id' => ['nullable', 'integer', 'exists:comments,id'],
+            ...CommentImageProcessor::rules(),
         ]);
 
         $targetParent = isset($data['parent_id']) ? Comment::findOrFail($data['parent_id']) : null;
@@ -34,13 +40,13 @@ class SocialController extends Controller
         // Normalize 1-level reply threading: if target is already a child reply, link to its root parent
         $effectiveParentId = $targetParent ? ($targetParent->parent_id ?: $targetParent->id) : null;
 
-        return response()->json(Comment::create([
+        return $this->createComment($request, $images, [
             'ranking_post_id' => $post->id,
             'user_id' => $request->user()->id,
             'parent_id' => $effectiveParentId,
             'body' => $data['body'],
             'status' => 'visible',
-        ]), 201);
+        ]);
     }
 
     public function getComments(Request $request, RankingPost $post): JsonResponse
@@ -83,6 +89,7 @@ class SocialController extends Controller
 
             return $c;
         });
+        CommentImage::attachToComments($comments);
 
         $totalCount = DB::table('comments')
             ->where('ranking_post_id', $post->id)
@@ -96,12 +103,13 @@ class SocialController extends Controller
         ]);
     }
 
-    public function objectComment(Request $request, MasterObject $object): JsonResponse
+    public function objectComment(Request $request, MasterObject $object, CommentImageProcessor $images): JsonResponse
     {
         abort_unless($object->status === 'verified' && $request->user()->canParticipate(), 403);
         $data = $request->validate([
             'body' => ['required', 'string', 'min:2', 'max:3000'],
             'parent_id' => ['nullable', 'integer', 'exists:comments,id'],
+            ...CommentImageProcessor::rules(),
         ]);
         $objectIds = $object->mergedFamilyIds();
         $parent = isset($data['parent_id']) ? Comment::findOrFail($data['parent_id']) : null;
@@ -109,13 +117,13 @@ class SocialController extends Controller
             throw ValidationException::withMessages(['parent_id' => __('votmee.parent_mismatch')]);
         }
 
-        return response()->json(Comment::create([
+        return $this->createComment($request, $images, [
             'object_id' => $parent?->object_id ?? $object->id,
             'user_id' => $request->user()->id,
             'parent_id' => $parent ? ($parent->parent_id ?: $parent->id) : null,
             'body' => $data['body'],
             'status' => 'visible',
-        ]), 201);
+        ]);
     }
 
     public function getObjectComments(Request $request, MasterObject $object): JsonResponse
@@ -148,12 +156,13 @@ class SocialController extends Controller
 
             return $comment;
         });
+        CommentImage::attachToComments($comments);
         $total = Comment::query()->whereIn('object_id', $objectIds)->where('status', 'visible')->count();
 
         return response()->json(['comments' => $comments, 'total' => $total, 'has_more' => $offset + $comments->count() < $total]);
     }
 
-    public function articleComment(Request $request, ObjectArticle $article): JsonResponse
+    public function articleComment(Request $request, ObjectArticle $article, CommentImageProcessor $images): JsonResponse
     {
         $this->ensurePublishedArticle($article);
         abort_unless($request->user()->canParticipate(), 403);
@@ -161,6 +170,7 @@ class SocialController extends Controller
         $data = $request->validate([
             'body' => ['required', 'string', 'min:2', 'max:3000'],
             'parent_id' => ['nullable', 'integer', 'exists:comments,id'],
+            ...CommentImageProcessor::rules(),
         ]);
         $parent = isset($data['parent_id']) ? Comment::findOrFail($data['parent_id']) : null;
 
@@ -168,13 +178,13 @@ class SocialController extends Controller
             throw ValidationException::withMessages(['parent_id' => __('votmee.parent_mismatch')]);
         }
 
-        return response()->json(Comment::create([
+        return $this->createComment($request, $images, [
             'article_id' => $article->id,
             'user_id' => $request->user()->id,
             'parent_id' => $parent ? ($parent->parent_id ?: $parent->id) : null,
             'body' => $data['body'],
             'status' => 'visible',
-        ]), 201);
+        ]);
     }
 
     public function getArticleComments(Request $request, ObjectArticle $article): JsonResponse
@@ -209,6 +219,7 @@ class SocialController extends Controller
 
             return $comment;
         });
+        CommentImage::attachToComments($comments);
         $total = Comment::query()->where('article_id', $article->id)->where('status', 'visible')->count();
 
         return response()->json(['comments' => $comments, 'total' => $total, 'has_more' => $offset + $comments->count() < $total]);
@@ -279,6 +290,66 @@ class SocialController extends Controller
             'user' => $user->only('id', 'name', 'username', 'locale', 'region_code'),
             'rankings' => RankingPost::query()->where('creator_id', $user->id)->where('status', 'published')->latest('published_at')->paginate(20),
         ]);
+    }
+
+    /**
+     * Serve a comment image while its comment is visible in a public ranking, object or article.
+     */
+    public function commentImage(Request $request, CommentImage $image): StreamedResponse
+    {
+        $comment = $image->comment;
+        abort_unless($comment?->status === 'visible', 404);
+
+        if ($comment->ranking_post_id !== null) {
+            abort_unless($comment->rankingPost?->status === 'published', 404);
+        } elseif ($comment->object_id !== null) {
+            abort_unless(in_array($comment->object?->status, ['verified', 'merged'], true), 404);
+        } else {
+            $this->ensurePublishedArticle($comment->article);
+        }
+
+        $disk = Storage::disk('local');
+        $path = $image->path;
+        $variant = $request->query('size');
+        if (is_string($variant) && array_key_exists($variant, CommentImageProcessor::VARIANTS)
+            && $disk->exists(CommentImageProcessor::variantPath($path, $variant))) {
+            $path = CommentImageProcessor::variantPath($path, $variant);
+        }
+
+        abort_unless($disk->exists($path), 404);
+
+        // Comments can be hidden by moderators: browsers may keep the image for a day (the hidden comment
+        // disappears from every page anyway), but shared caches such as a CDN must drop it within minutes.
+        $lastModified = $disk->lastModified($path);
+        $response = $disk->response($path, null, ['X-Content-Type-Options' => 'nosniff']);
+        $response->setPublic();
+        $response->setMaxAge(86400);
+        $response->setSharedMaxAge(600);
+        $response->setLastModified(new DateTimeImmutable('@'.$lastModified));
+        $response->setEtag(sha1($path.'|'.$lastModified));
+        $response->isNotModified($request);
+
+        return $response;
+    }
+
+    /**
+     * Create a comment together with its uploaded images.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function createComment(Request $request, CommentImageProcessor $images, array $attributes): JsonResponse
+    {
+        $comment = DB::transaction(function () use ($request, $images, $attributes): Comment {
+            $comment = Comment::create($attributes);
+            $images->attach($comment, $request->file('images', []));
+
+            return $comment;
+        });
+
+        return response()->json([
+            ...$comment->toArray(),
+            'images' => $comment->images->map(fn (CommentImage $image): array => $image->toListing())->all(),
+        ], 201);
     }
 
     private function ensurePublishedArticle(ObjectArticle $article): void

@@ -46,6 +46,11 @@ class Comment extends Model
         return $this->hasMany(Comment::class, 'parent_id')->where('status', 'visible');
     }
 
+    public function images(): HasMany
+    {
+        return $this->hasMany(CommentImage::class)->orderBy('position');
+    }
+
     public function likes(): HasMany
     {
         return $this->hasMany(CommentLike::class);

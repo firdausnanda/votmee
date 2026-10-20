@@ -5,6 +5,9 @@ return [
     'key_reused' => 'Kunci ini sudah dipakai untuk transaksi lain.',
     'candidate_unavailable' => 'Kandidat ini belum dapat menerima dukungan.',
     'insufficient_points' => 'Poin tidak mencukupi.',
+    'quick_vote_done' => 'Kamu sudah memakai vote cepat hari ini. Kembali lagi besok.',
+    'quick_vote_closed' => 'Duel ini sudah ditutup.',
+    'quick_vote_invalid_entry' => 'Pilihan ini bukan bagian dari duel.',
     'account_ineligible' => 'Akun harus terverifikasi dan tidak dibatasi.',
     'review_invalid' => 'Perubahan status objek tidak valid.',
     'merge_target_invalid' => 'Pilih objek terverifikasi lain.',
@@ -17,5 +20,8 @@ return [
     'object_exists' => 'Objek terverifikasi dengan identitas ini sudah ada.',
     'category_exists' => 'Kategori dengan nama ini sudah ada atau tidak valid.',
     'brand_exists' => 'Merek dengan nama ini sudah ada.',
+    'content_image_external' => 'Gambar dalam tulisan harus diunggah melalui editor Votmee.',
+    'content_image_invalid' => 'Salah satu gambar tidak tersedia. Hapus lalu unggah ulang gambarnya.',
+    'content_image_limit' => 'Gunakan maksimal :max gambar dalam satu tulisan.',
     'image_too_large' => 'Gambar terlalu besar. Gunakan gambar maksimal 8000 px per sisi dan 24 megapiksel.',
 ];

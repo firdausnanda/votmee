@@ -1,9 +1,11 @@
 <?php
 
 use App\Models\User;
+use App\Services\OrphanImagePruner;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -43,3 +45,15 @@ Artisan::command('votmee:grant-role {email} {role}', function () {
 
     return 0;
 })->purpose('Assign a Votmee role to an existing account');
+
+Artisan::command('votmee:prune-images {--hours=24 : Only remove uploads older than this many hours} {--dry-run : Report what would be removed without deleting}', function (OrphanImagePruner $pruner) {
+    $hours = max(1, (int) $this->option('hours'));
+    $dryRun = (bool) $this->option('dry-run');
+    $result = $pruner->prune(now()->subHours($hours), $dryRun);
+
+    $this->info(($dryRun ? 'Would remove' : 'Removed')." {$result['unused_content_images']} unused editor image(s) and {$result['orphan_files']} orphan file(s) older than {$hours} hour(s).");
+
+    return 0;
+})->purpose('Remove uploaded images that are no longer referenced');
+
+Schedule::command('votmee:prune-images')->dailyAt('03:00')->withoutOverlapping();

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Backend;
 
 use App\Http\Controllers\Controller;
 use App\Models\MasterObject;
+use App\Services\ContentImageService;
 use App\Services\ObjectImageProcessor;
 use App\Services\ObjectMatchingService;
 use DateTimeImmutable;
@@ -90,7 +91,7 @@ class ObjectController extends Controller
         return $response;
     }
 
-    public function store(Request $request, ObjectMatchingService $matching, ObjectImageProcessor $images): JsonResponse
+    public function store(Request $request, ObjectMatchingService $matching, ObjectImageProcessor $images, ContentImageService $contentImages): JsonResponse
     {
         abort_unless($request->user()->canParticipate(), 403);
         $data = $request->validate([
@@ -111,8 +112,9 @@ class ObjectController extends Controller
         if ($matches->contains(fn (MasterObject $object) => $object->normalized_name === $matching->normalize($data['canonical_name']) && $object->status === 'verified')) {
             throw ValidationException::withMessages(['canonical_name' => __('votmee.object_exists')]);
         }
+        $imageIds = $contentImages->referencedIds($data['summary_body'], $request->user(), 'summary_body');
 
-        $object = DB::transaction(function () use ($data, $request, $matching, $images): MasterObject {
+        $object = DB::transaction(function () use ($data, $request, $matching, $images, $contentImages, $imageIds): MasterObject {
             $object = MasterObject::create([
                 'canonical_name' => $data['canonical_name'],
                 'normalized_name' => $matching->normalize($data['canonical_name']),
@@ -123,7 +125,7 @@ class ObjectController extends Controller
                 'status' => 'pending',
             ]);
 
-            $object->contentRevisions()->create([
+            $revision = $object->contentRevisions()->create([
                 'author_id' => $request->user()->id,
                 'body' => $data['summary_body'],
                 'body_format' => $data['summary_body_format'] ?? 'plain',
@@ -131,6 +133,7 @@ class ObjectController extends Controller
                 'sources' => $data['sources'],
                 'status' => 'pending',
             ]);
+            $contentImages->link($revision, $imageIds);
 
             foreach ($data['sources'] as $source) {
                 DB::table('object_references')->insert([
@@ -158,7 +161,7 @@ class ObjectController extends Controller
         return response()->json($object, 201);
     }
 
-    public function resubmit(Request $request, MasterObject $object, ObjectMatchingService $matching, ObjectImageProcessor $images): JsonResponse
+    public function resubmit(Request $request, MasterObject $object, ObjectMatchingService $matching, ObjectImageProcessor $images, ContentImageService $contentImages): JsonResponse
     {
         abort_unless($object->submitted_by === $request->user()->id && in_array($object->status, ['needs_revision', 'rejected'], true) && $request->user()->canParticipate(), 403);
         $data = $request->validate([
@@ -178,8 +181,9 @@ class ObjectController extends Controller
             throw ValidationException::withMessages(['canonical_name' => __('votmee.object_exists')]);
         }
 
+        $imageIds = $contentImages->referencedIds($data['summary_body'], $request->user(), 'summary_body');
         $previousPendingPath = $object->pending_image_path;
-        DB::transaction(function () use ($object, $request, $data, $normalized, $images): void {
+        DB::transaction(function () use ($object, $request, $data, $normalized, $images, $contentImages, $imageIds): void {
             $updates = [
                 'canonical_name' => $data['canonical_name'],
                 'normalized_name' => $normalized,
@@ -189,7 +193,7 @@ class ObjectController extends Controller
                 $updates['brand_id'] = $data['brand_id'];
             }
             $object->update($updates);
-            $object->contentRevisions()->create([
+            $revision = $object->contentRevisions()->create([
                 'author_id' => $request->user()->id,
                 'body' => $data['summary_body'],
                 'body_format' => $data['summary_body_format'] ?? 'plain',
@@ -197,6 +201,7 @@ class ObjectController extends Controller
                 'sources' => $data['sources'],
                 'status' => 'pending',
             ]);
+            $contentImages->link($revision, $imageIds);
             if ($request->hasFile('image')) {
                 $path = $images->store($request->file('image'), 'objects/'.$object->id);
                 try {

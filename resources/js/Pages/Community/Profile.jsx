@@ -1,7 +1,9 @@
+import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { Link, usePage } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import SelectBox from '../../Components/SelectBox';
-import { categoryHashtag, dateLabel, dictionary, Layout, NavIcon, numberLabel, PageHead, PaginationLinks, path } from './Shared';
+import { ALLOWED_TYPES, MAX_BYTES, optimizeImage } from './ObjectImageField';
+import { api, categoryHashtag, dateLabel, dictionary, Layout, NavIcon, numberLabel, PageHead, PaginationLinks, path } from './Shared';
 
 function formatMemberSince(isoDate, locale) {
     if (!isoDate) return '—';
@@ -84,23 +86,145 @@ function AnimatedNumber({ value, locale }) {
     </>;
 }
 
+const PROFILE_IMAGE_EDGES = { avatar: 1000, cover: 2400 };
+
+const withSize = (url, size) => `${url}&size=${size}`;
+
+/**
+ * Upload, replace or remove the signed-in member's avatar or cover image.
+ */
+function ProfileImageEditor({ type, hasImage, locale, buttonClassName, label, showText = false, onError }) {
+    const isId = locale === 'id';
+    const inputRef = useRef(null);
+    const wrapRef = useRef(null);
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [confirmingRemoval, setConfirmingRemoval] = useState(false);
+
+    useEffect(() => {
+        if (!menuOpen) return undefined;
+
+        const close = (event) => {
+            if (event.type === 'keydown' ? event.key === 'Escape' : !wrapRef.current?.contains(event.target)) setMenuOpen(false);
+        };
+        document.addEventListener('mousedown', close);
+        document.addEventListener('keydown', close);
+
+        return () => {
+            document.removeEventListener('mousedown', close);
+            document.removeEventListener('keydown', close);
+        };
+    }, [menuOpen]);
+
+    const run = async (request) => {
+        setMenuOpen(false);
+        setBusy(true);
+        onError('');
+        try {
+            await request();
+            router.reload({ only: ['profile', 'auth'], preserveScroll: true });
+        } catch (error) {
+            onError(error.message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const upload = (event) => {
+        const selected = event.target.files?.[0];
+        event.target.value = '';
+        if (!selected) return;
+
+        if (!ALLOWED_TYPES.includes(selected.type)) {
+            onError(isId ? 'Format harus JPG, PNG, atau WebP.' : 'The image must be a JPG, PNG, or WebP file.');
+            return;
+        }
+
+        run(async () => {
+            const optimized = await optimizeImage(selected, PROFILE_IMAGE_EDGES[type]).catch(() => selected);
+            if (optimized.size > MAX_BYTES) {
+                throw new Error(isId ? 'Ukuran gambar masih di atas 4 MB. Pilih gambar yang lebih kecil.' : 'The image is still larger than 4 MB. Choose a smaller image.');
+            }
+            const payload = new FormData();
+            payload.append('image', optimized);
+            await api(`/backend/profile/${type}`, 'POST', payload);
+        });
+    };
+
+    const removeImage = async () => {
+        await run(() => api(`/backend/profile/${type}`, 'DELETE'));
+        setConfirmingRemoval(false);
+    };
+
+    const removalCopy = type === 'avatar'
+        ? {
+            title: isId ? 'Hapus foto profil?' : 'Remove profile photo?',
+            body: isId ? 'Foto profil Anda akan dihapus permanen dan diganti dengan inisial nama.' : 'Your profile photo will be permanently removed and replaced with your initial.',
+        }
+        : {
+            title: isId ? 'Hapus sampul?' : 'Remove cover image?',
+            body: isId ? 'Gambar sampul Anda akan dihapus permanen dan diganti dengan sampul bawaan.' : 'Your cover image will be permanently removed and replaced with the default cover.',
+        };
+
+    return <div className={`vpr-image-editor vpr-image-editor-${type}`} ref={wrapRef}>
+        <input type="file" ref={inputRef} accept={ALLOWED_TYPES.join(',')} hidden onChange={upload} />
+        <button
+            type="button"
+            className={buttonClassName}
+            onClick={() => (hasImage ? setMenuOpen(open => !open) : inputRef.current?.click())}
+            disabled={busy}
+            aria-haspopup={hasImage ? 'menu' : undefined}
+            aria-expanded={hasImage ? menuOpen : undefined}
+            aria-label={label}
+            title={label}
+        >
+            <NavIcon name="camera" size={showText ? 9 : 14} />
+            {showText && <span>{busy ? (confirmingRemoval ? (isId ? 'Menghapus…' : 'Removing…') : (isId ? 'Mengunggah…' : 'Uploading…')) : label}</span>}
+        </button>
+        {menuOpen && <div className="vpr-image-menu" role="menu">
+            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); inputRef.current?.click(); }}>
+                <NavIcon name="camera" size={13} />
+                {isId ? 'Ganti gambar' : 'Change image'}
+            </button>
+            <button type="button" role="menuitem" className="is-danger" onClick={() => { setMenuOpen(false); setConfirmingRemoval(true); }}>
+                <NavIcon name="trash" size={13} />
+                {isId ? 'Hapus gambar' : 'Remove image'}
+            </button>
+        </div>}
+        <Dialog open={confirmingRemoval} onClose={() => { if (!busy) setConfirmingRemoval(false); }} className="vt-report-overlay">
+            <DialogBackdrop transition className="vt-report-backdrop vpr-confirm-backdrop" />
+            <div className="vt-report-positioner">
+                <DialogPanel transition className="vt-report-dialog vpr-confirm-dialog">
+                    <div className="vt-report-header">
+                        <div>
+                            <DialogTitle className="vt-report-title">{removalCopy.title}</DialogTitle>
+                            <p className="vt-report-intro">{removalCopy.body}</p>
+                        </div>
+                    </div>
+                    <div className="vt-report-footer">
+                        <div className="vt-report-actions">
+                            <button type="button" className="vt-report-cancel" onClick={() => setConfirmingRemoval(false)} disabled={busy}>
+                                {isId ? 'Batal' : 'Cancel'}
+                            </button>
+                            <button type="button" className="vt-report-submit" onClick={removeImage} disabled={busy}>
+                                {busy ? (isId ? 'Menghapus…' : 'Removing…') : (isId ? 'Hapus' : 'Remove')}
+                            </button>
+                        </div>
+                    </div>
+                </DialogPanel>
+            </div>
+        </Dialog>
+    </div>;
+}
+
 export default function Profile({ locale, categories = [], leaders = [], profile, rankings }) {
     const t = dictionary(locale);
     const currentUser = usePage().props.auth?.user;
     const isOwnProfile = currentUser && currentUser.id === profile.id;
 
-    const fileInputRef = useRef(null);
-    const [coverPreview, setCoverPreview] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('');
-
-    const handleCoverChange = (e) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const url = URL.createObjectURL(file);
-            setCoverPreview(url);
-        }
-    };
+    const [imageError, setImageError] = useState('');
 
     const roleName = profile.role === 'admin'
         ? 'Administrator'
@@ -157,27 +281,26 @@ export default function Profile({ locale, categories = [], leaders = [], profile
             <div className="vpr-page">
                 {/* 1. Hero Cover & Profile Identity Card */}
                 <header className="vpr-hero">
-                    <div
-                        className="vpr-cover"
-                        style={coverPreview ? { backgroundImage: `url(${coverPreview})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
-                    >
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            accept="image/*"
-                            style={{ display: 'none' }}
-                            onChange={handleCoverChange}
-                        />
-                        {(isOwnProfile || !currentUser) && (
-                            <button
-                                type="button"
-                                className="vpr-cover-btn"
-                                onClick={() => fileInputRef.current?.click()}
-                                aria-label={locale === 'id' ? 'Edit foto sampul' : 'Edit cover photo'}
-                            >
-                                <NavIcon name="camera" size={9} />
-                                <span>{locale === 'id' ? 'Edit Sampul' : 'Edit Cover'}</span>
-                            </button>
+                    <div className={`vpr-cover ${profile.cover_url ? 'has-image' : ''}`}>
+                        {profile.cover_url && (
+                            <img
+                                className="vpr-cover-img"
+                                src={profile.cover_url}
+                                srcSet={`${withSize(profile.cover_url, 'small')} 800w, ${profile.cover_url} 1600w`}
+                                sizes="(max-width: 1000px) 100vw, 960px"
+                                alt=""
+                            />
+                        )}
+                        {isOwnProfile && (
+                            <ProfileImageEditor
+                                type="cover"
+                                hasImage={Boolean(profile.cover_url)}
+                                locale={locale}
+                                buttonClassName="vpr-cover-btn"
+                                label={locale === 'id' ? 'Edit Sampul' : 'Edit Cover'}
+                                showText
+                                onError={setImageError}
+                            />
                         )}
                     </div>
 
@@ -185,8 +308,25 @@ export default function Profile({ locale, categories = [], leaders = [], profile
                         <div className="vpr-card-main">
                             <div className="vpr-avatar-wrap">
                                 <div className="vpr-avatar" aria-hidden="true">
-                                    {profile.name ? profile.name.slice(0, 1).toUpperCase() : 'U'}
+                                    {profile.avatar_url ? (
+                                        <img
+                                            src={withSize(profile.avatar_url, 'small')}
+                                            srcSet={`${withSize(profile.avatar_url, 'small')} 96w, ${profile.avatar_url} 400w`}
+                                            sizes="84px"
+                                            alt=""
+                                        />
+                                    ) : (profile.name ? profile.name.slice(0, 1).toUpperCase() : 'U')}
                                 </div>
+                                {isOwnProfile && (
+                                    <ProfileImageEditor
+                                        type="avatar"
+                                        hasImage={Boolean(profile.avatar_url)}
+                                        locale={locale}
+                                        buttonClassName="vpr-avatar-edit-btn"
+                                        label={locale === 'id' ? 'Edit foto profil' : 'Edit profile photo'}
+                                        onError={setImageError}
+                                    />
+                                )}
                                 <span className={`vpr-avatar-role-pill ${roleClass}`}>
                                     {roleName}
                                 </span>
@@ -223,6 +363,7 @@ export default function Profile({ locale, categories = [], leaders = [], profile
                                         {profile.locale?.toUpperCase() || 'ID'}
                                     </span>
                                 </div>
+                                {imageError && <p className="vpr-image-error" role="alert">{imageError}</p>}
                             </div>
                             <div className="vpr-inline-stats" aria-label={locale === 'id' ? 'Statistik Poin' : 'Point Statistics'}>
                                 <div className="vpr-inline-stat">

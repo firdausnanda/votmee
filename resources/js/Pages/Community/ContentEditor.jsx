@@ -1,10 +1,11 @@
 import { Link, router } from '@inertiajs/react';
-import { EditorContent, useEditor } from '@tiptap/react';
+import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import Image from '@tiptap/extension-image';
 import { Markdown } from '@tiptap/markdown';
-import { useState } from 'react';
-import { api, Layout, PageHead, path } from './Shared';
-import ObjectImageField from './ObjectImageField';
+import { useRef, useState } from 'react';
+import { api, Layout, NavIcon, PageHead, path } from './Shared';
+import ObjectImageField, { ALLOWED_TYPES, MAX_BYTES, optimizeImage } from './ObjectImageField';
 
 const lines = (value) => value.split('\n').map((line) => line.trim()).filter(Boolean);
 
@@ -14,6 +15,41 @@ function ToolbarButton({ editor, active, label, onClick, children }) {
 
 function RichEditor({ editor, locale }) {
     const isId = locale === 'id';
+    const imageInputRef = useRef(null);
+    const [imageBusy, setImageBusy] = useState(false);
+    const [imageError, setImageError] = useState('');
+    const selectedImage = useEditorState({
+        editor,
+        selector: ({ editor: current }) => (current?.isActive('image') ? { alt: current.getAttributes('image').alt ?? '' } : null),
+    });
+
+    const insertImage = async (event) => {
+        const selected = event.target.files?.[0];
+        event.target.value = '';
+        if (!selected || !editor) return;
+        setImageError('');
+
+        if (!ALLOWED_TYPES.includes(selected.type)) {
+            setImageError(isId ? 'Format harus JPG, PNG, atau WebP.' : 'The image must be a JPG, PNG, or WebP file.');
+            return;
+        }
+
+        setImageBusy(true);
+        try {
+            const optimized = await optimizeImage(selected).catch(() => selected);
+            if (optimized.size > MAX_BYTES) {
+                throw new Error(isId ? 'Ukuran gambar masih di atas 4 MB. Pilih gambar yang lebih kecil.' : 'The image is still larger than 4 MB. Choose a smaller image.');
+            }
+            const payload = new FormData();
+            payload.append('image', optimized);
+            const uploaded = await api('/backend/content-images', 'POST', payload);
+            editor.chain().focus().setImage({ src: uploaded.url, alt: '' }).run();
+        } catch (failure) {
+            setImageError(failure.message);
+        } finally {
+            setImageBusy(false);
+        }
+    };
     const setLink = () => {
         const current = editor.getAttributes('link').href ?? '';
         const url = window.prompt(isId ? 'URL tautan (https://)' : 'Link URL (https://)', current);
@@ -40,10 +76,24 @@ function RichEditor({ editor, locale }) {
             <ToolbarButton editor={editor} active={editor?.isActive('blockquote')} label={isId ? 'Kutipan' : 'Quote'} onClick={() => editor.chain().focus().toggleBlockquote().run()}>❝</ToolbarButton>
             <span className="vob-toolbar-divider" />
             <ToolbarButton editor={editor} active={editor?.isActive('link')} label={isId ? 'Tautan' : 'Link'} onClick={setLink}>↗</ToolbarButton>
+            <ToolbarButton editor={imageBusy ? null : editor} active={false} label={imageBusy ? (isId ? 'Mengunggah gambar…' : 'Uploading image…') : (isId ? 'Sisipkan gambar' : 'Insert image')} onClick={() => imageInputRef.current?.click()}>
+                {imageBusy ? '…' : <NavIcon name="image" size={15} />}
+            </ToolbarButton>
+            <input ref={imageInputRef} type="file" accept={ALLOWED_TYPES.join(',')} hidden onChange={insertImage} />
             <ToolbarButton editor={editor} active={false} label={isId ? 'Batalkan' : 'Undo'} onClick={() => editor.chain().focus().undo().run()}>↶</ToolbarButton>
             <ToolbarButton editor={editor} active={false} label={isId ? 'Ulangi' : 'Redo'} onClick={() => editor.chain().focus().redo().run()}>↷</ToolbarButton>
         </div>
+        {selectedImage && <label className="vob-image-alt-bar">
+            <span>{isId ? 'Deskripsi gambar' : 'Image description'} <small>{isId ? 'opsional · dibacakan untuk pembaca tunanetra' : 'optional · read aloud to blind readers'}</small></span>
+            <input
+                value={selectedImage.alt}
+                onChange={(event) => editor.chain().updateAttributes('image', { alt: event.target.value.replace(/[[\]]/g, '') }).run()}
+                maxLength={150}
+                placeholder={isId ? 'Mis. Tampak belakang iPhone warna hitam' : 'E.g. Back of a black iPhone'}
+            />
+        </label>}
         <EditorContent editor={editor} aria-label={isId ? 'Isi tulisan' : 'Article body'} />
+        {imageError && <p role="alert" className="vob-form-error">{imageError}</p>}
     </div>;
 }
 
@@ -68,7 +118,7 @@ export default function ContentEditor({ locale, categories, leaders, object, mod
         : isNew ? (isId ? 'Tulis artikel' : 'Write an article')
             : (isId ? 'Usulkan revisi artikel' : 'Suggest an article revision');
     const editor = useEditor({
-        extensions: [StarterKit.configure({ link: { openOnClick: false, defaultProtocol: 'https' } }), Markdown],
+        extensions: [StarterKit.configure({ link: { openOnClick: false, defaultProtocol: 'https' } }), Image.configure({ allowBase64: false }), Markdown],
         content: initial?.body ?? '',
         contentType: 'markdown',
         editorProps: { attributes: { class: 'vob-richbox-content', 'aria-label': isId ? 'Isi tulisan' : 'Article body' } },
