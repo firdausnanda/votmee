@@ -19,6 +19,7 @@ use App\Services\ObjectMatchingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -56,7 +57,7 @@ class CommunityController extends Controller
     public function ranking(Request $request, string $locale, RankingPost $post, LeaderboardService $leaderboard): Response
     {
         abort_unless($post->status === 'published', 404);
-        $post->load(['creator:id,name,username', 'category:id,name,slug', 'entries.object:id,canonical_name,slug,status']);
+        $post->load(['creator:id,name,username', 'category:id,name,slug', 'entries.object:id,canonical_name,slug,status,image_path']);
         $scores = DB::table('support_events')->where('status', 'valid')->whereIn('ranking_entry_id', $post->entries->pluck('id'))
             ->selectRaw('ranking_entry_id, SUM(amount) as points, COUNT(DISTINCT user_id) as supporters')
             ->groupBy('ranking_entry_id')->get()->keyBy('ranking_entry_id');
@@ -120,16 +121,48 @@ class CommunityController extends Controller
             : null;
         $articles = $object->status === 'verified'
             ? ObjectArticle::query()->whereIn('object_id', $objectIds)->whereNotNull('published_revision_id')
-                ->with(['author:id,name,username', 'publishedRevision'])->latest()->paginate(10, ['*'], 'articles_page')
+                ->with(['author:id,name,username', 'publishedRevision:id,title,body,body_format,language_code,published_at'])
+                ->latest()->orderByDesc('id')->paginate(10, ['*'], 'articles_page')->withQueryString()
             : null;
+        $articles?->getCollection()->each(function (ObjectArticle $article): void {
+            $revision = $article->publishedRevision;
+
+            if ($revision === null) {
+                return;
+            }
+
+            $revision->setAttribute('excerpt', $this->contentExcerpt($revision));
+            $revision->makeHidden(['body', 'body_format']);
+        });
         $myRevisions = $request->user()
             ? ObjectContentRevision::query()->where('object_id', $object->id)->where('author_id', $request->user()->id)
                 ->with('article:id,type,published_revision_id')->latest()->limit(20)->get()
             : collect();
+        $myRevisions->each(function (ObjectContentRevision $revision): void {
+            $revision->setAttribute('excerpt', $this->contentExcerpt($revision));
+            $revision->makeHidden(['body', 'body_format', 'sources']);
+        });
         $stats = DB::table('support_events')->where('object_id', $object->id)->where('status', 'valid')
             ->selectRaw('COALESCE(SUM(amount), 0) as points, COUNT(DISTINCT user_id) as supporters')->first();
-        $rankings = RankingPost::query()->where('status', 'published')->whereHas('entries', fn ($query) => $query->where('object_id', $object->id))
-            ->with(['creator:id,name,username', 'category:id,name,slug'])->latest('published_at')->limit(12)->get();
+        $rankingSearchInput = $request->query('ranking_q', '');
+        $rankingSearch = is_string($rankingSearchInput) ? Str::limit(trim($rankingSearchInput), 100, '') : '';
+        $rankingSort = $request->query('ranking_sort') === 'oldest' ? 'oldest' : 'latest';
+        $rankingsQuery = RankingPost::query()->where('status', 'published')
+            ->whereHas('entries', fn ($query) => $query->where('object_id', $object->id));
+        $rankingTotal = $rankingSearch !== '' ? (clone $rankingsQuery)->count() : null;
+
+        if ($rankingSearch !== '') {
+            $rankingsQuery->where(fn ($query) => $query
+                ->where('title', 'like', '%'.$rankingSearch.'%')
+                ->orWhereHas('creator', fn ($creatorQuery) => $creatorQuery->where('name', 'like', '%'.$rankingSearch.'%')));
+        }
+
+        $rankings = $rankingsQuery->with(['creator:id,name,username', 'category:id,name,slug'])
+            ->orderBy('published_at', $rankingSort === 'oldest' ? 'asc' : 'desc')
+            ->orderBy('id', $rankingSort === 'oldest' ? 'asc' : 'desc')
+            ->paginate(10, ['id', 'creator_id', 'category_id', 'slug', 'title', 'published_at'], 'rankings_page')
+            ->withQueryString();
+        $rankingTotal ??= $rankings->total();
 
         return Inertia::render('Community/Object', [
             ...$this->shared($request),
@@ -143,7 +176,33 @@ class CommunityController extends Controller
                 : null,
             'stats' => $stats,
             'rankings' => $rankings,
+            'rankingTotal' => $rankingTotal,
+            'rankingFilters' => ['search' => $rankingSearch, 'sort' => $rankingSort],
             'leaders' => $leaderboard->leaders(),
+        ]);
+    }
+
+    public function article(Request $request, string $locale, ObjectArticle $article): Response
+    {
+        $article->load(['author:id,name,username', 'object', 'publishedRevision']);
+        $revision = $article->publishedRevision;
+
+        abort_unless($revision?->status === 'published' && $revision->article_id === $article->id, 404);
+
+        $object = $article->object;
+
+        while ($object->status === 'merged') {
+            $object = MasterObject::findOrFail($object->merged_into_id);
+        }
+
+        abort_unless($object->status === 'verified', 404);
+
+        return Inertia::render('Community/Article', [
+            ...$this->shared($request),
+            'article' => $article->only('id', 'type', 'author_id'),
+            'author' => $article->author?->only('name', 'username'),
+            'revision' => $revision->only('id', 'title', 'body', 'body_format', 'language_code', 'sources', 'published_at'),
+            'object' => $object->only('slug', 'canonical_name'),
         ]);
     }
 
@@ -301,7 +360,8 @@ class CommunityController extends Controller
         return Inertia::render('Community/Admin', [
             ...$this->shared($request),
             'leaders' => $leaderboard->leaders(),
-            'objects' => MasterObject::query()->whereIn('status', ['pending', 'needs_revision'])
+            'objects' => MasterObject::query()->where(fn ($query) => $query->whereIn('status', ['pending', 'needs_revision'])
+                ->orWhere(fn ($images) => $images->where('status', 'verified')->whereNotNull('pending_image_path')))
                 ->with(['contentRevisions' => fn ($query) => $query->whereNull('article_id')->latest()])
                 ->oldest()->paginate(20, ['*'], 'objects_page'),
             'contentQueue' => ObjectContentRevision::query()->where('status', 'pending')
@@ -311,7 +371,8 @@ class CommunityController extends Controller
             'mergedObjects' => MasterObject::query()->where('status', 'merged')->latest()->limit(20)->get(['id', 'canonical_name', 'status']),
             'isAdmin' => $request->user()->can('administer'),
             'stats' => [
-                'pendingObjects' => MasterObject::query()->whereIn('status', ['pending', 'needs_revision'])->count(),
+                'pendingObjects' => MasterObject::query()->where(fn ($query) => $query->whereIn('status', ['pending', 'needs_revision'])
+                    ->orWhere(fn ($images) => $images->where('status', 'verified')->whereNotNull('pending_image_path')))->count(),
                 'openReports' => Report::query()->where('status', 'open')->count(),
                 'verifiedObjects' => MasterObject::query()->where('status', 'verified')->count(),
                 'totalCategories' => Category::query()->count(),
@@ -337,6 +398,16 @@ class CommunityController extends Controller
                 ->limit(5)
                 ->get(['id', 'ranking_post_id', 'user_id', 'body', 'created_at']),
         ];
+    }
+
+    private function contentExcerpt(ObjectContentRevision $revision): string
+    {
+        $content = $revision->body_format === 'markdown'
+            ? Str::markdown($revision->body, ['html_input' => 'strip', 'allow_unsafe_links' => false])
+            : $revision->body;
+        $plainText = Str::squish(html_entity_decode(strip_tags($content), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+
+        return Str::limit($plainText, 180);
     }
 
     private function locale(Request $request): string

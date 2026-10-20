@@ -21,7 +21,9 @@ class ModerationService
             throw ValidationException::withMessages(['status' => __('votmee.review_invalid')]);
         }
 
-        DB::transaction(function () use ($actor, $object, $status, $reason): void {
+        $previousImagePath = $object->image_path;
+        $discardedImagePath = null;
+        DB::transaction(function () use ($actor, $object, $status, $reason, &$discardedImagePath): void {
             $pendingSummary = $object->contentRevisions()->whereNull('article_id')->where('status', 'pending')->latest()->first();
             if ($pendingSummary && ($object->status !== 'verified' || $status !== 'verified')) {
                 $pendingSummary->update([
@@ -31,9 +33,53 @@ class ModerationService
                     'published_at' => $status === 'verified' ? now('UTC') : null,
                 ]);
             }
-            $object->update(['status' => $status, 'verified_by' => $status === 'verified' ? $actor->id : null]);
+            $updates = ['status' => $status, 'verified_by' => $status === 'verified' ? $actor->id : null];
+            if ($status === 'verified' && $object->pending_image_path) {
+                $updates['image_path'] = $object->pending_image_path;
+                $updates['pending_image_path'] = null;
+                $updates['pending_image_by'] = null;
+            }
+            if ($status === 'rejected' && $object->pending_image_path) {
+                $discardedImagePath = $object->pending_image_path;
+                $updates['pending_image_path'] = null;
+                $updates['pending_image_by'] = null;
+            }
+            $object->update($updates);
             $this->audit($actor, 'object.review', 'object', $object->id, ['status' => $status, 'reason' => $reason]);
         });
+
+        $images = app(ObjectImageProcessor::class);
+        if ($status === 'verified' && $previousImagePath && $previousImagePath !== $object->image_path) {
+            $images->delete($previousImagePath);
+        }
+        $images->delete($discardedImagePath);
+    }
+
+    public function reviewImage(User $actor, MasterObject $object, string $status, string $reason): void
+    {
+        if (! in_array($status, ['approved', 'rejected'], true)) {
+            throw ValidationException::withMessages(['status' => __('votmee.review_invalid')]);
+        }
+
+        [$previousImagePath, $pendingImagePath] = DB::transaction(function () use ($actor, $object, $status, $reason): array {
+            $lockedObject = MasterObject::query()->lockForUpdate()->findOrFail($object->id);
+            if ($lockedObject->status !== 'verified' || ! $lockedObject->pending_image_path) {
+                throw ValidationException::withMessages(['status' => __('votmee.review_invalid')]);
+            }
+            $previousImagePath = $lockedObject->image_path;
+            $pendingImagePath = $lockedObject->pending_image_path;
+            $lockedObject->update([
+                'image_path' => $status === 'approved' ? $pendingImagePath : $previousImagePath,
+                'pending_image_path' => null,
+                'pending_image_by' => null,
+            ]);
+            $this->audit($actor, 'object.image.review', 'object', $object->id, ['status' => $status, 'reason' => $reason]);
+
+            return [$previousImagePath, $pendingImagePath];
+        });
+
+        $unusedPath = $status === 'approved' ? $previousImagePath : $pendingImagePath;
+        app(ObjectImageProcessor::class)->delete($unusedPath);
     }
 
     public function reviewContentRevision(User $actor, ObjectContentRevision $revision, string $status, string $reason): void

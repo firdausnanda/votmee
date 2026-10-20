@@ -1,5 +1,5 @@
-import { Link, usePage } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { Link, router, usePage } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
 import {
     api,
     dateLabel,
@@ -7,6 +7,8 @@ import {
     Layout,
     NavIcon,
     numberLabel,
+    objectImageSrcSet,
+    objectImageUrl,
     openLoginModal,
     PageHead,
     path,
@@ -15,41 +17,75 @@ import {
 import ReportDialog from './ReportDialog';
 import ShareModal from './ShareModal';
 import ObjectKnowledge from './ObjectKnowledge';
+import ObjectImageField from './ObjectImageField';
 
-export default function ObjectPage({ locale, categories, leaders, object, stats, rankings = [], summary, articles, myRevisions = [], reviewFeedback }) {
+export default function ObjectPage({ locale, categories, leaders, object, stats, rankings, rankingTotal = 0, rankingFilters = {}, summary, articles, myRevisions = [], reviewFeedback }) {
     const t = dictionary(locale);
     const user = usePage().props.auth?.user;
     const { createRanking } = useCommunityAccess();
     const [reporting, setReporting] = useState(false);
     const [message, setMessage] = useState('');
     const [shareOpen, setShareOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [sortOrder, setSortOrder] = useState('latest');
+    const [imageFormOpen, setImageFormOpen] = useState(false);
+    const [imageFile, setImageFile] = useState(null);
+    const [imageBusy, setImageBusy] = useState(false);
+    const [imageError, setImageError] = useState('');
+    const [searchQuery, setSearchQuery] = useState(rankingFilters.search ?? '');
+    const sortOrder = rankingFilters.sort ?? 'latest';
+    const visibleRankings = rankings?.data ?? [];
+
+    useEffect(() => setSearchQuery(rankingFilters.search ?? ''), [rankingFilters.search]);
 
     const displayName = object.translations?.find(item => item.locale === locale)?.name ?? object.canonical_name;
+    const hasPublishedImage = object.status === 'verified' && Boolean(object.image_path);
+    const imageUrl = hasPublishedImage
+        ? objectImageUrl(object, 'thumb')
+        : object.pending_image_path && object.pending_image_by === user?.id
+            ? `/backend/objects/${object.id}/image?pending=1`
+            : null;
     const objectUrl = typeof window !== 'undefined' ? window.location.href : '';
     const shareText = locale === 'id'
         ? `Lihat objek ${displayName} di Votmee!`
         : `Check out ${displayName} on Votmee!`;
 
-    const filteredRankings = useMemo(() => {
-        const query = searchQuery.trim().toLowerCase();
-        const matchingRankings = query ? rankings.filter(post =>
-            post.title?.toLowerCase().includes(query) ||
-            post.creator?.name?.toLowerCase().includes(query)
-        ) : rankings;
+    const navigateRankings = (search, sort) => {
+        const url = new URL(window.location.href);
+        const trimmedSearch = search.trim();
 
-        return [...matchingRankings].sort((first, second) => {
-            const dateDifference = (Date.parse(second.published_at) || 0) - (Date.parse(first.published_at) || 0);
-            return sortOrder === 'latest' ? dateDifference : -dateDifference;
-        });
-    }, [rankings, searchQuery, sortOrder]);
+        if (trimmedSearch) url.searchParams.set('ranking_q', trimmedSearch);
+        else url.searchParams.delete('ranking_q');
+
+        if (sort === 'oldest') url.searchParams.set('ranking_sort', 'oldest');
+        else url.searchParams.delete('ranking_sort');
+
+        url.searchParams.delete('rankings_page');
+        router.get(url.pathname + url.search, {}, { preserveScroll: true });
+    };
 
     const report = async (reason) => {
         await api('/backend/reports', 'POST', { target_type: 'object', target_id: object.id, reason });
         setReporting(false);
         setMessage(locale === 'id' ? 'Laporan berhasil terkirim.' : 'Report successfully submitted.');
         setTimeout(() => setMessage(''), 4000);
+    };
+
+    const proposeImage = async (event) => {
+        event.preventDefault();
+        if (!imageFile) return;
+        setImageBusy(true);
+        setImageError('');
+        try {
+            const payload = new FormData();
+            payload.append('image', imageFile);
+            await api(`/backend/objects/${object.id}/image`, 'POST', payload);
+            setImageFormOpen(false);
+            setImageFile(null);
+            router.reload({ preserveScroll: true });
+        } catch (error) {
+            setImageError(error.message);
+        } finally {
+            setImageBusy(false);
+        }
     };
 
     return (
@@ -123,7 +159,11 @@ export default function ObjectPage({ locale, categories, leaders, object, stats,
 
                     <div className="vob-spotlight-inner">
                         <div className="vob-spotlight-main">
-                            <div className="vob-spotlight-details">
+                            <div className="vob-object-identity">
+                                <div className="vob-object-image">
+                                    {imageUrl ? <img src={imageUrl} srcSet={hasPublishedImage ? objectImageSrcSet(object, true) : undefined} sizes="112px" alt={displayName} /> : <span aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span>}
+                                </div>
+                                <div className="vob-spotlight-details">
                                 <h1 className="vob-title">{displayName}</h1>
 
                                 {object.canonical_name && object.canonical_name !== displayName && (
@@ -145,6 +185,7 @@ export default function ObjectPage({ locale, categories, leaders, object, stats,
                                         </div>
                                     </div>
                                 )}
+                                </div>
                             </div>
                         </div>
 
@@ -162,6 +203,23 @@ export default function ObjectPage({ locale, categories, leaders, object, stats,
 
                         </div>
                     </div>
+                    {object.status === 'verified' && (
+                        <div className="vob-image-contribution">
+                            {object.pending_image_path ? <span>{locale === 'id' ? 'Usulan gambar sedang ditinjau' : 'An image suggestion is under review'}</span> : (
+                                <button type="button" onClick={() => user ? setImageFormOpen(!imageFormOpen) : openLoginModal()}>
+                                    <NavIcon name="camera" size={14} />
+                                    {locale === 'id' ? 'Usulkan gambar objek' : 'Suggest an object image'}
+                                </button>
+                            )}
+                        </div>
+                    )}
+                    {imageFormOpen && !object.pending_image_path && (
+                        <form className="vob-image-proposal" onSubmit={proposeImage}>
+                            <ObjectImageField file={imageFile} onChange={setImageFile} locale={locale} currentUrl={imageUrl} compact />
+                            {imageError && <p role="alert" className="vob-form-error">{imageError}</p>}
+                            <button type="submit" disabled={imageBusy || !imageFile}>{imageBusy ? (locale === 'id' ? 'Mengirim...' : 'Submitting...') : (locale === 'id' ? 'Kirim untuk ditinjau' : 'Submit for review')}</button>
+                        </form>
+                    )}
                 </header>
 
                 <ObjectKnowledge object={object} summary={summary} articles={articles} myRevisions={myRevisions} reviewFeedback={reviewFeedback} locale={locale} />
@@ -174,7 +232,6 @@ export default function ObjectPage({ locale, categories, leaders, object, stats,
                             <div>
                                 <div className="vob-panel-title-row">
                                     <h2 className="vob-panel-title">{t.objectRankings}</h2>
-                                    <span className="vob-badge-pill" aria-live="polite">{numberLabel(filteredRankings.length, locale)}</span>
                                 </div>
                                 <p className="vob-panel-subtitle">
                                     {locale === 'id'
@@ -183,14 +240,14 @@ export default function ObjectPage({ locale, categories, leaders, object, stats,
                                 </p>
                             </div>
 
-                            {rankings.length > 1 && (
+                            {(rankingTotal > 0 || rankingFilters.search) && (
                                 <div className="vob-panel-tools">
                                     <div className="vob-sort-control" role="group" aria-label={locale === 'id' ? 'Urutan ranking' : 'Ranking order'}>
                                         <button
                                             type="button"
                                             className={sortOrder === 'latest' ? 'active' : ''}
                                             aria-pressed={sortOrder === 'latest'}
-                                            onClick={() => setSortOrder('latest')}
+                                            onClick={() => navigateRankings(searchQuery, 'latest')}
                                         >
                                             {locale === 'id' ? 'Terbaru' : 'Newest'}
                                         </button>
@@ -198,40 +255,42 @@ export default function ObjectPage({ locale, categories, leaders, object, stats,
                                             type="button"
                                             className={sortOrder === 'oldest' ? 'active' : ''}
                                             aria-pressed={sortOrder === 'oldest'}
-                                            onClick={() => setSortOrder('oldest')}
+                                            onClick={() => navigateRankings(searchQuery, 'oldest')}
                                         >
                                             {locale === 'id' ? 'Terlama' : 'Oldest'}
                                         </button>
                                     </div>
-                                    {rankings.length > 2 && (
-                                        <div className="vob-search-filter">
-                                            <NavIcon name="search" size={13} className="vob-filter-icon" />
-                                            <input
-                                                type="text"
-                                                value={searchQuery}
-                                                onChange={(event) => setSearchQuery(event.target.value)}
-                                                placeholder={locale === 'id' ? 'Saring ranking...' : 'Filter rankings...'}
-                                                aria-label={locale === 'id' ? 'Saring ranking' : 'Filter rankings'}
-                                            />
-                                            {searchQuery && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setSearchQuery('')}
-                                                    className="vob-filter-clear"
-                                                    aria-label={locale === 'id' ? 'Hapus' : 'Clear'}
-                                                >
-                                                    ✕
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
+                                    <form className="vob-search-filter" role="search" onSubmit={(event) => { event.preventDefault(); navigateRankings(searchQuery, sortOrder); }}>
+                                        <span className="vob-filter-leading" aria-hidden="true"><NavIcon name="search" size={15} /></span>
+                                        <input
+                                            type="text"
+                                            value={searchQuery}
+                                            onChange={(event) => setSearchQuery(event.target.value)}
+                                            maxLength={100}
+                                            placeholder={locale === 'id' ? 'Cari ranking...' : 'Search rankings...'}
+                                            aria-label={locale === 'id' ? 'Cari ranking dalam objek ini' : 'Search rankings for this object'}
+                                        />
+                                        {searchQuery && (
+                                            <button
+                                                type="button"
+                                                onClick={() => { setSearchQuery(''); navigateRankings('', sortOrder); }}
+                                                className="vob-filter-clear"
+                                                aria-label={locale === 'id' ? 'Hapus pencarian ranking' : 'Clear ranking search'}
+                                            >
+                                                <span aria-hidden="true">×</span>
+                                            </button>
+                                        )}
+                                        <button type="submit" className="vob-filter-submit">
+                                            {locale === 'id' ? 'Cari' : 'Search'}
+                                        </button>
+                                    </form>
                                 </div>
                             )}
                         </div>
 
-                        {filteredRankings.length > 0 ? (
+                        {visibleRankings.length > 0 ? (
                             <div className="vob-stream-list">
-                                {filteredRankings.map(post => (
+                                {visibleRankings.map(post => (
                                     <article className="vob-stream-card" key={post.id}>
                                         <div className="vob-stream-top">
                                             <div className="vob-stream-cat-wrap">
@@ -288,11 +347,11 @@ export default function ObjectPage({ locale, categories, leaders, object, stats,
                                 </div>
                                 <h3>{t.noRankings}</h3>
                                 <p>
-                                    {searchQuery
+                                    {rankingFilters.search
                                         ? (locale === 'id' ? 'Tidak ada ranking yang cocok dengan kata kunci pencarian.' : 'No rankings matched your search term.')
                                         : (locale === 'id' ? 'Objek ini belum dimasukkan ke dalam daftar ranking manapun.' : 'This object has not been featured in any ranking list yet.')}
                                 </p>
-                                {createRanking && !searchQuery && (
+                                {createRanking && !rankingFilters.search && (
                                     <div style={{ marginTop: 14 }}>
                                         <Link href={path(locale, '/create')} className="vpr-btn vpr-btn-primary" style={{ display: 'inline-flex' }}>
                                             <NavIcon name="plus" size={14} />
@@ -302,6 +361,22 @@ export default function ObjectPage({ locale, categories, leaders, object, stats,
                                 )}
                             </div>
                         )}
+
+                        {rankings?.last_page > 1 && (
+                            <nav aria-label={locale === 'id' ? 'Halaman ranking objek' : 'Object ranking pages'} className="vob-article-pages">
+                                {rankings.prev_page_url && (
+                                    <Link href={rankings.prev_page_url} preserveScroll className="vob-page-nav-btn">
+                                        ← {locale === 'id' ? 'Sebelumnya' : 'Previous'}
+                                    </Link>
+                                )}
+                                <span className="vob-page-nav-info">{rankings.current_page} / {rankings.last_page}</span>
+                                {rankings.next_page_url && (
+                                    <Link href={rankings.next_page_url} preserveScroll className="vob-page-nav-btn">
+                                        {locale === 'id' ? 'Berikutnya' : 'Next'} →
+                                    </Link>
+                                )}
+                            </nav>
+                        )}
                     </div>
 
                     {/* Right Sidebar: Entity Information & Interactive Widgets */}
@@ -309,7 +384,6 @@ export default function ObjectPage({ locale, categories, leaders, object, stats,
                         {/* Widget 1: Entity Spec Matrix */}
                         <div className="vob-widget-card">
                             <div className="vob-widget-head">
-                                <NavIcon name="sparkles" size={15} className="vob-widget-head-icon" />
                                 <h4>{locale === 'id' ? 'Informasi Objek' : 'Object Details'}</h4>
                             </div>
 
@@ -326,7 +400,7 @@ export default function ObjectPage({ locale, categories, leaders, object, stats,
                                 <div className="vob-spec-row">
                                     <span className="vob-spec-key">{locale === 'id' ? 'Tampil di Ranking' : 'Appears in'}</span>
                                     <span className="vob-spec-val">
-                                        {rankings.length} {locale === 'id' ? 'Daftar' : 'Lists'}
+                                        {numberLabel(rankingTotal, locale)} {locale === 'id' ? 'Daftar' : 'Lists'}
                                     </span>
                                 </div>
                             </div>
@@ -335,7 +409,6 @@ export default function ObjectPage({ locale, categories, leaders, object, stats,
                         {/* Widget 2: How Support Voting Works */}
                         <div className="vob-widget-card vob-guide-widget">
                             <div className="vob-widget-head">
-                                <NavIcon name="award" size={15} className="vob-widget-head-icon" />
                                 <h4>{locale === 'id' ? 'Cara Mendukung Objek' : 'How to Support'}</h4>
                             </div>
 

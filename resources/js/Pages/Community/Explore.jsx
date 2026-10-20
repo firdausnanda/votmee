@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { categoryHashtag, dictionary, EmptyState, Layout, Leaderboard, numberLabel, PageHead, PaginationLinks, RankingCard, path } from './Shared';
+import { categoryHashtag, dictionary, EmptyState, Layout, Leaderboard, numberLabel, objectImageSrcSet, objectImageUrl, PageHead, PaginationLinks, RankingCard, path } from './Shared';
 
 export default function Explore({ locale, categories, leaders, feed, filters, objects }) {
     const t = dictionary(locale);
@@ -51,7 +51,11 @@ export default function Explore({ locale, categories, leaders, feed, filters, ob
                 </div>
                 {objects.length ? <div className="vx-object-results">
                     {objects.map((object) => <Link key={object.id} href={path(locale, `/object/${object.slug}`)}>
-                        <span className="vx-object-avatar" aria-hidden="true">{object.canonical_name.slice(0, 1).toUpperCase()}</span>
+                        <span className="vx-object-avatar" aria-hidden="true">
+                            {object.status === 'verified' && object.image_path
+                                ? <img src={objectImageUrl(object, 'small')} srcSet={objectImageSrcSet(object)} sizes="40px" alt="" loading="lazy" />
+                                : object.canonical_name.slice(0, 1).toUpperCase()}
+                        </span>
                         <span className="vx-object-name">{object.canonical_name}</span>
                         <small className={object.status === 'verified' ? 'is-verified' : ''}>
                             {object.status === 'verified' ? t.verified : t.pending}

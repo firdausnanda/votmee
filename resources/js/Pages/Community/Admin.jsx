@@ -162,6 +162,28 @@ export default function Admin({
         }
     };
 
+    const reviewObjectImage = async (object, status) => {
+        if (reason.trim().length < 5) {
+            setMessage(isId ? 'Alasan tindakan minimal 5 karakter.' : 'Reason must be at least 5 characters.');
+            setMessageType('error');
+            return;
+        }
+        setBusy(true);
+        setMessage('');
+        try {
+            await api(`/admin/backend/objects/${object.id}/image`, 'PATCH', { status, reason });
+            setReason('');
+            setMessage(isId ? 'Gambar objek berhasil ditinjau.' : 'Object image reviewed.');
+            setMessageType('success');
+            router.reload();
+        } catch (error) {
+            setMessage(error.message);
+            setMessageType('error');
+        } finally {
+            setBusy(false);
+        }
+    };
+
     const reviewContent = async (revision, status) => {
         if (reason.trim().length < 5) {
             setMessage(isId ? 'Alasan tindakan minimal 5 karakter.' : 'Reason must be at least 5 characters.');
@@ -460,6 +482,7 @@ export default function Admin({
                                                         <td>
                                                             <div className="vap-object-name-col">
                                                                 <strong>{object.canonical_name}</strong>
+                                                                {object.pending_image_path && <img className="vap-object-image-preview" src={`/backend/objects/${object.id}/image?pending=1`} alt={isId ? `Usulan gambar ${object.canonical_name}` : `Proposed image for ${object.canonical_name}`} />}
                                                                 {object.content_revisions?.[0] && <details className="vap-subtext">
                                                                     <summary>{isId ? 'Baca ringkasan yang diajukan' : 'Read submitted summary'}</summary>
                                                                     <ContentBody revision={object.content_revisions[0]} />
@@ -480,6 +503,10 @@ export default function Admin({
                                                         </td>
                                                         <td className="text-right">
                                                             <div className="vap-action-btn-group">
+                                                                {object.status === 'verified' ? <>
+                                                                    <button type="button" className="vap-btn vap-btn-success" disabled={busy} onClick={() => reviewObjectImage(object, 'approved')}>✓ {isId ? 'Setujui gambar' : 'Approve image'}</button>
+                                                                    <button type="button" className="vap-btn vap-btn-danger" disabled={busy} onClick={() => reviewObjectImage(object, 'rejected')}>✕ {isId ? 'Tolak gambar' : 'Reject image'}</button>
+                                                                </> : <>
                                                                 <button
                                                                     type="button"
                                                                     className="vap-btn vap-btn-success"
@@ -507,6 +534,7 @@ export default function Admin({
                                                                 >
                                                                     ✕ {t.reject}
                                                                 </button>
+                                                                </>}
                                                             </div>
                                                         </td>
                                                     </tr>

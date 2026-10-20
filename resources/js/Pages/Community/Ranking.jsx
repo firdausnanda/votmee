@@ -1,6 +1,6 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
-import { api, categoryHashtag, dateLabel, dictionary, Layout, numberLabel, openLoginModal, PageHead, path } from './Shared';
+import { api, categoryHashtag, dateLabel, dictionary, Layout, numberLabel, objectImageSrcSet, objectImageUrl, openLoginModal, PageHead, path } from './Shared';
 import ReportDialog from './ReportDialog';
 import ShareModal from './ShareModal';
 
@@ -820,7 +820,6 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                         const points = Number(score?.points ?? 0);
                         const percent = totalPoints ? Math.round((points / totalPoints) * 100) : 0;
                         const rank = index + 1;
-                        const imageIndex = ((Number(entry.position ?? rank) - 1) % 5) + 1;
                         const isBoosted = boostedEntryId === entry.id;
                         const canReceiveSupport = ['verified', 'merged'].includes(entry.object?.status);
                         const unavailableLabel = entry.object?.status === 'rejected'
@@ -842,12 +841,9 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                                         className="vr-thumb-link"
                                         aria-label={entry.object.canonical_name}
                                     >
-                                        <img
-                                            src={`/images/stitch/object-${imageIndex}.jpg`}
-                                            alt=""
-                                            className="vr-thumb-img"
-                                            loading="lazy"
-                                        />
+                                        {entry.object.image_path
+                                            ? <img src={objectImageUrl(entry.object, 'small')} srcSet={objectImageSrcSet(entry.object)} sizes="44px" alt="" className="vr-thumb-img" loading="lazy" />
+                                            : <span className="vr-thumb-placeholder" aria-hidden="true">{entry.object.canonical_name.slice(0, 1).toUpperCase()}</span>}
                                     </Link>
 
                                     <div className="vr-info-col">
@@ -1182,11 +1178,9 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                         <div className="vr-modal-body vr-support-body">
                             <div className="vr-support-summary">
                                 <div className="vr-support-target">
-                                    <img
-                                        src={`/images/stitch/object-${((Number(selected.position ?? 1) - 1) % 5) + 1}.jpg`}
-                                        alt=""
-                                        className="vr-support-target-image"
-                                    />
+                                    {selected.object.image_path
+                                        ? <img src={objectImageUrl(selected.object, 'small')} srcSet={objectImageSrcSet(selected.object)} sizes="48px" alt="" className="vr-support-target-image" />
+                                        : <span className="vr-support-target-image vr-thumb-placeholder" aria-hidden="true">{selected.object.canonical_name.slice(0, 1).toUpperCase()}</span>}
                                     <div className="vr-support-target-copy">
                                         <span>{isId ? 'Kandidat' : 'Candidate'}</span>
                                         <strong>{selected.object.canonical_name}</strong>

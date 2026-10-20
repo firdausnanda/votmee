@@ -2,6 +2,7 @@ import { Link, router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import SelectBox from '../../Components/SelectBox';
 import { api, dictionary, Layout, PageHead, path } from './Shared';
+import ObjectImageField from './ObjectImageField';
 
 export default function Create({ locale, categories, leaders, myObjects = [] }) {
     const t = dictionary(locale);
@@ -22,6 +23,7 @@ export default function Create({ locale, categories, leaders, myObjects = [] }) 
     const [similar, setSimilar] = useState([]);
     const [proposing, setProposing] = useState(false);
     const [objectName, setObjectName] = useState('');
+    const [objectImage, setObjectImage] = useState(null);
     const [summaryBody, setSummaryBody] = useState('');
     const [referenceUrl, setReferenceUrl] = useState('');
     const [brands, setBrands] = useState([]);
@@ -112,19 +114,19 @@ export default function Create({ locale, categories, leaders, myObjects = [] }) 
         setBusy(true);
         setMessage('');
         try {
-            const object = await api('/backend/objects', 'POST', {
-                canonical_name: objectName,
-                summary_body: summaryBody,
-                language_code: locale,
-                sources: [referenceUrl],
-                ...(brandId ? { brand_id: Number(brandId) } : {}),
-                ...(identityKey.trim() && identityValue.trim()
-                    ? { identity_attributes: { [identityKey.trim()]: identityValue.trim() } }
-                    : {}),
-            });
+            const payload = new FormData();
+            payload.append('canonical_name', objectName);
+            payload.append('summary_body', summaryBody);
+            payload.append('language_code', locale);
+            payload.append('sources[0]', referenceUrl);
+            if (brandId) payload.append('brand_id', brandId);
+            if (identityKey.trim() && identityValue.trim()) payload.append(`identity_attributes[${identityKey.trim()}]`, identityValue.trim());
+            if (objectImage) payload.append('image', objectImage);
+            const object = await api('/backend/objects', 'POST', payload);
             select(object);
             setProposing(false);
             setObjectName('');
+            setObjectImage(null);
             setSummaryBody('');
             setReferenceUrl('');
             setBrandId('');
@@ -222,20 +224,6 @@ export default function Create({ locale, categories, leaders, myObjects = [] }) 
                             : 'Set up comparison topics, pick candidates, and publish your ranking to gather community votes.'}
                     </p>
                 </header>
-
-                {myObjects.some((item) => ['pending', 'needs_revision', 'rejected'].includes(item.status)) && (
-                    <section className="vob-knowledge-panel" aria-label={isId ? 'Pengajuan objek saya' : 'My object submissions'}>
-                        <h2>{isId ? 'Pengajuan objek saya' : 'My object submissions'}</h2>
-                        <ul>
-                            {myObjects.filter((item) => ['pending', 'needs_revision', 'rejected'].includes(item.status)).map((item) => (
-                                <li key={item.id}>
-                                    <Link href={path(locale, `/object/${item.slug}`)}>{item.canonical_name}</Link>
-                                    <span> · {item.status}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </section>
-                )}
 
                 <nav ref={progressRef} className="vcr-progress" aria-label={isId ? 'Tahapan membuat ranking' : 'Ranking creation steps'}>
                     <ol>
@@ -647,6 +635,8 @@ export default function Create({ locale, categories, leaders, myObjects = [] }) 
                                                     required
                                                 />
                                             </label>
+
+                                            <ObjectImageField file={objectImage} onChange={setObjectImage} locale={locale} />
 
                                             {brands.length > 0 && (
                                                 <label className="vcr-field">

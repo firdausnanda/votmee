@@ -9,6 +9,23 @@ import en from '../../i18n/en.json';
 
 export const dictionary = (locale) => locale === 'en' ? en : id;
 export const path = (locale, suffix = '') => `/${locale}${suffix}`;
+
+/**
+ * Versioned object image URL: the stored file name is unique, so the server can cache it as immutable.
+ */
+export const objectImageUrl = (object, size = null) => {
+    const params = new URLSearchParams();
+    if (size) params.set('size', size);
+    params.set('v', object.image_path.split('/').pop().replace(/\.[^.]+$/, ''));
+
+    return `/backend/objects/${object.id}/image?${params}`;
+};
+
+export const objectImageSrcSet = (object, includeFull = false) => [
+    `${objectImageUrl(object, 'small')} 160w`,
+    `${objectImageUrl(object, 'thumb')} 400w`,
+    ...(includeFull ? [`${objectImageUrl(object)} 1600w`] : []),
+].join(', ');
 export const openLoginModal = () => window.dispatchEvent(new Event('votmee:open-login'));
 export const categoryHashtag = (category) => {
     const label = category?.slug ?? category?.name;
@@ -70,6 +87,10 @@ export function NavIcon({ name, size = 18, className = '' }) {
         trash: <><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></>,
         alertTriangle: <><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></>,
         mail: <><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></>,
+        send: <><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></>,
+        x: <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
+        cornerDownRight: <><polyline points="15 10 20 15 15 20" /><path d="M4 4v7a4 4 0 0 0 4 4h12" /></>,
+        messageSquare: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
     };
     return <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
@@ -155,6 +176,7 @@ function commentTimeAgo(value, locale) {
 }
 
 export async function api(url, method = 'GET', data) {
+    const isFormData = data instanceof FormData;
     const xsrfCookie = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]+)/)?.[1];
     const csrfHeaders = xsrfCookie
         ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrfCookie) }
@@ -164,10 +186,10 @@ export async function api(url, method = 'GET', data) {
         credentials: 'same-origin',
         headers: {
             Accept: 'application/json',
-            'Content-Type': 'application/json',
+            ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
             ...csrfHeaders,
         },
-        body: data ? JSON.stringify(data) : undefined,
+        body: data ? (isFormData ? data : JSON.stringify(data)) : undefined,
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) {

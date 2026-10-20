@@ -1,9 +1,12 @@
 <?php
 
+use App\Models\Category;
 use App\Models\Comment;
 use App\Models\MasterObject;
 use App\Models\ObjectArticle;
 use App\Models\ObjectContentRevision;
+use App\Models\RankingEntry;
+use App\Models\RankingPost;
 use App\Models\User;
 use App\Services\ModerationService;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -126,7 +129,160 @@ test('informative articles need sources and revisions remain private until appro
     ])->assertCreated();
     $this->actingAs($other)->get('/id/object/'.$object->slug)->assertInertia(fn (Assert $page) => $page
         ->where('articles.data.0.published_revision.title', $payload['title'])
+        ->where('articles.data.0.published_revision.excerpt', $payload['body'])
+        ->missing('articles.data.0.published_revision.body')
         ->where('myRevisions', [])->etc());
+});
+
+test('community article previews render markdown as short plain text', function () {
+    $object = MasterObject::factory()->create();
+    $article = ObjectArticle::factory()->create(['object_id' => $object->id]);
+    $revision = ObjectContentRevision::factory()->create([
+        'object_id' => $object->id,
+        'article_id' => $article->id,
+        'author_id' => $article->author_id,
+        'title' => 'A useful article',
+        'body' => "## First impressions\n\nThis **object** is [easy to use](https://example.com) & reliable. ".str_repeat('More details. ', 20),
+        'body_format' => 'markdown',
+        'status' => 'published',
+        'published_at' => now(),
+    ]);
+    $article->update(['published_revision_id' => $revision->id]);
+
+    $this->get(route('community.object', ['locale' => 'id', 'object' => $object->slug]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('articles.data.0.published_revision.excerpt', fn (string $excerpt): bool => str_starts_with($excerpt, 'First impressions This object is easy to use & reliable.')
+                && mb_strlen($excerpt) <= 183
+                && ! str_contains($excerpt, '**'))
+            ->missing('articles.data.0.published_revision.body')
+            ->etc());
+});
+
+test('pending summary and article proposals appear only in their authors object page data', function () {
+    $object = MasterObject::factory()->create();
+    $author = User::factory()->create();
+    $other = User::factory()->create();
+    $article = ObjectArticle::factory()->create(['object_id' => $object->id, 'author_id' => $author->id]);
+    $articleRevision = ObjectContentRevision::factory()->create([
+        'object_id' => $object->id,
+        'article_id' => $article->id,
+        'author_id' => $author->id,
+        'title' => 'A proposed community story',
+        'body' => "## Opening\n\nThis **draft** is awaiting review.",
+        'body_format' => 'markdown',
+        'status' => 'pending',
+    ]);
+    $summaryRevision = ObjectContentRevision::factory()->create([
+        'object_id' => $object->id,
+        'author_id' => $author->id,
+        'body' => 'A proposed factual summary awaiting review.',
+        'status' => 'pending',
+    ]);
+
+    $this->actingAs($author)->get('/id/object/'.$object->slug)->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('articles.total', 0)
+            ->where('myRevisions', function ($revisions) use ($article, $articleRevision, $summaryRevision): bool {
+                $ownRevisions = collect($revisions)->keyBy('id');
+
+                return $ownRevisions->count() === 2
+                    && $ownRevisions[$articleRevision->id]['status'] === 'pending'
+                    && $ownRevisions[$articleRevision->id]['excerpt'] === 'Opening This draft is awaiting review.'
+                    && $ownRevisions[$articleRevision->id]['article']['type'] === $article->type
+                    && $ownRevisions[$summaryRevision->id]['excerpt'] === 'A proposed factual summary awaiting review.'
+                    && $ownRevisions->every(fn ($revision) => ! array_key_exists('body', $revision)
+                        && ! array_key_exists('sources', $revision));
+            })->etc());
+
+    $this->actingAs($other)->get('/id/object/'.$object->slug)->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('articles.total', 0)->where('myRevisions', [])->etc());
+    auth()->logout();
+    $this->get('/id/object/'.$object->slug)->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('myRevisions', [])->etc());
+});
+
+test('object articles and rankings paginate independently when both lists grow', function () {
+    $object = MasterObject::factory()->create();
+    $author = User::factory()->create();
+    $category = Category::factory()->create();
+
+    for ($index = 0; $index < 11; $index++) {
+        $article = ObjectArticle::factory()->create(['object_id' => $object->id, 'author_id' => $author->id]);
+        $revision = ObjectContentRevision::factory()->create([
+            'object_id' => $object->id,
+            'article_id' => $article->id,
+            'author_id' => $author->id,
+            'title' => 'Article '.($index + 1),
+            'status' => 'published',
+            'published_at' => now()->subMinutes($index),
+        ]);
+        $article->update(['published_revision_id' => $revision->id]);
+
+        $ranking = RankingPost::factory()->create([
+            'creator_id' => $author->id,
+            'category_id' => $category->id,
+            'title' => 'Ranking '.($index + 1),
+            'published_at' => now()->subMinutes($index),
+        ]);
+        RankingEntry::factory()->create(['ranking_post_id' => $ranking->id, 'object_id' => $object->id]);
+    }
+
+    $this->get(route('community.object', [
+        'locale' => 'id', 'object' => $object->slug, 'articles_page' => 2, 'rankings_page' => 2,
+    ]))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('articles.total', 11)
+        ->where('articles.current_page', 2)
+        ->has('articles.data', 1)
+        ->where('articles.prev_page_url', fn (string $url): bool => str_contains($url, 'rankings_page=2'))
+        ->where('rankings.total', 11)
+        ->where('rankingTotal', 11)
+        ->where('rankings.current_page', 2)
+        ->has('rankings.data', 1)
+        ->where('rankings.prev_page_url', fn (string $url): bool => str_contains($url, 'articles_page=2'))
+        ->etc());
+});
+
+test('object ranking search and oldest order include records beyond the first page', function () {
+    $object = MasterObject::factory()->create();
+    $author = User::factory()->create();
+    $category = Category::factory()->create();
+    $oldest = RankingPost::factory()->create([
+        'creator_id' => $author->id,
+        'category_id' => $category->id,
+        'title' => 'Hidden history',
+        'published_at' => now()->subDays(30),
+    ]);
+    RankingEntry::factory()->create(['ranking_post_id' => $oldest->id, 'object_id' => $object->id]);
+
+    for ($index = 0; $index < 11; $index++) {
+        $ranking = RankingPost::factory()->create([
+            'creator_id' => $author->id,
+            'category_id' => $category->id,
+            'title' => 'Recent ranking '.($index + 1),
+            'published_at' => now()->subDays($index),
+        ]);
+        RankingEntry::factory()->create(['ranking_post_id' => $ranking->id, 'object_id' => $object->id]);
+    }
+
+    $this->get(route('community.object', ['locale' => 'id', 'object' => $object->slug]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('rankings.total', 12)
+            ->has('rankings.data', 10)
+            ->where('rankings.data', fn ($rankings): bool => collect($rankings)->doesntContain('id', $oldest->id))
+            ->etc());
+    $this->get(route('community.object', ['locale' => 'id', 'object' => $object->slug, 'ranking_q' => 'Hidden']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('rankings.total', 1)
+            ->where('rankingTotal', 12)
+            ->where('rankingFilters.search', 'Hidden')
+            ->where('rankings.data.0.id', $oldest->id)
+            ->etc());
+    $this->get(route('community.object', ['locale' => 'id', 'object' => $object->slug, 'ranking_sort' => 'oldest']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('rankingFilters.sort', 'oldest')
+            ->where('rankings.data.0.id', $oldest->id)
+            ->etc());
 });
 
 test('experience articles need no source and merged object content follows the current master', function () {
@@ -148,6 +304,8 @@ test('experience articles need no source and merged object content follows the c
 
     app(ModerationService::class)->mergeObject($admin, $source, $target, 'These are the same object.');
     $this->get('/en/object/'.$target->slug)->assertInertia(fn (Assert $page) => $page->where('articles.data.0.id', $article->id)->etc());
+    $this->get(route('community.article', ['locale' => 'en', 'article' => $article->id]))
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->where('object.slug', $target->slug)->etc());
     $this->getJson(route('backend.objects.comments.index', $target->slug))->assertJsonPath('comments.0.id', $comment->id);
     $this->actingAs($author)->postJson(route('backend.objects.comments.store', $target->slug), [
         'body' => 'A reply while the objects are merged.', 'parent_id' => $comment->id,

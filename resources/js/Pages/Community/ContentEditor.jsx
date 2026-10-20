@@ -4,6 +4,7 @@ import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
 import { useState } from 'react';
 import { api, Layout, PageHead, path } from './Shared';
+import ObjectImageField from './ObjectImageField';
 
 const lines = (value) => value.split('\n').map((line) => line.trim()).filter(Boolean);
 
@@ -53,6 +54,7 @@ export default function ContentEditor({ locale, categories, leaders, object, mod
     const [type, setType] = useState(article?.type ?? 'informative');
     const [title, setTitle] = useState(initial?.title ?? '');
     const [objectName, setObjectName] = useState(object.canonical_name);
+    const [objectImage, setObjectImage] = useState(null);
     const [sources, setSources] = useState((initial?.sources ?? []).join('\n'));
     const [language, setLanguage] = useState(initial?.language_code ?? locale);
     const [busy, setBusy] = useState(false);
@@ -91,13 +93,15 @@ export default function ContentEditor({ locale, categories, leaders, object, mod
         const payload = { body, body_format: 'markdown', language_code: language, sources: sourceUrls, ...(isArticle ? { title: title.trim() } : {}) };
         try {
             if (mode === 'submission') {
-                await api(`/backend/objects/${object.id}/submission`, 'PATCH', {
-                    canonical_name: objectName.trim(),
-                    summary_body: body,
-                    summary_body_format: 'markdown',
-                    language_code: language,
-                    sources: sourceUrls,
-                });
+                const submission = new FormData();
+                submission.append('_method', 'PATCH');
+                submission.append('canonical_name', objectName.trim());
+                submission.append('summary_body', body);
+                submission.append('summary_body_format', 'markdown');
+                submission.append('language_code', language);
+                sourceUrls.forEach((url, index) => submission.append(`sources[${index}]`, url));
+                if (objectImage) submission.append('image', objectImage);
+                await api(`/backend/objects/${object.id}/submission`, 'POST', submission);
             } else if (mode === 'summary') {
                 await api(`/backend/objects/${object.slug}/summary-revisions`, 'POST', payload);
             } else if (isNew) {
@@ -123,6 +127,7 @@ export default function ContentEditor({ locale, categories, leaders, object, mod
                     {(initial?.review_reason || reviewFeedback?.reason) && <div className="vob-editor-feedback" role="status"><strong>{isId ? 'Catatan moderator' : 'Moderator note'}</strong><p>{reviewFeedback?.reason ?? initial.review_reason}</p></div>}
                     {reviewPending && <div className="vob-editor-feedback" role="status"><strong>{isId ? 'Usulan sedang ditinjau' : 'A revision is under review'}</strong><p>{isId ? 'Tunggu keputusan moderator sebelum mengirim revisi berikutnya.' : 'Wait for the moderator’s decision before sending another revision.'}</p></div>}
                     {mode === 'submission' && <label className="vob-page-field">{isId ? 'Nama objek' : 'Object name'}<input value={objectName} onChange={(event) => setObjectName(event.target.value)} minLength={2} maxLength={255} required /></label>}
+                    {mode === 'submission' && <ObjectImageField file={objectImage} onChange={setObjectImage} locale={locale} currentUrl={object.pending_image_path ? `/backend/objects/${object.id}/image?pending=1` : null} />}
                     {isArticle && <label className="vob-page-field">{isId ? 'Judul artikel' : 'Article title'}<input value={title} onChange={(event) => setTitle(event.target.value)} minLength={5} maxLength={255} placeholder={isId ? 'Judul yang spesifik dan mudah dipahami' : 'A clear, specific title'} required /></label>}
                     {isNew && <fieldset className="vob-type-options"><legend>{isId ? 'Jenis artikel' : 'Article type'}</legend><label className={type === 'informative' ? 'selected' : ''}><input type="radio" name="type" value="informative" checked={type === 'informative'} onChange={() => setType('informative')} /><span><strong>{isId ? 'Informatif' : 'Informative'}</strong><small>{isId ? 'Fakta dan penjelasan dengan sumber' : 'Facts and explanations with sources'}</small></span></label><label className={type === 'experience' ? 'selected' : ''}><input type="radio" name="type" value="experience" checked={type === 'experience'} onChange={() => setType('experience')} /><span><strong>{isId ? 'Pengalaman pribadi' : 'Personal experience'}</strong><small>{isId ? 'Cerita langsung dari pengalaman Anda' : 'A first-hand account'}</small></span></label></fieldset>}
                     <div className="vob-page-field"><span>{isId ? 'Isi tulisan' : 'Content'}</span><RichEditor editor={editor} locale={locale} /><small>{bodyLength} {isId ? 'karakter teks' : 'text characters'} · {isId ? 'Minimal 30 karakter' : 'Minimum 30 characters'}</small></div>

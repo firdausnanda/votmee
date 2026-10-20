@@ -31,6 +31,11 @@ class ObjectArticle extends Model
         return $this->hasMany(ObjectContentRevision::class, 'article_id');
     }
 
+    public function comments(): HasMany
+    {
+        return $this->hasMany(Comment::class, 'article_id');
+    }
+
     public function publishedRevision(): BelongsTo
     {
         return $this->belongsTo(ObjectContentRevision::class, 'published_revision_id');

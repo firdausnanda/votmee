@@ -17,4 +17,5 @@ return [
     'object_exists' => 'Objek terverifikasi dengan identitas ini sudah ada.',
     'category_exists' => 'Kategori dengan nama ini sudah ada atau tidak valid.',
     'brand_exists' => 'Merek dengan nama ini sudah ada.',
+    'image_too_large' => 'Gambar terlalu besar. Gunakan gambar maksimal 8000 px per sisi dan 24 megapiksel.',
 ];

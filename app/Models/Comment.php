@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Mattiverse\Userstamps\Traits\Userstamps;
 
-#[Fillable(['ranking_post_id', 'object_id', 'user_id', 'parent_id', 'body', 'status', 'created_by', 'updated_by'])]
+#[Fillable(['ranking_post_id', 'object_id', 'article_id', 'user_id', 'parent_id', 'body', 'status', 'created_by', 'updated_by'])]
 class Comment extends Model
 {
     /** @use HasFactory<CommentFactory> */
@@ -29,6 +29,11 @@ class Comment extends Model
     public function object(): BelongsTo
     {
         return $this->belongsTo(MasterObject::class, 'object_id');
+    }
+
+    public function article(): BelongsTo
+    {
+        return $this->belongsTo(ObjectArticle::class, 'article_id');
     }
 
     public function parent(): BelongsTo

@@ -27,6 +27,7 @@ Route::prefix('{locale}')->where(['locale' => 'id|en'])->middleware(SetRequestLo
     Route::get('/explore', [CommunityController::class, 'explore'])->name('explore');
     Route::get('/ranking/{post:slug}', [CommunityController::class, 'ranking'])->name('ranking');
     Route::get('/object/{object:slug}', [CommunityController::class, 'object'])->name('object');
+    Route::get('/article/{article}', [CommunityController::class, 'article'])->name('article');
     Route::get('/profile/{user:username}', [CommunityController::class, 'profile'])->name('profile');
     Route::get('/login', [CommunityController::class, 'home'])->middleware('guest')->name('login');
     Route::get('/auth/google', [GoogleLoginController::class, 'redirect'])
@@ -58,20 +59,24 @@ Route::prefix('backend')->middleware(SetRequestLocale::class)->name('backend.')-
     Route::get('brands', [CategoryController::class, 'brands'])->name('brands.index');
     Route::get('objects', [ObjectController::class, 'index'])->name('objects.index');
     Route::get('objects/{object:slug}', [ObjectController::class, 'show'])->name('objects.show');
+    Route::get('objects/{object}/image', [ObjectController::class, 'image'])->name('objects.image');
     Route::get('rankings', [RankingController::class, 'index'])->name('rankings.index');
     Route::get('rankings/{post:slug}', [RankingController::class, 'show'])->name('rankings.show');
     Route::get('rankings/{post:slug}/comments', [SocialController::class, 'getComments'])->name('comments.index');
     Route::get('objects/{object:slug}/comments', [SocialController::class, 'getObjectComments'])->name('objects.comments.index');
+    Route::get('articles/{article}/comments', [SocialController::class, 'getArticleComments'])->name('articles.comments.index');
     Route::get('leaderboard', [LeaderboardController::class, 'index'])->name('leaderboard');
     Route::get('profile/{user:username}', [SocialController::class, 'profile'])->name('profile');
 
     Route::middleware(['auth', 'throttle:30,1'])->group(function () {
-        Route::post('objects', [ObjectController::class, 'store'])->name('objects.store');
-        Route::patch('objects/{object}/submission', [ObjectController::class, 'resubmit'])->name('objects.resubmit');
+        Route::post('objects', [ObjectController::class, 'store'])->name('objects.store')->middleware('throttle:object-uploads');
+        Route::patch('objects/{object}/submission', [ObjectController::class, 'resubmit'])->name('objects.resubmit')->middleware('throttle:object-uploads');
+        Route::post('objects/{object}/image', [ObjectController::class, 'proposeImage'])->name('objects.image.propose')->middleware('throttle:object-uploads');
         Route::post('objects/{object:slug}/summary-revisions', [ObjectContentController::class, 'storeSummary'])->name('objects.summary.store');
         Route::post('objects/{object:slug}/articles', [ObjectContentController::class, 'storeArticle'])->name('objects.articles.store');
         Route::patch('articles/{article}', [ObjectContentController::class, 'reviseArticle'])->name('articles.revise');
         Route::post('objects/{object:slug}/comments', [SocialController::class, 'objectComment'])->name('objects.comments.store');
+        Route::post('articles/{article}/comments', [SocialController::class, 'articleComment'])->name('articles.comments.store');
         Route::post('rankings', [RankingController::class, 'store'])->name('rankings.store');
         Route::get('wallet', [WalletController::class, 'show'])->name('wallet.show');
         Route::post('wallet/claim', [WalletController::class, 'claim'])->name('wallet.claim');
@@ -85,6 +90,7 @@ Route::prefix('backend')->middleware(SetRequestLocale::class)->name('backend.')-
 Route::prefix('admin/backend')->middleware(['auth', SetRequestLocale::class, 'can:moderate', 'throttle:30,1'])->name('admin.backend.')->group(function () {
     Route::get('queue', [ModerationController::class, 'queue'])->name('queue');
     Route::patch('objects/{object}', [ModerationController::class, 'reviewObject'])->name('objects.review');
+    Route::patch('objects/{object}/image', [ModerationController::class, 'reviewImage'])->name('objects.image.review');
     Route::post('objects/{object}/aliases', [ModerationController::class, 'addAlias'])->name('objects.aliases.store');
     Route::put('objects/{object}/translations', [ModerationController::class, 'setTranslation'])->name('objects.translations.store');
     Route::patch('rankings/{post}/hide', [ModerationController::class, 'hidePost'])->name('rankings.hide');

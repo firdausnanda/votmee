@@ -17,4 +17,5 @@ return [
     'object_exists' => 'A verified object with this identity already exists.',
     'category_exists' => 'A category with this name already exists or is invalid.',
     'brand_exists' => 'A brand with this name already exists.',
+    'image_too_large' => 'The image is too large. Use an image of at most 8000 px per side and 24 megapixels.',
 ];

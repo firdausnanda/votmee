@@ -25,7 +25,8 @@ class ModerationController extends Controller
     public function queue(): JsonResponse
     {
         return response()->json([
-            'objects' => MasterObject::query()->whereIn('status', ['pending', 'needs_revision'])->oldest()->paginate(20),
+            'objects' => MasterObject::query()->where(fn ($query) => $query->whereIn('status', ['pending', 'needs_revision'])
+                ->orWhere(fn ($images) => $images->where('status', 'verified')->whereNotNull('pending_image_path')))->oldest()->paginate(20),
             'content' => ObjectContentRevision::query()->where('status', 'pending')->whereHas('object', fn ($query) => $query->where('status', 'verified'))
                 ->with(['author:id,name,username', 'article:id,type', 'object:id,canonical_name,slug'])->oldest()->paginate(20),
             'reports' => Report::query()->where('status', 'open')->oldest()->paginate(20),
@@ -36,6 +37,14 @@ class ModerationController extends Controller
     {
         $data = $request->validate(['status' => ['required', 'in:verified,needs_revision,rejected'], 'reason' => ['required', 'string', 'min:5', 'max:2000']]);
         $moderation->reviewObject($request->user(), $object, $data['status'], $data['reason']);
+
+        return response()->json($object->refresh());
+    }
+
+    public function reviewImage(Request $request, MasterObject $object, ModerationService $moderation): JsonResponse
+    {
+        $data = $request->validate(['status' => ['required', 'in:approved,rejected'], 'reason' => ['required', 'string', 'min:5', 'max:2000']]);
+        $moderation->reviewImage($request->user(), $object, $data['status'], $data['reason']);
 
         return response()->json($object->refresh());
     }

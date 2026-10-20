@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import SelectBox from '../../Components/SelectBox';
 import { categoryHashtag, dateLabel, dictionary, Layout, NavIcon, numberLabel, PageHead, PaginationLinks, path } from './Shared';
@@ -11,6 +11,77 @@ function formatMemberSince(isoDate, locale) {
         month: 'long',
         year: 'numeric',
     }).format(date);
+}
+
+const prefersReducedMotion = () => typeof window !== 'undefined'
+    && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * Animate a number from its previous value to the target with an ease-out curve.
+ */
+function useCountUp(target, duration = 1100) {
+    const [value, setValue] = useState(() => (prefersReducedMotion() ? target : 0));
+    const valueRef = useRef(value);
+
+    useEffect(() => {
+        if (prefersReducedMotion()) {
+            valueRef.current = target;
+            setValue(target);
+            return undefined;
+        }
+
+        const from = valueRef.current;
+        const start = performance.now();
+        let frame;
+        const tick = (now) => {
+            const progress = Math.min(1, (now - start) / duration);
+            const next = Math.round(from + (target - from) * (1 - Math.pow(1 - progress, 3)));
+            valueRef.current = next;
+            setValue(next);
+            if (progress < 1) frame = requestAnimationFrame(tick);
+        };
+        frame = requestAnimationFrame(tick);
+
+        return () => cancelAnimationFrame(frame);
+    }, [target, duration]);
+
+    return value;
+}
+
+/**
+ * Reveal `[data-reveal]` children with a staggered transition as they scroll into view.
+ */
+function useRevealOnScroll(dependency) {
+    const containerRef = useRef(null);
+
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container || typeof IntersectionObserver === 'undefined' || prefersReducedMotion()) return undefined;
+
+        container.classList.add('is-reveal-ready');
+        const observer = new IntersectionObserver((entries) => {
+            entries.filter(entry => entry.isIntersecting).forEach((entry, index) => {
+                entry.target.style.setProperty('--vpr-reveal-delay', `${Math.min(index, 5) * 70}ms`);
+                entry.target.classList.add('is-revealed');
+                observer.unobserve(entry.target);
+            });
+        }, { rootMargin: '0px 0px -40px 0px', threshold: 0.12 });
+
+        container.querySelectorAll('[data-reveal]:not(.is-revealed)').forEach(item => observer.observe(item));
+
+        return () => observer.disconnect();
+    }, [dependency]);
+
+    return containerRef;
+}
+
+function AnimatedNumber({ value, locale }) {
+    const animated = useCountUp(Number(value || 0));
+
+    return <>
+        <span aria-hidden="true">{numberLabel(animated, locale)}</span>
+        <span className="vm-sr-only">{numberLabel(value, locale)}</span>
+    </>;
 }
 
 export default function Profile({ locale, categories = [], leaders = [], profile, rankings }) {
@@ -70,6 +141,7 @@ export default function Profile({ locale, categories = [], leaders = [], profile
     const stats = profile.stats || {};
     const supportPointsReceived = stats.support_points_received ?? 0;
     const walletBalance = stats.wallet_balance ?? 0;
+    const gridRef = useRevealOnScroll(filteredRankings);
 
     return (
         <Layout locale={locale} categories={categories} leaders={leaders} active="profile">
@@ -155,12 +227,12 @@ export default function Profile({ locale, categories = [], leaders = [], profile
                             <div className="vpr-inline-stats" aria-label={locale === 'id' ? 'Statistik Poin' : 'Point Statistics'}>
                                 <div className="vpr-inline-stat">
                                     <NavIcon name="heart" size={14} />
-                                    <strong>{numberLabel(supportPointsReceived, locale)}</strong>
+                                    <strong><AnimatedNumber value={supportPointsReceived} locale={locale} /></strong>
                                     <span>{locale === 'id' ? 'Total Poin Diterima' : 'Total Points Received'}</span>
                                 </div>
                                 <div className="vpr-inline-stat">
                                     <NavIcon name="wallet" size={14} />
-                                    <strong>{numberLabel(walletBalance, locale)}</strong>
+                                    <strong><AnimatedNumber value={walletBalance} locale={locale} /></strong>
                                     <span>{locale === 'id' ? 'Poin Dimiliki' : 'Points Owned'}</span>
                                 </div>
                             </div>
@@ -240,11 +312,11 @@ export default function Profile({ locale, categories = [], leaders = [], profile
 
                     {/* Rankings Grid or Empty State */}
                     {filteredRankings.length > 0 ? (
-                        <div className="vpr-grid">
+                        <div className="vpr-grid" ref={gridRef}>
                             {filteredRankings.map(post => {
                                 const contenders = post.entries || [];
                                 return (
-                                    <article className="vpr-ranking-card" key={post.id}>
+                                    <article className="vpr-ranking-card" key={post.id} data-reveal>
                                         <div className="vpr-card-header">
                                             <span className={`vm-category-tag vm-tag-${post.category?.slug ?? 'default'}`}>
                                                 {categoryHashtag(post.category) || (locale === 'id' ? 'Umum' : 'General')}

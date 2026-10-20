@@ -153,6 +153,67 @@ class SocialController extends Controller
         return response()->json(['comments' => $comments, 'total' => $total, 'has_more' => $offset + $comments->count() < $total]);
     }
 
+    public function articleComment(Request $request, ObjectArticle $article): JsonResponse
+    {
+        $this->ensurePublishedArticle($article);
+        abort_unless($request->user()->canParticipate(), 403);
+
+        $data = $request->validate([
+            'body' => ['required', 'string', 'min:2', 'max:3000'],
+            'parent_id' => ['nullable', 'integer', 'exists:comments,id'],
+        ]);
+        $parent = isset($data['parent_id']) ? Comment::findOrFail($data['parent_id']) : null;
+
+        if ($parent && ($parent->article_id !== $article->id || $parent->status !== 'visible')) {
+            throw ValidationException::withMessages(['parent_id' => __('votmee.parent_mismatch')]);
+        }
+
+        return response()->json(Comment::create([
+            'article_id' => $article->id,
+            'user_id' => $request->user()->id,
+            'parent_id' => $parent ? ($parent->parent_id ?: $parent->id) : null,
+            'body' => $data['body'],
+            'status' => 'visible',
+        ]), 201);
+    }
+
+    public function getArticleComments(Request $request, ObjectArticle $article): JsonResponse
+    {
+        $this->ensurePublishedArticle($article);
+
+        $offset = max(0, (int) $request->input('offset', 0));
+        $limit = min(max(1, (int) $request->input('limit', 15)), 50);
+        $sort = $request->input('sort', 'latest');
+        $query = DB::table('comments')
+            ->join('users', 'users.id', '=', 'comments.user_id')
+            ->leftJoin('comment_likes', 'comment_likes.comment_id', '=', 'comments.id')
+            ->where('comments.article_id', $article->id)
+            ->where('comments.status', 'visible')
+            ->selectRaw('comments.id, comments.parent_id, comments.body, comments.created_at, users.name, users.username, COUNT(comment_likes.id) as likes_count')
+            ->groupBy('comments.id', 'comments.parent_id', 'comments.body', 'comments.created_at', 'users.name', 'users.username');
+
+        if ($sort === 'popular') {
+            $query->orderByDesc('likes_count')->orderByDesc('comments.created_at');
+        } else {
+            $query->orderByDesc('comments.created_at')->orderByDesc('comments.id');
+        }
+
+        $comments = $query->skip($offset)->take($limit)->get();
+        $likedCommentIds = $request->user()
+            ? DB::table('comment_likes')->where('user_id', $request->user()->id)
+                ->whereIn('comment_id', $comments->pluck('id'))->pluck('comment_id')->flip()->toArray()
+            : [];
+        $comments->transform(function ($comment) use ($likedCommentIds) {
+            $comment->liked = isset($likedCommentIds[$comment->id]);
+            $comment->likes_count = (int) $comment->likes_count;
+
+            return $comment;
+        });
+        $total = Comment::query()->where('article_id', $article->id)->where('status', 'visible')->count();
+
+        return response()->json(['comments' => $comments, 'total' => $total, 'has_more' => $offset + $comments->count() < $total]);
+    }
+
     public function report(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -184,6 +245,10 @@ class SocialController extends Controller
         abort_unless($comment->status === 'visible', 404);
         abort_unless($request->user()->canParticipate(), 403);
 
+        if ($comment->article_id !== null) {
+            $this->ensurePublishedArticle($comment->article);
+        }
+
         $existing = CommentLike::query()
             ->where('comment_id', $comment->id)
             ->where('user_id', $request->user()->id)
@@ -214,5 +279,20 @@ class SocialController extends Controller
             'user' => $user->only('id', 'name', 'username', 'locale', 'region_code'),
             'rankings' => RankingPost::query()->where('creator_id', $user->id)->where('status', 'published')->latest('published_at')->paginate(20),
         ]);
+    }
+
+    private function ensurePublishedArticle(ObjectArticle $article): void
+    {
+        $article->loadMissing(['publishedRevision', 'object']);
+        $revision = $article->publishedRevision;
+        abort_unless($revision?->status === 'published' && $revision->article_id === $article->id, 404);
+
+        $object = $article->object;
+
+        while ($object->status === 'merged') {
+            $object = MasterObject::findOrFail($object->merged_into_id);
+        }
+
+        abort_unless($object->status === 'verified', 404);
     }
 }

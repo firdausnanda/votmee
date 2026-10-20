@@ -29,6 +29,53 @@ test('writing and revision pages require the right user and object state', funct
         ->assertOk()->assertInertia(fn (Assert $page) => $page->where('mode', 'submission')->etc());
 });
 
+test('published community articles have a public reading page', function () {
+    $object = MasterObject::factory()->create();
+    $article = ObjectArticle::factory()->create(['object_id' => $object->id]);
+    $revision = ObjectContentRevision::factory()->create([
+        'object_id' => $object->id,
+        'article_id' => $article->id,
+        'author_id' => $article->author_id,
+        'title' => 'A detailed community review',
+        'body' => 'The complete article body is available here.',
+        'status' => 'published',
+        'published_at' => now(),
+    ]);
+    $article->update(['published_revision_id' => $revision->id]);
+
+    foreach (['id', 'en'] as $locale) {
+        $this->get(route('community.article', ['locale' => $locale, 'article' => $article->id]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Community/Article')
+                ->where('locale', $locale)
+                ->where('article.id', $article->id)
+                ->where('revision.id', $revision->id)
+                ->where('revision.body', 'The complete article body is available here.')
+                ->where('object.slug', $object->slug)
+                ->etc());
+    }
+});
+
+test('draft and unpublished community articles cannot be read publicly', function () {
+    $object = MasterObject::factory()->create();
+    $article = ObjectArticle::factory()->create(['object_id' => $object->id]);
+    $revision = ObjectContentRevision::factory()->create([
+        'object_id' => $object->id,
+        'article_id' => $article->id,
+        'author_id' => $article->author_id,
+    ]);
+
+    $this->get(route('community.article', ['locale' => 'id', 'article' => $article->id]))->assertNotFound();
+
+    $article->update(['published_revision_id' => $revision->id]);
+    $this->get(route('community.article', ['locale' => 'id', 'article' => $article->id]))->assertNotFound();
+
+    $revision->update(['status' => 'published', 'published_at' => now()]);
+    $object->update(['status' => 'rejected']);
+    $this->get(route('community.article', ['locale' => 'id', 'article' => $article->id]))->assertNotFound();
+});
+
 test('rich editor submissions retain markdown while older revisions remain plain text', function () {
     $author = User::factory()->create();
     $object = MasterObject::factory()->create();
