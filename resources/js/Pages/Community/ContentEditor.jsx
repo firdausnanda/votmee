@@ -9,6 +9,9 @@ import ObjectImageField, { ALLOWED_TYPES, MAX_BYTES, optimizeImage } from './Obj
 
 const lines = (value) => value.split('\n').map((line) => line.trim()).filter(Boolean);
 
+/** Review outcomes that ask the author to act, so the moderator note is still relevant. */
+const FEEDBACK_STATUSES = ['needs_revision', 'rejected'];
+
 function ToolbarButton({ editor, active, label, onClick, children }) {
     return <button type="button" className={active ? 'is-active' : ''} aria-label={label} aria-pressed={active} disabled={!editor} onClick={onClick}>{children}</button>;
 }
@@ -101,6 +104,9 @@ export default function ContentEditor({ locale, categories, leaders, object, mod
     const isId = locale === 'id';
     const isArticle = mode === 'article' || mode === 'article_revision';
     const isNew = mode === 'article';
+    const moderatorNote = FEEDBACK_STATUSES.includes(reviewFeedback?.status) && reviewFeedback.reason
+        ? reviewFeedback.reason
+        : FEEDBACK_STATUSES.includes(initial?.status) ? initial.review_reason : null;
     const [type, setType] = useState(article?.type ?? 'informative');
     const [title, setTitle] = useState(initial?.title ?? '');
     const [objectName, setObjectName] = useState(object.canonical_name);
@@ -174,7 +180,7 @@ export default function ContentEditor({ locale, categories, leaders, object, mod
             <header className="vob-editor-page-header"><div><span className="vob-editor-kicker">{isId ? 'KONTRIBUSI KOMUNITAS' : 'COMMUNITY CONTRIBUTION'}</span><h1>{heading}</h1><p>{isId ? 'Tulis dengan jelas dan periksa sumber sebelum dikirim ke moderator.' : 'Write clearly and check your sources before sending this for review.'}</p></div><span className="vob-editor-language">{language.toUpperCase()}</span></header>
             <form onSubmit={submit} className="vob-editor-layout">
                 <div className="vob-editor-main">
-                    {(initial?.review_reason || reviewFeedback?.reason) && <div className="vob-editor-feedback" role="status"><strong>{isId ? 'Catatan moderator' : 'Moderator note'}</strong><p>{reviewFeedback?.reason ?? initial.review_reason}</p></div>}
+                    {moderatorNote && <div className="vob-editor-feedback" role="status"><strong>{isId ? 'Catatan moderator' : 'Moderator note'}</strong><p>{moderatorNote}</p></div>}
                     {reviewPending && <div className="vob-editor-feedback" role="status"><strong>{isId ? 'Usulan sedang ditinjau' : 'A revision is under review'}</strong><p>{isId ? 'Tunggu keputusan moderator sebelum mengirim revisi berikutnya.' : 'Wait for the moderator’s decision before sending another revision.'}</p></div>}
                     {mode === 'submission' && <label className="vob-page-field">{isId ? 'Nama objek' : 'Object name'}<input value={objectName} onChange={(event) => setObjectName(event.target.value)} minLength={2} maxLength={255} required /></label>}
                     {mode === 'submission' && <ObjectImageField file={objectImage} onChange={setObjectImage} locale={locale} currentUrl={object.pending_image_path ? `/backend/objects/${object.id}/image?pending=1` : null} />}
