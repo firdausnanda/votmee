@@ -59,7 +59,7 @@ export default function UpdateProfileInformationForm({
                 {user.username && (
                     <div className="vst-field">
                         <label htmlFor="username" className="vst-label">
-                            <span>{isId ? 'Username' : 'Username'}</span>
+                            <span>{isId ? 'Username' : 'Username'} </span>
                             <span className="vst-hint">{isId ? 'Tidak dapat diubah' : 'Immutable'}</span>
                         </label>
                         <input

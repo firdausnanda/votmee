@@ -12,6 +12,7 @@ use App\Models\ObjectContentRevision;
 use App\Models\PointLedger;
 use App\Models\RankingPost;
 use App\Models\Report;
+use App\Models\SavedRanking;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Services\FeedService;
@@ -105,6 +106,8 @@ class CommunityController extends Controller
         return Inertia::render('Community/Ranking', [
             ...$this->shared($request),
             'post' => $post,
+            'isSaved' => $request->user() !== null && SavedRanking::query()
+                ->where('user_id', $request->user()->id)->where('ranking_post_id', $post->id)->exists(),
             'scores' => $scores,
             'comments' => $comments,
             'total_comments_count' => $totalCommentsCount,
@@ -339,6 +342,19 @@ class CommunityController extends Controller
             ],
             'rankings' => $rankings,
             'leaders' => $leaderboard->leaders(),
+        ]);
+    }
+
+    public function saved(Request $request, FeedService $feed, LeaderboardService $leaderboard): Response
+    {
+        $filters = ['saved_by' => $request->user()->id, 'sort' => 'saved'];
+
+        return Inertia::render('Community/Saved', [
+            ...$this->shared($request),
+            'feed' => Inertia::scroll(fn () => $feed->paginate($filters, $request->user())->withQueryString()),
+            'savedCount' => SavedRanking::query()->where('user_id', $request->user()->id)
+                ->whereHas('rankingPost', fn ($query) => $query->where('status', 'published'))->count(),
+            'leaders' => $leaderboard->leaders('weekly', 'support'),
         ]);
     }
 

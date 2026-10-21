@@ -4,16 +4,17 @@ namespace Database\Seeders;
 
 use App\Models\Comment;
 use App\Models\MasterObject;
-use App\Models\RankingPost;
 use App\Models\Report;
 use App\Models\User;
+use Database\Seeders\Content\CommunityContent;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 class ModerationActionSeeder extends Seeder
 {
     /**
-     * Run the database seeds.
+     * Record the moderator's work as a consequence of the data that exists: reports that were
+     * resolved or dismissed, the comments hidden for it, and the objects they verified.
      */
     public function run(): void
     {
@@ -21,59 +22,39 @@ class ModerationActionSeeder extends Seeder
             ?? User::where('role', 'admin')->first()
             ?? User::first();
 
-        if (! $moderator) {
+        if (! $moderator || DB::table('moderation_actions')->exists()) {
             return;
         }
 
-        $actions = [
-            [
-                'target_type' => 'comment',
-                'action' => 'comment.hide',
-                'reason' => 'Komentar mengandung bahasa kasar dan melanggar pedoman komunitas.',
-            ],
-            [
-                'target_type' => 'report',
-                'action' => 'report.resolved',
-                'reason' => 'Laporan telah diverifikasi dan tindakan moderasi telah diterapkan.',
-            ],
-            [
-                'target_type' => 'report',
-                'action' => 'report.dismissed',
-                'reason' => 'Setelah peninjauan, konten dinilai masih mematuhi kriteria dan tidak melanggar.',
-            ],
-            [
-                'target_type' => 'object',
-                'action' => 'object.review',
-                'reason' => 'Verifikasi keaslian dan kesesuaian kategori objek rujukan resmi selesai.',
-            ],
-            [
-                'target_type' => 'ranking_post',
-                'action' => 'post.review',
-                'reason' => 'Pemeriksaan kepatuhan kriteria perbandingan postingan ranking.',
-            ],
-        ];
+        $record = fn (string $type, string $targetId, string $action, string $reason, $at) => DB::table('moderation_actions')->insert([
+            'actor_id' => $moderator->id,
+            'target_type' => $type,
+            'target_id' => $targetId,
+            'action' => $action,
+            'reason' => $reason,
+            'created_at' => $at,
+            'updated_at' => $at,
+        ]);
+        $resolutions = collect(CommunityContent::reports())->keyBy('reason');
 
-        // Seed 15 realistic moderation transactions
-        for ($i = 0; $i < 15; $i++) {
-            $template = $actions[$i % count($actions)];
-            $targetId = match ($template['target_type']) {
-                'comment' => (string) (Comment::inRandomOrder()->value('id') ?? rand(1, 20)),
-                'report' => (string) (Report::inRandomOrder()->value('id') ?? rand(1, 10)),
-                'object' => (string) (MasterObject::inRandomOrder()->value('id') ?? '01JH0000000000000000000000'),
-                default => (string) (RankingPost::inRandomOrder()->value('id') ?? '01JH0000000000000000000000'),
-            };
+        foreach (Report::whereIn('status', ['resolved', 'dismissed'])->orderBy('created_at')->get() as $report) {
+            $reason = $resolutions[$report->reason]['resolution'] ?? 'Laporan sudah ditinjau oleh moderator.';
+            $at = $report->created_at->copy()->addHours(mt_rand(2, 18));
+            $at = $at->isFuture() ? now('UTC')->subMinutes(mt_rand(10, 120)) : $at;
 
-            $createdAt = now('UTC')->subDays(rand(0, 10))->subHours(rand(1, 23));
+            if ($report->status === 'resolved' && $report->target_type === 'comment') {
+                $comment = Comment::find($report->target_id);
 
-            DB::table('moderation_actions')->insert([
-                'actor_id' => $moderator->id,
-                'target_type' => $template['target_type'],
-                'target_id' => $targetId,
-                'action' => $template['action'],
-                'reason' => $template['reason'],
-                'created_at' => $createdAt,
-                'updated_at' => $createdAt,
-            ]);
+                if ($comment?->status === 'hidden') {
+                    $record('comment', (string) $comment->id, 'comment.hide', $reason, $at);
+                }
+            }
+
+            $record('report', (string) $report->id, 'report.'.$report->status, $reason, $at->copy()->addMinutes(2));
+        }
+
+        foreach (MasterObject::where('status', 'verified')->orderBy('created_at')->limit(6)->get() as $object) {
+            $record('object', $object->id, 'object.review', 'Nama, kategori, dan identitas objek sudah sesuai dengan rujukan umum.', now('UTC')->subDays(mt_rand(10, 24))->subHours(mt_rand(0, 20)));
         }
     }
 }

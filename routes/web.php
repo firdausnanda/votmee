@@ -10,6 +10,8 @@ use App\Http\Controllers\Backend\ObjectController;
 use App\Http\Controllers\Backend\ProfileImageController;
 use App\Http\Controllers\Backend\QuickDuelController;
 use App\Http\Controllers\Backend\RankingController;
+use App\Http\Controllers\Backend\SavedRankingController;
+use App\Http\Controllers\Backend\SearchController;
 use App\Http\Controllers\Backend\SocialController;
 use App\Http\Controllers\Backend\WalletController;
 use App\Http\Controllers\ProfileController;
@@ -43,6 +45,7 @@ Route::prefix('{locale}')->where(['locale' => 'id|en'])->middleware(SetRequestLo
         Route::get('/object/{object:slug}/submission/edit', [CommunityController::class, 'editObjectSubmission'])->name('object.submission.edit');
         Route::get('/article/{article}/edit', [CommunityController::class, 'editObjectArticle'])->name('article.edit');
         Route::get('/wallet', [CommunityController::class, 'wallet'])->name('wallet');
+        Route::get('/saved', [CommunityController::class, 'saved'])->name('saved');
     });
 });
 
@@ -71,6 +74,7 @@ Route::prefix('backend')->middleware(SetRequestLocale::class)->name('backend.')-
     Route::get('articles/{article}/comments', [SocialController::class, 'getArticleComments'])->name('articles.comments.index');
     Route::get('comment-images/{image}', [SocialController::class, 'commentImage'])->name('comment-images.show');
     Route::get('content-images/{image}', [ContentImageController::class, 'show'])->name('content-images.show');
+    Route::get('search', SearchController::class)->middleware('throttle:60,1')->name('search');
     Route::get('leaderboard', [LeaderboardController::class, 'index'])->name('leaderboard');
     Route::get('quick-duel', [QuickDuelController::class, 'show'])->name('quick-duel.show');
     Route::get('profile/{user:username}', [SocialController::class, 'profile'])->name('profile');
@@ -94,6 +98,9 @@ Route::prefix('backend')->middleware(SetRequestLocale::class)->name('backend.')-
         Route::post('quick-duel/{duel}/vote', [QuickDuelController::class, 'vote'])->name('quick-duel.vote');
         Route::post('rankings/{post:slug}/comments', [SocialController::class, 'comment'])->name('comments.store')->middleware('throttle:comment-uploads');
         Route::post('comments/{comment}/like', [SocialController::class, 'toggleCommentLike'])->name('comments.like');
+        Route::put('rankings/{post}/save', [SavedRankingController::class, 'store'])->name('rankings.save');
+        Route::delete('rankings/{post}/save', [SavedRankingController::class, 'destroy'])->name('rankings.unsave');
+        Route::post('saved-rankings/sync', [SavedRankingController::class, 'sync'])->name('saved-rankings.sync');
         Route::post('reports', [SocialController::class, 'report'])->name('reports.store');
     });
 });

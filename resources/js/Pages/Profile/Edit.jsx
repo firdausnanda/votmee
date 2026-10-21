@@ -80,39 +80,49 @@ export default function Edit({
 
                             <nav className="vst-nav-card" aria-label={isId ? 'Bagian pengaturan' : 'Settings sections'}>
                                 <button
+                                    id="settings-profile-tab"
                                     type="button"
                                     className={`vst-nav-btn ${activeTab === 'profile' ? 'is-active' : ''}`}
                                     onClick={() => setActiveTab('profile')}
                                     aria-pressed={activeTab === 'profile'}
+                                    aria-controls="settings-panel"
                                 >
-                                    <NavIcon name="user" size={17} />
+                                    <NavIcon name="user" size={16} />
                                     <span>{isId ? 'Informasi Profil' : 'Profile Information'}</span>
                                 </button>
 
                                 <button
+                                    id="settings-security-tab"
                                     type="button"
                                     className={`vst-nav-btn ${activeTab === 'security' ? 'is-active' : ''}`}
                                     onClick={() => setActiveTab('security')}
                                     aria-pressed={activeTab === 'security'}
+                                    aria-controls="settings-panel"
                                 >
-                                    <NavIcon name="lock" size={17} />
+                                    <NavIcon name="lock" size={16} />
                                     <span>{isId ? 'Kata Sandi & Keamanan' : 'Password & Security'}</span>
                                 </button>
 
                                 <button
+                                    id="settings-danger-tab"
                                     type="button"
                                     className={`vst-nav-btn is-danger ${activeTab === 'danger' ? 'is-active' : ''}`}
                                     onClick={() => setActiveTab('danger')}
                                     aria-pressed={activeTab === 'danger'}
+                                    aria-controls="settings-panel"
                                 >
-                                    <NavIcon name="trash" size={17} />
+                                    <NavIcon name="trash" size={16} />
                                     <span>{isId ? 'Hapus Akun' : 'Delete Account'}</span>
                                 </button>
                             </nav>
                         </div>
                     </aside>
 
-                    <main className="vst-content">
+                    <section
+                        id="settings-panel"
+                        className="vst-content"
+                        aria-labelledby={`settings-${activeTab}-tab`}
+                    >
                         {activeTab === 'profile' && (
                             <UpdateProfileInformationForm
                                 mustVerifyEmail={mustVerifyEmail}
@@ -128,7 +138,7 @@ export default function Edit({
                         {activeTab === 'danger' && (
                             <DeleteUserForm locale={locale} />
                         )}
-                    </main>
+                    </section>
                 </div>
             </div>
         </Layout>

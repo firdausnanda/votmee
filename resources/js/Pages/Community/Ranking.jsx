@@ -1,6 +1,6 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
-import { api, categoryHashtag, dateLabel, dictionary, Layout, numberLabel, objectImageSrcSet, objectImageUrl, openLoginModal, PageHead, path } from './Shared';
+import { api, categoryHashtag, dateLabel, dictionary, Layout, numberLabel, objectImageSrcSet, objectImageUrl, openLoginModal, PageHead, path, useSavedRanking } from './Shared';
 import { CommentImageAttachButton, CommentImageGallery, CommentImagePreviews, commentPayload, useCommentImages } from './CommentImages';
 import ReportDialog from './ReportDialog';
 import ShareModal from './ShareModal';
@@ -123,7 +123,7 @@ function RankingIcon({ name, size = 16, className = '', fill = 'none' }) {
     );
 }
 
-export default function Ranking({ locale, categories, leaders, post, scores, comments, total_comments_count }) {
+export default function Ranking({ locale, categories, leaders, post, isSaved = false, scores, comments, total_comments_count }) {
     const t = dictionary(locale);
     const user = usePage().props.auth?.user;
     const isId = locale === 'id';
@@ -148,7 +148,7 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
     const [busy, setBusy] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
     const [toastType, setToastType] = useState('info');
-    const [saved, setSaved] = useState(false);
+    const { saved, toggle: toggleSaved } = useSavedRanking(post, isSaved);
     const [copied, setCopied] = useState(false);
     const [shareOpen, setShareOpen] = useState(false);
 
@@ -236,31 +236,17 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
     const [replyingTo, setReplyingTo] = useState(null);
     const [replyBody, setReplyBody] = useState('');
 
-    // Persist bookmark state in localStorage
-    useEffect(() => {
-        try {
-            const stored = JSON.parse(localStorage.getItem('votmee.savedRankings') || '[]');
-            setSaved(Array.isArray(stored) && stored.includes(post.id));
-        } catch {
-            setSaved(false);
-        }
-    }, [post.id]);
-
     const showToast = (msg, type = 'info') => {
         setToastMessage(msg);
         setToastType(type);
         window.setTimeout(() => setToastMessage(''), 3000);
     };
 
-    const toggleSave = () => {
+    const toggleSave = async () => {
         try {
-            const stored = JSON.parse(localStorage.getItem('votmee.savedRankings') || '[]');
-            const list = Array.isArray(stored) ? stored : [];
-            const next = list.includes(post.id) ? list.filter((id) => id !== post.id) : [...list, post.id];
-            localStorage.setItem('votmee.savedRankings', JSON.stringify(next));
-            setSaved(next.includes(post.id));
+            const isNowSaved = await toggleSaved();
             showToast(
-                next.includes(post.id)
+                isNowSaved
                     ? isId
                         ? 'Ranking disimpan ke koleksi'
                         : 'Saved to collection'
@@ -269,8 +255,8 @@ export default function Ranking({ locale, categories, leaders, post, scores, com
                     : 'Removed from saved',
                 'success'
             );
-        } catch {
-            // ignore
+        } catch (error) {
+            showToast(error.message, 'error');
         }
     };
 

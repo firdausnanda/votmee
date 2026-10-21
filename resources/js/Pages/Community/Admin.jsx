@@ -4,6 +4,8 @@ import AdminLayout from '@/Layouts/AdminLayout';
 import ContentBody from './ContentBody';
 import { api, dictionary, PaginationLinks } from './Shared';
 
+const CATEGORY_FILTER_THRESHOLD = 12;
+
 export default function Admin({
     locale,
     categories = [],
@@ -21,6 +23,7 @@ export default function Admin({
     const [activeTab, setActiveTab] = useState('overview');
     const [reason, setReason] = useState('');
     const [categoryName, setCategoryName] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('');
     const [brandName, setBrandName] = useState('');
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState('');
@@ -36,6 +39,11 @@ export default function Admin({
     const [translationName, setTranslationName] = useState('');
     const [translationLocale, setTranslationLocale] = useState('en');
     const [audits, setAudits] = useState([]);
+
+    const normalizedCategoryFilter = categoryFilter.trim().toLowerCase();
+    const filteredCategories = normalizedCategoryFilter
+        ? categories.filter((category) => category.name.toLowerCase().includes(normalizedCategoryFilter) || category.slug.includes(normalizedCategoryFilter))
+        : categories;
 
     const computedStats = {
         pendingObjects: stats.pendingObjects ?? objects?.total ?? 0,
@@ -929,14 +937,31 @@ export default function Admin({
                                         </button>
                                     </form>
 
-                                    <div className="vap-chips-cloud">
-                                        {categories.map((category) => (
-                                            <span key={category.id} className="vap-chip">
-                                                <strong>{category.name}</strong>
-                                                <small className="vap-chip-slug">/{category.slug}</small>
-                                            </span>
-                                        ))}
-                                    </div>
+                                    {categories.length > CATEGORY_FILTER_THRESHOLD && (
+                                        <input
+                                            type="search"
+                                            className="vap-input vap-chips-filter"
+                                            value={categoryFilter}
+                                            onChange={(e) => setCategoryFilter(e.target.value)}
+                                            placeholder={isId ? `Cari di ${categories.length} kategori...` : `Search ${categories.length} categories...`}
+                                            aria-label={isId ? 'Cari kategori' : 'Search categories'}
+                                        />
+                                    )}
+
+                                    {filteredCategories.length ? (
+                                        <div className="vap-chips-cloud is-scrollable">
+                                            {filteredCategories.map((category) => (
+                                                <span key={category.id} className="vap-chip">
+                                                    <strong>{category.name}</strong>
+                                                    <small className="vap-chip-slug">/{category.slug}</small>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="vap-chips-empty" role="status">
+                                            {isId ? 'Tidak ada kategori yang cocok.' : 'No matching categories.'}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 

@@ -1,12 +1,43 @@
 import { Transition } from '@headlessui/react';
 import { useForm } from '@inertiajs/react';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { NavIcon } from '../../Community/Shared';
+
+function PasswordVisibilityButton({ fieldId, fieldLabel, isVisible, locale, onToggle }) {
+    const isId = locale === 'id';
+
+    return (
+        <button
+            type="button"
+            className="vst-password-toggle"
+            onClick={onToggle}
+            aria-controls={fieldId}
+            aria-pressed={isVisible}
+            aria-label={isVisible
+                ? (isId ? `Sembunyikan ${fieldLabel.toLowerCase()}` : `Hide ${fieldLabel.toLowerCase()}`)
+                : (isId ? `Tampilkan ${fieldLabel.toLowerCase()}` : `Show ${fieldLabel.toLowerCase()}`)}
+        >
+            <NavIcon name={isVisible ? 'eyeOff' : 'eye'} size={18} />
+        </button>
+    );
+}
 
 export default function UpdatePasswordForm({ locale = 'id' }) {
     const isId = locale === 'id';
     const passwordInput = useRef();
     const currentPasswordInput = useRef();
+    const [visiblePasswords, setVisiblePasswords] = useState({
+        current_password: false,
+        password: false,
+        password_confirmation: false,
+    });
+
+    const togglePasswordVisibility = (field) => {
+        setVisiblePasswords((currentVisibility) => ({
+            ...currentVisibility,
+            [field]: !currentVisibility[field],
+        }));
+    };
 
     const {
         data,
@@ -27,7 +58,14 @@ export default function UpdatePasswordForm({ locale = 'id' }) {
 
         put(route('password.update'), {
             preserveScroll: true,
-            onSuccess: () => reset(),
+            onSuccess: () => {
+                reset();
+                setVisiblePasswords({
+                    current_password: false,
+                    password: false,
+                    password_confirmation: false,
+                });
+            },
             onError: (errs) => {
                 if (errs.password) {
                     reset('password', 'password_confirmation');
@@ -62,17 +100,26 @@ export default function UpdatePasswordForm({ locale = 'id' }) {
                     <label htmlFor="current_password" className="vst-label">
                         <span>{isId ? 'Kata Sandi Saat Ini' : 'Current Password'} <span className="vst-label-req">*</span></span>
                     </label>
-                    <input
-                        id="current_password"
-                        ref={currentPasswordInput}
-                        value={data.current_password}
-                        onChange={(e) => setData('current_password', e.target.value)}
-                        type="password"
-                        className={`vst-input ${errors.current_password ? 'has-error' : ''}`}
-                        autoComplete="current-password"
-                        placeholder="••••••••"
-                        required
-                    />
+                    <div className="vst-input-wrap">
+                        <input
+                            id="current_password"
+                            ref={currentPasswordInput}
+                            value={data.current_password}
+                            onChange={(e) => setData('current_password', e.target.value)}
+                            type={visiblePasswords.current_password ? 'text' : 'password'}
+                            className={`vst-input ${errors.current_password ? 'has-error' : ''}`}
+                            autoComplete="current-password"
+                            placeholder="••••••••"
+                            required
+                        />
+                        <PasswordVisibilityButton
+                            fieldId="current_password"
+                            fieldLabel={isId ? 'Kata Sandi Saat Ini' : 'Current Password'}
+                            isVisible={visiblePasswords.current_password}
+                            locale={locale}
+                            onToggle={() => togglePasswordVisibility('current_password')}
+                        />
+                    </div>
                     {errors.current_password && (
                         <p className="vst-error" role="alert">{errors.current_password}</p>
                     )}
@@ -82,17 +129,26 @@ export default function UpdatePasswordForm({ locale = 'id' }) {
                     <label htmlFor="password" className="vst-label">
                         <span>{isId ? 'Kata Sandi Baru' : 'New Password'} <span className="vst-label-req">*</span></span>
                     </label>
-                    <input
-                        id="password"
-                        ref={passwordInput}
-                        value={data.password}
-                        onChange={(e) => setData('password', e.target.value)}
-                        type="password"
-                        className={`vst-input ${errors.password ? 'has-error' : ''}`}
-                        autoComplete="new-password"
-                        placeholder="••••••••"
-                        required
-                    />
+                    <div className="vst-input-wrap">
+                        <input
+                            id="password"
+                            ref={passwordInput}
+                            value={data.password}
+                            onChange={(e) => setData('password', e.target.value)}
+                            type={visiblePasswords.password ? 'text' : 'password'}
+                            className={`vst-input ${errors.password ? 'has-error' : ''}`}
+                            autoComplete="new-password"
+                            placeholder="••••••••"
+                            required
+                        />
+                        <PasswordVisibilityButton
+                            fieldId="password"
+                            fieldLabel={isId ? 'Kata Sandi Baru' : 'New Password'}
+                            isVisible={visiblePasswords.password}
+                            locale={locale}
+                            onToggle={() => togglePasswordVisibility('password')}
+                        />
+                    </div>
                     {errors.password && (
                         <p className="vst-error" role="alert">{errors.password}</p>
                     )}
@@ -107,16 +163,25 @@ export default function UpdatePasswordForm({ locale = 'id' }) {
                     <label htmlFor="password_confirmation" className="vst-label">
                         <span>{isId ? 'Konfirmasi Kata Sandi Baru' : 'Confirm New Password'} <span className="vst-label-req">*</span></span>
                     </label>
-                    <input
-                        id="password_confirmation"
-                        value={data.password_confirmation}
-                        onChange={(e) => setData('password_confirmation', e.target.value)}
-                        type="password"
-                        className={`vst-input ${errors.password_confirmation ? 'has-error' : ''}`}
-                        autoComplete="new-password"
-                        placeholder="••••••••"
-                        required
-                    />
+                    <div className="vst-input-wrap">
+                        <input
+                            id="password_confirmation"
+                            value={data.password_confirmation}
+                            onChange={(e) => setData('password_confirmation', e.target.value)}
+                            type={visiblePasswords.password_confirmation ? 'text' : 'password'}
+                            className={`vst-input ${errors.password_confirmation ? 'has-error' : ''}`}
+                            autoComplete="new-password"
+                            placeholder="••••••••"
+                            required
+                        />
+                        <PasswordVisibilityButton
+                            fieldId="password_confirmation"
+                            fieldLabel={isId ? 'Konfirmasi Kata Sandi Baru' : 'Confirm New Password'}
+                            isVisible={visiblePasswords.password_confirmation}
+                            locale={locale}
+                            onToggle={() => togglePasswordVisibility('password_confirmation')}
+                        />
+                    </div>
                     {errors.password_confirmation && (
                         <p className="vst-error" role="alert">{errors.password_confirmation}</p>
                     )}

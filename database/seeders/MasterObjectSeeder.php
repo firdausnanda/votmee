@@ -2,60 +2,34 @@
 
 namespace Database\Seeders;
 
+use App\Models\Category;
 use App\Models\MasterObject;
 use App\Models\User;
+use App\Services\ObjectMatchingService;
+use Database\Seeders\Content\CommunityContent;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
 class MasterObjectSeeder extends Seeder
 {
     /**
-     * Run the database seeds.
+     * Seed the verified objects that the demo rankings compare, filed under the ranking's category.
      */
     public function run(): void
     {
         $admin = User::where('role', 'admin')->first() ?? User::first();
+        $matching = app(ObjectMatchingService::class);
+        $categories = Category::pluck('id', 'slug');
 
-        $objectNames = [
-            'iPhone 16 Pro Max',
-            'Samsung Galaxy S25 Ultra',
-            'Google Pixel 9 Pro',
-            'Xiaomi 15 Ultra',
-            'Asus ROG Phone 9',
-            'MacBook Pro M4',
-            'Raja Ampat Papua',
-            'Labuan Bajo Komodo',
-            'Ubud Bali',
-            'Gunung Bromo Tengger',
-            'Danau Toba Samosir',
-            'Rendang Daging Padang',
-            'Sate Ayam Madura',
-            'Nasi Goreng Spesial',
-            'Bakso Malang Komplit',
-            'Soto Betawi Kuah Susu',
-            'Hyundai Ioniq 5',
-            'Honda CR-V Hybrid',
-            'BYD Seal Performance',
-            'Toyota Innova Zenix Hybrid',
-            'Wuling Binguo EV',
-            'Gadis Kretek',
-            'Laskar Pelangi',
-            'Pengabdi Setan',
-            'Petualangan Sherina 2',
-        ];
+        foreach (CommunityContent::posts() as $post) {
+            foreach ($post['candidates'] as $candidate) {
+                $normalized = $matching->normalize($candidate['name']);
 
-        foreach ($objectNames as $name) {
-            $slug = Str::slug($name);
-            $normalized = strtolower(trim($name));
-
-            $existing = MasterObject::where('normalized_name', $normalized)->first();
-
-            if (! $existing) {
-                MasterObject::create([
+                MasterObject::firstOrCreate(['normalized_name' => $normalized], [
                     'id' => (string) Str::ulid(),
-                    'canonical_name' => $name,
-                    'normalized_name' => $normalized,
-                    'slug' => $slug,
+                    'category_id' => $categories[$post['category']] ?? null,
+                    'canonical_name' => $candidate['name'],
+                    'slug' => Str::slug($candidate['name']),
                     'status' => 'verified',
                     'submitted_by' => $admin?->id,
                     'verified_by' => $admin?->id,

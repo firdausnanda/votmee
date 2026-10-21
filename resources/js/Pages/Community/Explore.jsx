@@ -1,6 +1,8 @@
 import { InfiniteScroll, Link } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
-import { categoryHashtag, dictionary, EmptyState, Layout, Leaderboard, MobileQuickDuel, NavIcon, numberLabel, objectImageSrcSet, objectImageUrl, PageHead, RankingCard, path } from './Shared';
+import { categoryHashtag, dictionary, EmptyState, Layout, Leaderboard, MobileQuickDuel, NavIcon, numberLabel, objectImageSrcSet, objectImageUrl, PageHead, RankingCard, path, sortCategoriesByPopularity } from './Shared';
+
+const CATEGORY_CARD_LIMIT = 12;
 
 export default function Explore({ locale, categories, leaders, feed, filters, objects, spotlight = null, rising = [] }) {
     const t = dictionary(locale);
@@ -10,6 +12,20 @@ export default function Explore({ locale, categories, leaders, feed, filters, ob
     const risingRef = useRef(null);
     const [risingColumns, setRisingColumns] = useState(null);
     const visibleRising = risingColumns ? rising.slice(0, risingColumns) : rising;
+    const categoryRailRef = useRef(null);
+    const [categoryQuery, setCategoryQuery] = useState('');
+    const [showAllCategories, setShowAllCategories] = useState(false);
+    const popularCategories = sortCategoriesByPopularity(categories);
+    const normalizedCategoryQuery = categoryQuery.trim().toLowerCase();
+    const filteredCategories = normalizedCategoryQuery
+        ? popularCategories.filter((category) => category.name.toLowerCase().includes(normalizedCategoryQuery) || category.slug.includes(normalizedCategoryQuery))
+        : popularCategories;
+    const visibleCategories = showAllCategories || normalizedCategoryQuery ? filteredCategories : filteredCategories.slice(0, CATEGORY_CARD_LIMIT);
+    const hiddenCategoryCount = filteredCategories.length - visibleCategories.length;
+
+    useEffect(() => {
+        categoryRailRef.current?.querySelector('.is-active')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    }, [activeCategory?.id]);
 
     useEffect(() => {
         const list = risingRef.current;
@@ -55,7 +71,7 @@ export default function Explore({ locale, categories, leaders, feed, filters, ob
         <div className="vx-explore">
             <h1 className="vm-sr-only">{t.explore}</h1>
 
-            {hasActiveFilters && <nav className="vx-category-rail" aria-label={isId ? 'Jelajahi berdasarkan kategori' : 'Browse by category'}>
+            {hasActiveFilters && <nav ref={categoryRailRef} className="vx-category-rail" aria-label={isId ? 'Jelajahi berdasarkan kategori' : 'Browse by category'}>
                 <Link href={exploreUrl({ category: null })} preserveScroll className={!activeCategory ? 'is-active' : ''} aria-current={!activeCategory ? 'page' : undefined}>{isId ? 'Semua topik' : 'All topics'}</Link>
                 {categories.map((category) => <Link key={category.id} href={exploreUrl({ category })} preserveScroll className={activeCategory?.id === category.id ? 'is-active' : ''} aria-current={activeCategory?.id === category.id ? 'page' : undefined}>
                     {categoryHashtag(category)}
@@ -129,14 +145,24 @@ export default function Explore({ locale, categories, leaders, feed, filters, ob
                         <span className="vx-section-kicker">{isId ? 'TOPIK' : 'TOPICS'}</span>
                         <h2 id="explore-categories-heading">{isId ? 'Jelajahi kategori' : 'Browse categories'}</h2>
                     </div>
+                    {categories.length > CATEGORY_CARD_LIMIT && <label className="vx-category-search">
+                        <span className="vm-sr-only">{isId ? 'Cari kategori' : 'Search categories'}</span>
+                        <NavIcon name="search" size={15} />
+                        <input type="search" value={categoryQuery} onChange={(event) => setCategoryQuery(event.target.value)} placeholder={isId ? 'Cari kategori...' : 'Search categories...'} />
+                    </label>}
                 </div>
-                <div className="vx-category-cards">
-                    {categories.map((category) => <Link key={category.id} href={exploreUrl({ category })}>
+                {visibleCategories.length ? <div className="vx-category-cards">
+                    {visibleCategories.map((category) => <Link key={category.id} href={exploreUrl({ category })}>
                         <span className={`vx-cat-icon vm-cover-ph-${category.slug}`} aria-hidden="true"><NavIcon name="trophy" size={18} /></span>
                         <strong>{category.name}</strong>
                         <small>{numberLabel(category.ranking_posts_count ?? 0, locale)} {t.rankings}</small>
                     </Link>)}
-                </div>
+                </div> : <p className="vx-category-empty" role="status">{isId ? `Tidak ada kategori yang cocok dengan "${categoryQuery}".` : `No categories match "${categoryQuery}".`}</p>}
+                {!normalizedCategoryQuery && filteredCategories.length > CATEGORY_CARD_LIMIT && <button type="button" className="vx-category-toggle" aria-expanded={showAllCategories} onClick={() => setShowAllCategories((value) => !value)}>
+                    {showAllCategories
+                        ? (isId ? 'Tampilkan lebih sedikit' : 'Show less')
+                        : (isId ? `Tampilkan semua kategori (+${hiddenCategoryCount})` : `Show all categories (+${hiddenCategoryCount})`)}
+                </button>}
             </section>}
 
             {spotlight && <section className="vx-featured" aria-labelledby="explore-featured-heading">

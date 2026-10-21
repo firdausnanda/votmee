@@ -41,4 +41,9 @@ class RankingPost extends Model
     {
         return $this->hasMany(Comment::class);
     }
+
+    public function savedRankings(): HasMany
+    {
+        return $this->hasMany(SavedRanking::class);
+    }
 }

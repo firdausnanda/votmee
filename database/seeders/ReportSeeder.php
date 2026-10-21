@@ -7,102 +7,67 @@ use App\Models\MasterObject;
 use App\Models\RankingPost;
 use App\Models\Report;
 use App\Models\User;
+use Database\Seeders\Content\CommunityContent;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Carbon;
 
 class ReportSeeder extends Seeder
 {
     /**
-     * Run the database seeds.
+     * Seed reports that point at content which really deserves the complaint, so the moderation
+     * queue shows a spam ad, a hostile comment, and a few that moderators rightly dismissed.
      */
     public function run(): void
     {
-        $users = User::where('role', 'user')->get();
-        $posts = RankingPost::all();
-        $comments = Comment::all();
-        $objects = MasterObject::all();
-
-        if ($users->isEmpty()) {
+        if (Report::query()->exists()) {
             return;
         }
 
-        $reportReasons = [
-            'ranking_post' => [
-                'Topik perbandingan duplikat dengan ranking yang sudah ada sebelumnya.',
-                'Kriteria yang dicantumkan mengandung informasi yang kurang akurat.',
-                'Judul postingan mengandung unsur clickbait yang menyesatkan pemilih.',
-            ],
-            'comment' => [
-                'Komentar mengandung tautan promosi tidak relevan dan spam berulang.',
-                'Bahasa yang digunakan tidak sopan dan memicu perdebatan tidak sehat.',
-                'Komentar keluar dari topik pembahasan kandidat ranking.',
-            ],
-            'object' => [
-                'Spesifikasi atau nama canonical objek perlu direvisi agar sesuai rujukan resmi.',
-                'Objek ini terindikasi duplikasi dengan kandidat lain di kategori yang sama.',
-                'Kategori objek kurang tepat dan perlu dipindahkan.',
-            ],
-        ];
+        $users = User::pluck('id', 'username');
 
-        $statuses = ['open', 'open', 'resolved', 'dismissed'];
+        foreach (CommunityContent::reports() as $data) {
+            $reporterId = $users[$data['reporter']] ?? null;
+            [$targetId, $targetType, $since] = $this->target($data);
 
-        // 1. Seed ranking_post reports
-        if ($posts->isNotEmpty()) {
-            foreach ($posts->random(min(3, $posts->count())) as $post) {
-                $reporter = $users->random();
-                $createdAt = now('UTC')->subDays(rand(1, 10))->subHours(rand(1, 20));
-
-                Report::create([
-                    'reporter_id' => $reporter->id,
-                    'created_by' => $reporter->id,
-                    'updated_by' => $reporter->id,
-                    'target_type' => 'ranking_post',
-                    'target_id' => $post->id,
-                    'reason' => fake()->randomElement($reportReasons['ranking_post']),
-                    'status' => fake()->randomElement($statuses),
-                    'created_at' => $createdAt,
-                    'updated_at' => $createdAt,
-                ]);
+            if ($reporterId === null || $targetId === null) {
+                continue;
             }
+
+            $createdAt = $since->copy()->addHours($data['hours_after']);
+            $createdAt = $createdAt->isFuture() ? now('UTC')->subHours(mt_rand(2, 20)) : $createdAt;
+
+            (new Report)->forceFill([
+                'reporter_id' => $reporterId,
+                'created_by' => $reporterId,
+                'updated_by' => $reporterId,
+                'target_type' => $targetType,
+                'target_id' => (string) $targetId,
+                'reason' => $data['reason'],
+                'status' => $data['status'],
+                'created_at' => $createdAt,
+                'updated_at' => $createdAt,
+            ])->save();
+        }
+    }
+
+    /** @return array{0: string|int|null, 1: string, 2: Carbon} */
+    private function target(array $data): array
+    {
+        if ($data['type'] === 'comment') {
+            $post = RankingPost::where('title', $data['post'])->first();
+            $comment = $post ? Comment::where('ranking_post_id', $post->id)->where('body', 'like', '%'.$data['match'].'%')->first() : null;
+
+            return [$comment?->id, 'comment', $comment?->created_at ?? now('UTC')];
         }
 
-        // 2. Seed comment reports
-        if ($comments->isNotEmpty()) {
-            foreach ($comments->random(min(4, $comments->count())) as $comment) {
-                $reporter = $users->random();
-                $createdAt = now('UTC')->subDays(rand(1, 8))->subHours(rand(1, 18));
+        if ($data['type'] === 'ranking_post') {
+            $post = RankingPost::where('title', $data['post'])->first();
 
-                Report::create([
-                    'reporter_id' => $reporter->id,
-                    'created_by' => $reporter->id,
-                    'updated_by' => $reporter->id,
-                    'target_type' => 'comment',
-                    'target_id' => (string) $comment->id,
-                    'reason' => fake()->randomElement($reportReasons['comment']),
-                    'status' => fake()->randomElement($statuses),
-                    'created_at' => $createdAt,
-                    'updated_at' => $createdAt,
-                ]);
-            }
+            return [$post?->id, 'ranking_post', $post?->published_at ?? now('UTC')];
         }
 
-        // 3. Seed object reports
-        if ($objects->isNotEmpty()) {
-            foreach ($objects->random(min(3, $objects->count())) as $object) {
-                $reporter = $users->random();
-                $createdAt = now('UTC')->subDays(rand(1, 12))->subHours(rand(1, 15));
+        $object = MasterObject::where('canonical_name', $data['object'])->first();
 
-                Report::create([
-                    'reporter_id' => $reporter->id,
-                    'created_by' => $reporter->id,
-                    'updated_by' => $reporter->id,
-                    'target_type' => 'object',
-                    'target_id' => $object->id,
-                    'reason' => fake()->randomElement($reportReasons['object']),
-                    'status' => fake()->randomElement($statuses),
-                    'created_at' => $createdAt,
-                    'updated_at' => $createdAt,
-                ]);
-            }
-        }
+        return [$object?->id, 'object', $object?->created_at ?? now('UTC')];
     }
 }

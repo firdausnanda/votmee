@@ -5,86 +5,65 @@ namespace Database\Seeders;
 use App\Models\Comment;
 use App\Models\RankingPost;
 use App\Models\User;
+use Database\Seeders\Content\CommunityContent;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Collection;
 
 class CommentSeeder extends Seeder
 {
     /**
-     * Run the database seeds.
+     * Create the written discussion for every demo ranking. Each comment is posted after the
+     * ranking was published, by a member who actually has something to say about its topic.
      */
     public function run(): void
     {
-        $users = User::all();
-        $posts = RankingPost::all();
+        $users = User::pluck('id', 'username');
 
-        if ($users->isEmpty() || $posts->isEmpty()) {
-            return;
-        }
+        foreach (CommunityContent::posts() as $data) {
+            $post = RankingPost::where('title', $data['title'])->first();
 
-        $sampleComments = [
-            'Pilihan nomor satu memang layak memimpin, saya sudah gunakan selama beberapa bulan dan performanya sangat stabil.',
-            'Kriteria pembandingannya sangat jelas dan adil. Sangat membantu yang sedang bingung memilih.',
-            'Kandidat nomor dua menurut saya punya keunggulan tersendiri di efisiensi daya dan harga yang lebih terjangkau.',
-            'Kamera dan hasil fotonya jernih sekali, apalagi untuk foto low light di malam hari.',
-            'Kualitas material dan finishing produk ini benar-benar terasa premium di tangan.',
-            'Menarik melihat persaingan ketat di kategori ini. Semoga segera ada update untuk generasi berikutnya.',
-            'Saya lebih condong ke pilihan ketiga karena faktor kenyamanan dan layanan purna jualnya yang luas.',
-            'Lanskap alamnya luar biasa indah dan wajib dikunjungi setidaknya sekali seumur hidup.',
-            'Rasa bumbu rempahnya sangat otentik dan meresap sampai ke serat daging terdalam.',
-            'Suspensi dan kenyamanan kabinnya sangat tenang, cocok sekali untuk perjalanan jauh bersama keluarga.',
-        ];
+            if ($post === null || Comment::where('ranking_post_id', $post->id)->exists()) {
+                continue;
+            }
 
-        $sampleReplies = [
-            'Setuju banget dengan ulasan ini!',
-            'Bener, daya tahannya memang terbukti paling awet dibanding yang lain.',
-            'Kira-kira worth it nggak kalau upgrade dari seri sebelumnya?',
-            'Terima kasih atas insight-nya, sangat membantu pertimbangan saya.',
-            'Sama, pengalaman saya juga persis seperti yang disampaikan.',
-        ];
+            foreach ($data['comments'] as $comment) {
+                $top = $this->write($post, $users, $comment, null);
 
-        foreach ($posts as $post) {
-            $numComments = rand(4, 9);
-            $postVoters = $users->random(min($numComments, $users->count()));
-
-            foreach ($postVoters as $idx => $user) {
-                $body = fake()->boolean(70)
-                    ? fake()->randomElement($sampleComments)
-                    : fake('id_ID')->paragraph(2);
-
-                $createdAt = now('UTC')->subDays(rand(0, 12))->subHours(rand(1, 23));
-                $status = fake()->boolean(96) ? 'visible' : 'hidden';
-
-                $comment = Comment::create([
-                    'ranking_post_id' => $post->id,
-                    'user_id' => $user->id,
-                    'created_by' => $user->id,
-                    'updated_by' => $user->id,
-                    'parent_id' => null,
-                    'body' => $body,
-                    'status' => $status,
-                    'created_at' => $createdAt,
-                    'updated_at' => $createdAt,
-                ]);
-
-                // 40% chance of a reply to this comment
-                if (fake()->boolean(45) && $users->count() > 1) {
-                    $replyUser = $users->where('id', '!=', $user->id)->random();
-                    $replyBody = fake()->randomElement($sampleReplies);
-                    $replyTime = (clone $createdAt)->addHours(rand(1, 24));
-
-                    Comment::create([
-                        'ranking_post_id' => $post->id,
-                        'user_id' => $replyUser->id,
-                        'created_by' => $replyUser->id,
-                        'updated_by' => $replyUser->id,
-                        'parent_id' => $comment->id,
-                        'body' => $replyBody,
-                        'status' => 'visible',
-                        'created_at' => $replyTime,
-                        'updated_at' => $replyTime,
-                    ]);
+                foreach ($comment['replies'] ?? [] as $reply) {
+                    $this->write($post, $users, $reply, $top);
                 }
             }
         }
+    }
+
+    /**
+     * @param  Collection<string, int>  $users
+     * @param  array<string, mixed>  $data
+     */
+    private function write(RankingPost $post, $users, array $data, ?Comment $parent): ?Comment
+    {
+        $userId = $users[$data['by']] ?? null;
+
+        if ($userId === null) {
+            return null;
+        }
+
+        $createdAt = $post->published_at->copy()->addMinutes($data['at']);
+        $createdAt = $createdAt->isFuture() ? now('UTC')->subMinutes(mt_rand(5, 90)) : $createdAt;
+
+        $comment = new Comment;
+        $comment->forceFill([
+            'ranking_post_id' => $post->id,
+            'user_id' => $userId,
+            'created_by' => $userId,
+            'updated_by' => $userId,
+            'parent_id' => $parent?->id,
+            'body' => $data['body'],
+            'status' => ($data['flag'] ?? null) === 'spam' ? 'hidden' : 'visible',
+            'created_at' => $createdAt,
+            'updated_at' => $createdAt,
+        ])->save();
+
+        return $comment;
     }
 }

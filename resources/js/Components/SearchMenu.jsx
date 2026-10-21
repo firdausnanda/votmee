@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const RECENT_SEARCHES_KEY = "votmee_recent_searches";
+const BROWSE_CATEGORY_LIMIT = 8;
+const SUGGESTION_DEBOUNCE_MS = 200;
+const SUGGESTION_MIN_LENGTH = 2;
 
 const DEFAULT_RECENTS_ID = [
     "Smartphone Gaming",
@@ -36,6 +39,12 @@ const searchIcons = {
         <path d="M7 3h10v8a5 5 0 0 1-10 0V3ZM7 5H4v3a4 4 0 0 0 4 4M17 5h3v3a4 4 0 0 1-4 4M12 16v4m-4 1h8" />
     ),
     arrow: <path d="M5 12h14m-6-6 6 6-6 6" />,
+    user: (
+        <>
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 21a8 8 0 0 1 16 0" />
+        </>
+    ),
     enter: <path d="M9 10L4 15l5 5m11-9v4a2 2 0 0 1-2 2H4" />,
     compass: (
         <>
@@ -143,6 +152,8 @@ export default function SearchMenu({
     setSearchInput,
     onSearchSubmit,
     onSelectCategory,
+    onOpenLink,
+    fetchSuggestions,
     onClose,
     posts = [],
     leaders = [],
@@ -155,6 +166,8 @@ export default function SearchMenu({
 }) {
     const [isOpen, setIsOpen] = useState(autoFocus);
     const [activeIndex, setActiveIndex] = useState(-1);
+    const [showAllCategories, setShowAllCategories] = useState(false);
+    const [remote, setRemote] = useState({ query: "", posts: [], leaders: [], users: [], loading: false });
     const containerRef = useRef(null);
     const inputRef = useRef(null);
     const listRef = useRef(null);
@@ -228,6 +241,7 @@ export default function SearchMenu({
                 subtitle: `${p.voteLabel} ${ui.votesLabel || (language === "en" ? "votes" : "suara")}`,
                 badge: p.category,
                 type: "post",
+                href: p.href,
             }));
 
         const topLeader = leaders[0]
@@ -235,10 +249,11 @@ export default function SearchMenu({
                   {
                       id: `leader-0`,
                       title: leaders[0][0],
-                      category: "Teknologi",
+                      category: language === "en" ? "Object" : "Objek",
                       subtitle: `${leaders[0][1]} ${ui.supportersLabel || (language === "en" ? "supporters" : "pendukung")}`,
                       badge: language === "en" ? "Top Leader" : "Peringkat #1",
                       type: "leader",
+                      href: leaders[0][4],
                   },
               ]
             : [];
@@ -248,9 +263,35 @@ export default function SearchMenu({
 
     // Live search matching results when typing
     const query = searchInput.trim().toLowerCase();
+    const hasRemoteResults = Boolean(fetchSuggestions) && remote.query === query && !remote.loading;
+    const isSearching = Boolean(fetchSuggestions) && query.length >= SUGGESTION_MIN_LENGTH && !hasRemoteResults;
+
+    // Fetch server-side suggestions (debounced, stale requests aborted)
+    useEffect(() => {
+        if (!fetchSuggestions || !isOpen || query.length < SUGGESTION_MIN_LENGTH) {
+            return undefined;
+        }
+        const controller = new AbortController();
+        setRemote((current) => ({ ...current, loading: true }));
+        const timer = setTimeout(() => {
+            fetchSuggestions(query, controller.signal)
+                .then((result) => setRemote({ query, posts: result.posts ?? [], leaders: result.leaders ?? [], users: result.users ?? [], loading: false }))
+                .catch((error) => {
+                    if (error?.name !== "AbortError") {
+                        setRemote({ query, posts: [], leaders: [], users: [], loading: false });
+                    }
+                });
+        }, SUGGESTION_DEBOUNCE_MS);
+
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
+    }, [query, isOpen, fetchSuggestions]);
 
     const matchingPosts = useMemo(() => {
         if (!query) return [];
+        if (hasRemoteResults) return remote.posts;
         return posts
             .filter((p) => {
                 const title = (
@@ -286,8 +327,9 @@ export default function SearchMenu({
                 category: p.category,
                 author: p.author,
                 votes: p.voteLabel,
+                href: p.href,
             }));
-    }, [query, posts, language, englishPosts]);
+    }, [query, posts, language, englishPosts, hasRemoteResults, remote.posts]);
 
     // Matching category if query matches any category name
     const matchingCategory = useMemo(() => {
@@ -304,16 +346,24 @@ export default function SearchMenu({
     // Matching leader objects (e.g. Samsung, iPhone, Xiaomi)
     const matchingLeaders = useMemo(() => {
         if (!query) return [];
+        if (hasRemoteResults) return remote.leaders;
         return leaders
             .filter(([name]) => name.toLowerCase().includes(query))
             .slice(0, 3)
-            .map(([name, supporters, diff, up]) => ({
+            .map(([name, supporters, diff, up, href]) => ({
                 name,
                 supporters,
                 diff,
                 up,
+                href,
             }));
-    }, [query, leaders]);
+    }, [query, leaders, hasRemoteResults, remote.leaders]);
+
+    // Matching users (server-side only)
+    const matchingUsers = useMemo(
+        () => (query && hasRemoteResults ? remote.users : []),
+        [query, hasRemoteResults, remote.users]
+    );
 
     // Flatten navigable items list for keyboard navigation
     const navigableItems = useMemo(() => {
@@ -323,7 +373,7 @@ export default function SearchMenu({
                 list.push({ type: "recent", value: item, label: item });
             });
             trendingItems.forEach((item) => {
-                list.push({ type: "trending", value: item.title, label: item.title });
+                list.push({ type: "trending", value: item.title, label: item.title, href: item.href });
             });
             return list;
         } else {
@@ -339,6 +389,7 @@ export default function SearchMenu({
                     type: "post",
                     value: post.title,
                     label: post.title,
+                    href: post.href,
                     post,
                 });
             });
@@ -354,6 +405,15 @@ export default function SearchMenu({
                     type: "leader",
                     value: leader.name,
                     label: leader.name,
+                    href: leader.href,
+                });
+            });
+            matchingUsers.forEach((user) => {
+                list.push({
+                    type: "user",
+                    value: user.name,
+                    label: user.name,
+                    href: user.href,
                 });
             });
             return list;
@@ -366,6 +426,7 @@ export default function SearchMenu({
         matchingPosts,
         matchingCategory,
         matchingLeaders,
+        matchingUsers,
     ]);
 
     // Execute search action and close
@@ -389,6 +450,29 @@ export default function SearchMenu({
         }
     }
 
+    // Open a suggestion directly when it links to a page, otherwise search for it
+    function openItem(label, href) {
+        if (!href || !onOpenLink) {
+            handleExecute(label);
+            return;
+        }
+        addRecentSearch(label);
+        setIsOpen(false);
+        setActiveIndex(-1);
+        onOpenLink(href);
+        if (isMobile) {
+            onClose?.();
+        }
+    }
+
+    function selectNavigableItem(item) {
+        if (item.type === "category") {
+            handleExecute("", item.value);
+        } else {
+            openItem(item.value, item.href);
+        }
+    }
+
     // Keyboard navigation
     function handleKeyDown(event) {
         if (!isOpen) {
@@ -409,12 +493,7 @@ export default function SearchMenu({
         } else if (event.key === "Enter") {
             event.preventDefault();
             if (activeIndex >= 0 && navigableItems[activeIndex]) {
-                const item = navigableItems[activeIndex];
-                if (item.type === "category") {
-                    handleExecute("", item.value);
-                } else {
-                    handleExecute(item.value);
-                }
+                selectNavigableItem(navigableItems[activeIndex]);
             } else {
                 handleExecute(searchInput);
             }
@@ -488,6 +567,13 @@ export default function SearchMenu({
             clearAll: isId ? "Hapus Semua" : "Clear All",
             trendingTitle: isId ? "Sedang Tren di Votmee" : "Trending on Votmee",
             browseCategories: isId ? "Jelajahi Kategori" : "Browse Categories",
+            categoryHint: isId ? "Lihat semua ranking dalam kategori ini" : "See all rankings in this category",
+            searching: isId ? "Mencari..." : "Searching...",
+            viewObject: isId ? "Lihat halaman objek" : "View object page",
+            matchingUsers: isId ? "Pengguna" : "Users",
+            rankingsCount: isId ? "ranking" : "rankings",
+            moreCategories: isId ? "Lainnya" : "More",
+            fewerCategories: isId ? "Tampilkan lebih sedikit" : "Show less",
             matchingRankings: isId ? "Rekomendasi Ranking" : "Matching Rankings",
             matchingCategory: isId ? "Kategori Terkait" : "Related Category",
             matchingObject: isId ? "Objek Peringkat" : "Leaderboard Object",
@@ -520,12 +606,7 @@ export default function SearchMenu({
                 onSubmit={(e) => {
                     e.preventDefault();
                     if (activeIndex >= 0 && navigableItems[activeIndex]) {
-                        const item = navigableItems[activeIndex];
-                        if (item.type === "category") {
-                            handleExecute("", item.value);
-                        } else {
-                            handleExecute(item.value);
-                        }
+                        selectNavigableItem(navigableItems[activeIndex]);
                     } else {
                         handleExecute(searchInput);
                     }
@@ -686,7 +767,7 @@ export default function SearchMenu({
                                                 className={`vm-search-item ${
                                                     isActive ? "is-active" : ""
                                                 }`}
-                                                onClick={() => handleExecute(item.title)}
+                                                onClick={() => openItem(item.title, item.href)}
                                                 role="option"
                                                 aria-selected={isActive}
                                             >
@@ -727,8 +808,8 @@ export default function SearchMenu({
                                         {labels.browseCategories}
                                     </span>
                                 </div>
-                                <div className="vm-search-cat-grid">
-                                    {categories.map(([name, iconName]) => {
+                                <div className={`vm-search-cat-grid${showAllCategories ? " is-expanded" : ""}`}>
+                                    {(showAllCategories ? categories : categories.slice(0, BROWSE_CATEGORY_LIMIT)).map(([name, iconName]) => {
                                         const label =
                                             ui.categories && ui.categories[name]
                                                 ? ui.categories[name]
@@ -747,6 +828,18 @@ export default function SearchMenu({
                                             </button>
                                         );
                                     })}
+                                    {categories.length > BROWSE_CATEGORY_LIMIT && (
+                                        <button
+                                            type="button"
+                                            className="vm-search-cat-chip vm-search-cat-more"
+                                            aria-expanded={showAllCategories}
+                                            onClick={() => setShowAllCategories((value) => !value)}
+                                        >
+                                            {showAllCategories
+                                                ? labels.fewerCategories
+                                                : `${labels.moreCategories} (+${categories.length - BROWSE_CATEGORY_LIMIT})`}
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </>
@@ -777,7 +870,7 @@ export default function SearchMenu({
                                                 </strong>
                                             </div>
                                             <div className="vm-search-item-desc">
-                                                {labels.inAllCategories}
+                                                {isSearching ? labels.searching : labels.inAllCategories}
                                             </div>
                                         </div>
                                     </div>
@@ -812,13 +905,13 @@ export default function SearchMenu({
                                                     className={`vm-search-item ${
                                                         isActive ? "is-active" : ""
                                                     }`}
-                                                    onClick={() => handleExecute(post.title)}
+                                                    onClick={() => openItem(post.title, post.href)}
                                                     role="option"
                                                     aria-selected={isActive}
                                                 >
                                                     <div className="vm-search-item-left">
                                                         <span
-                                                            className={`vm-search-item-icon vm-search-cat-badge-${post.category.toLowerCase()}`}
+                                                            className={`vm-search-item-icon vm-search-cat-badge-${(post.category || "").toLowerCase()}`}
                                                         >
                                                             <MenuIcon name={catIcon} size={15} />
                                                         </span>
@@ -831,8 +924,8 @@ export default function SearchMenu({
                                                                     {ui.categories &&
                                                                     ui.categories[post.category]
                                                                         ? ui.categories[post.category]
-                                                                        : post.category}{" "}
-                                                                    • {post.author}
+                                                                        : post.category}
+                                                                    {post.author && ` • ${post.author}`}
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -883,7 +976,7 @@ export default function SearchMenu({
                                                                 {highlightMatch(catLabel, query)}
                                                             </div>
                                                             <div className="vm-search-item-desc">
-                                                                Lihat semua ranking dalam kategori ini
+                                                                {labels.categoryHint}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -920,7 +1013,7 @@ export default function SearchMenu({
                                                     className={`vm-search-item ${
                                                         isActive ? "is-active" : ""
                                                     }`}
-                                                    onClick={() => handleExecute(lead.name)}
+                                                    onClick={() => openItem(lead.name, lead.href)}
                                                     role="option"
                                                     aria-selected={isActive}
                                                 >
@@ -933,7 +1026,64 @@ export default function SearchMenu({
                                                                 {highlightMatch(lead.name, query)}
                                                             </div>
                                                             <div className="vm-search-item-desc">
-                                                                {lead.supporters} {labels.supporters}
+                                                                {lead.supporters
+                                                                    ? `${lead.supporters} ${labels.supporters}`
+                                                                    : labels.viewObject}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <span className="vm-search-item-arrow">
+                                                        <MenuIcon name="arrow" size={14} />
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Section: Matching Users */}
+                            {matchingUsers.length > 0 && (
+                                <div className="vm-search-section">
+                                    <div className="vm-search-section-header">
+                                        <span className="vm-search-section-title">
+                                            <MenuIcon name="user" size={13} />
+                                            {labels.matchingUsers}
+                                        </span>
+                                    </div>
+                                    <div className="vm-search-items-list">
+                                        {matchingUsers.map((user, idx) => {
+                                            const itemIndex =
+                                                1 +
+                                                matchingPosts.length +
+                                                (matchingCategory ? 1 : 0) +
+                                                matchingLeaders.length +
+                                                idx;
+                                            const isActive = activeIndex === itemIndex;
+                                            return (
+                                                <div
+                                                    key={`user-${user.username}`}
+                                                    className={`vm-search-item ${
+                                                        isActive ? "is-active" : ""
+                                                    }`}
+                                                    onClick={() => openItem(user.name, user.href)}
+                                                    role="option"
+                                                    aria-selected={isActive}
+                                                >
+                                                    <div className="vm-search-item-left">
+                                                        <span className="vm-search-item-icon vm-search-icon-user">
+                                                            {user.avatar ? (
+                                                                <img src={user.avatar} alt="" loading="lazy" decoding="async" />
+                                                            ) : (
+                                                                user.name.slice(0, 1).toUpperCase()
+                                                            )}
+                                                        </span>
+                                                        <div className="vm-search-item-text">
+                                                            <div className="vm-search-item-title">
+                                                                {highlightMatch(user.name, query.replace(/^@/, ""))}
+                                                            </div>
+                                                            <div className="vm-search-item-desc">
+                                                                @{user.username} • {user.rankings} {labels.rankingsCount}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -948,9 +1098,11 @@ export default function SearchMenu({
                             )}
 
                             {/* Empty state if nothing matches */}
-                            {matchingPosts.length === 0 &&
+                            {!isSearching &&
+                                matchingPosts.length === 0 &&
                                 !matchingCategory &&
-                                matchingLeaders.length === 0 && (
+                                matchingLeaders.length === 0 &&
+                                matchingUsers.length === 0 && (
                                     <div className="vm-search-empty-state">
                                         <div className="vm-search-empty-icon">
                                             <MenuIcon name="search" size={24} />

@@ -9,7 +9,7 @@ use Illuminate\Database\Seeder;
 class WalletSeeder extends Seeder
 {
     /**
-     * Run the database seeds.
+     * Every member starts with an empty wallet; the balance is built up by the point ledger.
      */
     public function run(): void
     {
@@ -21,12 +21,7 @@ class WalletSeeder extends Seeder
         }
 
         foreach ($users as $user) {
-            Wallet::firstOrCreate(
-                ['user_id' => $user->id],
-                [
-                    'balance' => fake()->numberBetween(35, 75),
-                ]
-            );
+            Wallet::firstOrCreate(['user_id' => $user->id], ['balance' => 0]);
         }
     }
 }

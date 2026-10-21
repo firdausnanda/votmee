@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import SearchMenu from '../../Components/SearchMenu';
 import LanguageSelect from '../../Components/LanguageSelect';
 import ProfileDropdown from '../../Components/ProfileDropdown';
@@ -85,6 +85,8 @@ export function NavIcon({ name, size = 18, className = '' }) {
         camera: <><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></>,
         settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></>,
         lock: <><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>,
+        eye: <><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></>,
+        eyeOff: <><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="M2 2l20 20" /></>,
         trash: <><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></>,
         alertTriangle: <><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></>,
         mail: <><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></>,
@@ -142,9 +144,21 @@ export function SocialIcon({ name, size = 26 }) {
 
 const categoryOrder = ['teknologi', 'wisata', 'kuliner', 'otomotif', 'hiburan', 'pendidikan', 'gadget', 'finansial'];
 
+/** Maximum categories listed in compact navigation before linking to the full list. */
+export const SIDEBAR_CATEGORY_LIMIT = 8;
+
 function categoryPosition(category) {
     const position = categoryOrder.indexOf(category.slug);
     return position < 0 ? categoryOrder.length : position;
+}
+
+/**
+ * Pinned categories first, then the rest by number of published rankings.
+ */
+export function sortCategoriesByPopularity(categories) {
+    return [...categories].sort((first, second) => categoryPosition(first) - categoryPosition(second)
+        || (second.ranking_posts_count ?? 0) - (first.ranking_posts_count ?? 0)
+        || first.name.localeCompare(second.name));
 }
 
 function relativeDate(value, locale) {
@@ -231,6 +245,81 @@ export function MobileQuickDuel({ locale }) {
     return useCompactLayout() ? <div className="vm-mobile-leaderboard"><QuickDuelWidget locale={locale} /></div> : null;
 }
 
+const SAVED_RANKINGS_KEY = 'votmee.savedRankings';
+const SAVED_RANKINGS_SYNC_LIMIT = 200;
+let savedRankingsSyncing = false;
+
+function readLocalSavedRankings() {
+    try {
+        const stored = JSON.parse(localStorage.getItem(SAVED_RANKINGS_KEY) || '[]');
+        return Array.isArray(stored) ? stored : [];
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Saved state for one ranking: stored on the account when signed in,
+ * in the browser for guests (imported to the account after login).
+ */
+export function useSavedRanking(post, initialSaved = false) {
+    const user = usePage().props.auth?.user;
+    const [saved, setSaved] = useState(Boolean(initialSaved));
+    const [busy, setBusy] = useState(false);
+
+    useEffect(() => {
+        setSaved(user ? Boolean(initialSaved) : readLocalSavedRankings().includes(post.id));
+    }, [post.id, initialSaved, user?.id]);
+
+    const toggle = async () => {
+        const next = !saved;
+        if (!user) {
+            const current = readLocalSavedRankings();
+            const updated = next ? [...new Set([...current, post.id])] : current.filter(id => id !== post.id);
+            try {
+                localStorage.setItem(SAVED_RANKINGS_KEY, JSON.stringify(updated));
+            } catch {
+                return saved;
+            }
+            setSaved(next);
+            return next;
+        }
+        if (busy) return saved;
+        setBusy(true);
+        setSaved(next);
+        try {
+            await api(`/backend/rankings/${post.id}/save`, next ? 'PUT' : 'DELETE');
+            return next;
+        } catch (error) {
+            setSaved(!next);
+            throw error;
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return { saved, toggle, busy };
+}
+
+/**
+ * Moves rankings saved as a guest into the signed-in account, once.
+ */
+function useSyncLocalSavedRankings(user) {
+    useEffect(() => {
+        if (!user || savedRankingsSyncing) return;
+        const ids = readLocalSavedRankings();
+        if (!ids.length) return;
+        savedRankingsSyncing = true;
+        api('/backend/saved-rankings/sync', 'POST', { ranking_post_ids: ids.slice(-SAVED_RANKINGS_SYNC_LIMIT) })
+            .then((result) => {
+                localStorage.removeItem(SAVED_RANKINGS_KEY);
+                if (result.imported > 0) router.reload();
+            })
+            .catch(() => {})
+            .finally(() => { savedRankingsSyncing = false; });
+    }, [user?.id]);
+}
+
 export function Layout({ locale, categories = [], leaders = [], children, active = '', searchPosts = [], loginModal = false, registerModal = false, recentComments: propRecentComments }) {
     const compactLayout = useCompactLayout();
     const t = dictionary(locale);
@@ -239,15 +328,18 @@ export function Layout({ locale, categories = [], leaders = [], children, active
     const useFeedFrame = showRankingPanel || useWideContent;
     const user = usePage().props.auth?.user;
     const access = useCommunityAccess();
-    const [query, setQuery] = useState('');
+    useSyncLocalSavedRankings(user);
+    const [query, setQuery] = useState(() => (typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('q') ?? ''));
     const [menuOpen, setMenuOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
     const [authMode, setAuthMode] = useState(registerModal ? 'register' : loginModal ? 'login' : null);
     const { loginStatus, googleAuthError, recentComments: pageRecentComments = [] } = usePage().props;
     const recentComments = propRecentComments || pageRecentComments || [];
-    const orderedCategories = [...categories].sort((first, second) => categoryPosition(first) - categoryPosition(second));
+    const orderedCategories = sortCategoriesByPopularity(categories);
+    const sidebarCategories = orderedCategories.slice(0, SIDEBAR_CATEGORY_LIMIT);
+    const hiddenCategoryCount = orderedCategories.length - sidebarCategories.length;
     const searchCategories = orderedCategories.map(category => [category.name, ({ teknologi: 'chip', wisata: 'mountain', kuliner: 'utensils', otomotif: 'car', hiburan: 'film', pendidikan: 'graduation', finansial: 'wallet', kesehatan: 'heartPulse' })[category.slug] ?? 'more']);
-    const searchLeaders = leaders.map(leader => [leader.name, numberLabel(leader.score, locale), '', true]);
+    const searchLeaders = leaders.map(leader => [leader.name, numberLabel(leader.score, locale), '', true, leader.slug ? path(locale, `/object/${leader.slug}`) : undefined]);
     const searchRankings = searchPosts.map(post => ({
         id: post.id,
         title: post.title,
@@ -256,7 +348,40 @@ export function Layout({ locale, categories = [], leaders = [], children, active
         author: post.creator?.username ? `@${post.creator.username}` : post.creator?.name ?? 'Votmee',
         votes: post.supporters_count ?? 0,
         voteLabel: numberLabel(post.supporters_count ?? 0, locale),
+        href: post.slug ? path(locale, `/ranking/${post.slug}`) : undefined,
     }));
+    const fetchSearchSuggestions = useCallback(async (value, signal) => {
+        const response = await fetch(`/backend/search?${new URLSearchParams({ q: value })}`, {
+            signal,
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) throw new Error('Search failed');
+        const result = await response.json();
+
+        return {
+            posts: result.rankings.map(post => ({
+                id: post.id,
+                title: post.title,
+                description: post.criteria,
+                category: post.category ?? '',
+                author: '',
+                votes: numberLabel(post.supporters_count, locale),
+                href: path(locale, `/ranking/${post.slug}`),
+            })),
+            leaders: result.objects.map(object => ({
+                name: object.name,
+                href: path(locale, `/object/${object.slug}`),
+            })),
+            users: result.users.map(user => ({
+                name: user.name,
+                username: user.username,
+                avatar: user.avatar_url ? `${user.avatar_url}&size=small` : null,
+                rankings: numberLabel(user.rankings_count, locale),
+                href: path(locale, `/profile/${user.username}`),
+            })),
+        };
+    }, [locale]);
     useEffect(() => { localStorage.setItem('votmee.locale', locale); }, [locale]);
     useEffect(() => {
         const open = () => setAuthMode('login');
@@ -286,6 +411,8 @@ export function Layout({ locale, categories = [], leaders = [], children, active
         setSearchInput: setQuery,
         onSearchSubmit: submitSearch,
         onSelectCategory: selectSearchCategory,
+        onOpenLink: (href) => router.visit(href),
+        fetchSuggestions: fetchSearchSuggestions,
         posts: searchRankings,
         leaders: searchLeaders,
         categories: searchCategories,
@@ -315,13 +442,16 @@ export function Layout({ locale, categories = [], leaders = [], children, active
                 <nav className="vt-main-nav vm-side-nav">
                     <Link className={active === 'home' ? 'active' : ''} href={path(locale)}><NavIcon name="home" />{t.home}</Link>
                     <Link className={active === 'explore' ? 'active' : ''} href={path(locale, '/explore')}><NavIcon name="search" />{t.explore}</Link>
-                    {access.createRanking && <Link href={path(locale, '/create')}><NavIcon name="plusCircle" />{t.create}</Link>}
-                    {access.viewWallet && <Link href={path(locale, '/wallet')}><NavIcon name="wallet" />{t.wallet}</Link>}
-                    {user && <Link href={path(locale, `/profile/${user.username}`)}><NavIcon name="user" />{t.profile}</Link>}
+                    {access.createRanking && <Link className={active === 'create' ? 'active' : ''} href={path(locale, '/create')}><NavIcon name="plusCircle" />{t.create}</Link>}
+                    {access.viewWallet && <Link className={active === 'wallet' ? 'active' : ''} href={path(locale, '/wallet')}><NavIcon name="wallet" />{t.wallet}</Link>}
+                    {user && <Link className={active === 'profile' ? 'active' : ''} href={path(locale, `/profile/${user.username}`)}><NavIcon name="user" />{t.profile}</Link>}
                 </nav>
                 <div className="vt-nav-section vm-side-categories">
                     <p className="vt-rail-label">{locale === 'id' ? 'KATEGORI POPULER' : 'POPULAR CATEGORIES'}</p>
-                    {orderedCategories.map(category => <Link key={category.id} href={path(locale, `/explore?category=${category.slug}`)}>{categoryHashtag(category)}</Link>)}
+                    {sidebarCategories.map(category => <Link key={category.id} href={path(locale, `/explore?category=${category.slug}`)}>{categoryHashtag(category)}</Link>)}
+                    {hiddenCategoryCount > 0 && <Link className="vm-side-categories-more" href={path(locale, '/explore')}>
+                        {locale === 'id' ? `Lihat semua kategori (+${hiddenCategoryCount})` : `View all categories (+${hiddenCategoryCount})`} →
+                    </Link>}
                 </div>
                 <div className="vt-mobile-account-links">
                     {!user && <><button type="button" onClick={() => { setMenuOpen(false); setAuthMode('login'); }}>{t.login}</button><button type="button" onClick={() => { setMenuOpen(false); setAuthMode('register'); }}>{locale === 'id' ? 'Daftar' : 'Sign up'}</button></>}
@@ -338,9 +468,9 @@ export function Layout({ locale, categories = [], leaders = [], children, active
         <nav className={`vt-bottom-nav vm-bottom-nav ${user ? '' : 'vm-bottom-nav-guest'}`} aria-label={t.menu}>
             <Link className={active === 'home' ? 'active' : ''} href={path(locale)}><NavIcon name="home" size={21} /><span>{t.home}</span></Link>
             <Link className={active === 'explore' ? 'active' : ''} href={path(locale, '/explore')}><NavIcon name="search" size={21} /><span>{t.explore}</span></Link>
-            {access.createRanking && <Link className="vm-bottom-create" href={path(locale, '/create')} aria-label={t.create}><NavIcon name="plus" size={26} /></Link>}
-            {access.viewWallet && <Link href={path(locale, '/wallet')}><NavIcon name="wallet" size={21} /><span>{t.wallet}</span></Link>}
-            {user ? <Link href={path(locale, `/profile/${user.username}`)}><NavIcon name="user" size={21} /><span>{t.profile}</span></Link> : <button type="button" onClick={() => setAuthMode('login')}><NavIcon name="user" size={21} /><span>{t.login}</span></button>}
+            {access.createRanking && <Link className={`vm-bottom-create${active === 'create' ? ' active' : ''}`} href={path(locale, '/create')} aria-label={t.create}><NavIcon name="plus" size={26} /></Link>}
+            {access.viewWallet && <Link className={active === 'wallet' ? 'active' : ''} href={path(locale, '/wallet')}><NavIcon name="wallet" size={21} /><span>{t.wallet}</span></Link>}
+            {user ? <Link className={active === 'profile' ? 'active' : ''} href={path(locale, `/profile/${user.username}`)}><NavIcon name="user" size={21} /><span>{t.profile}</span></Link> : <button type="button" onClick={() => setAuthMode('login')}><NavIcon name="user" size={21} /><span>{t.login}</span></button>}
         </nav>
         {!user && <AuthModal mode={authMode} onClose={closeAuth} onModeChange={setAuthMode} locale={locale} status={loginStatus} googleAuthError={googleAuthError} />}
     </div>;
@@ -946,35 +1076,18 @@ function FeedCover({ entries, categorySlug }) {
     </span>;
 }
 
-export function RankingCard({ post, locale, category }) {
+export function RankingCard({ post, locale, category, onSavedChange }) {
     const t = dictionary(locale);
     const categorySlug = post.category?.slug ?? category?.slug ?? '';
     const rankingUrl = path(locale, `/ranking/${post.slug}`);
     const author = post.creator?.username ? `@${post.creator.username}` : post.creator?.name ?? 'Votmee';
     const authorUsername = post.creator?.username ?? (typeof post.author === 'string' && post.author.startsWith('@') ? post.author.slice(1) : null);
     const profileUrl = authorUsername ? path(locale, `/profile/${authorUsername}`) : null;
-    const [saved, setSaved] = useState(false);
-
-    useEffect(() => {
-        try {
-            const stored = JSON.parse(localStorage.getItem('votmee.savedRankings') || '[]');
-            setSaved(Array.isArray(stored) && stored.includes(post.id));
-        } catch {
-            setSaved(false);
-        }
-    }, [post.id]);
-
+    const { saved, toggle, busy: savingRanking } = useSavedRanking(post, post.is_saved);
     const toggleSaved = () => {
-        let savedRankings = [];
-        try {
-            const stored = JSON.parse(localStorage.getItem('votmee.savedRankings') || '[]');
-            savedRankings = Array.isArray(stored) ? stored : [];
-        } catch {
-            savedRankings = [];
-        }
-        const updated = savedRankings.includes(post.id) ? savedRankings.filter(id => id !== post.id) : [...savedRankings, post.id];
-        localStorage.setItem('votmee.savedRankings', JSON.stringify(updated));
-        setSaved(updated.includes(post.id));
+        toggle()
+            .then((isSaved) => onSavedChange?.(post, isSaved))
+            .catch(() => {});
     };
 
     const avatarImage = post.creator?.avatar_url;
@@ -1011,7 +1124,7 @@ export function RankingCard({ post, locale, category }) {
         <div className="vm-feed-content">
             <div className="vm-feed-title-row">
                 <span className={`vm-category-tag vm-tag-${categorySlug}`}>{categoryHashtag(post.category ?? category) || t.category}</span>
-                <button className={`vm-save ${saved ? 'selected' : ''}`} type="button" onClick={toggleSaved} aria-label={`${saved ? (locale === 'id' ? 'Hapus simpanan' : 'Remove saved') : (locale === 'id' ? 'Simpan' : 'Save')} ${post.title}`} aria-pressed={saved}><NavIcon name="bookmark" size={17} /></button>
+                <button className={`vm-save ${saved ? 'selected' : ''}`} type="button" onClick={toggleSaved} disabled={savingRanking} aria-label={`${saved ? (locale === 'id' ? 'Hapus simpanan' : 'Remove saved') : (locale === 'id' ? 'Simpan' : 'Save')} ${post.title}`} aria-pressed={saved}><NavIcon name="bookmark" size={17} /></button>
             </div>
             <h2><Link href={rankingUrl}>{post.title}</Link></h2>
             <p className="vm-feed-description">{post.criteria}</p>

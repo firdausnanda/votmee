@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\RankingPost;
+use App\Models\SavedRanking;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -16,7 +17,7 @@ class FeedService
     public const POPULAR_PERIODS = ['today' => 1, 'week' => 7, 'all' => null];
 
     /**
-     * @param  array{q?: string|null, sort?: string|null, period?: string|null, category_id?: int|null, language_code?: string|null, region_code?: string|null}  $filters
+     * @param  array{q?: string|null, saved_by?: int|null, sort?: string|null, period?: string|null, category_id?: int|null, language_code?: string|null, region_code?: string|null}  $filters
      */
     public function paginate(array $filters, ?User $viewer = null, int $perPage = 20): LengthAwarePaginator
     {
@@ -38,11 +39,19 @@ class FeedService
                 $query->where('title', 'like', '%'.$search.'%')
                     ->orWhere('criteria', 'like', '%'.$search.'%');
             }))
-            ->when($filters['category_id'] ?? null, fn ($query, $id) => $query->where('category_id', $id));
+            ->when($filters['category_id'] ?? null, fn ($query, $id) => $query->where('category_id', $id))
+            ->when($viewer, fn ($query) => $query->withExists(['savedRankings as is_saved' => fn ($saved) => $saved->where('user_id', $viewer->id)]))
+            ->when($filters['saved_by'] ?? null, fn ($query, $userId) => $query->whereHas('savedRankings', fn ($saved) => $saved->where('user_id', $userId)));
 
         match ($filters['sort'] ?? 'for_you') {
             'popular' => $this->orderByTrending($query, $scoresForPost, $filters['period'] ?? 'week', $now),
             'latest' => $query->orderByDesc('published_at')->orderByDesc('ranking_posts.id'),
+            'saved' => $query->orderByDesc(SavedRanking::query()
+                ->select('created_at')
+                ->whereColumn('saved_rankings.ranking_post_id', 'ranking_posts.id')
+                ->where('user_id', $filters['saved_by'] ?? $viewer?->id)
+                ->limit(1))
+                ->orderByDesc('ranking_posts.id'),
             default => $this->orderForViewer($query, $scoresForPost, $filters, $viewer, $now),
         };
 
