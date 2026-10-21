@@ -18,6 +18,7 @@ use App\Models\Wallet;
 use App\Services\FeedService;
 use App\Services\LeaderboardService;
 use App\Services\ObjectMatchingService;
+use App\Services\SeoService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -31,9 +32,18 @@ class CommunityController extends Controller
     public function home(Request $request, FeedService $feed, LeaderboardService $leaderboard): Response
     {
         $filters = $this->feedFilters($request);
+        $locale = $this->locale($request);
+        $isIndexable = $request->query() === [] && ! $request->routeIs('community.login', 'community.register');
 
         return Inertia::render('Community/Feed', [
             ...$this->shared($request),
+            'seo' => app(SeoService::class)->page(
+                $locale,
+                '',
+                $locale === 'id' ? 'Ranking pilihan komunitas' : 'Community rankings',
+                $locale === 'id' ? 'Temukan ranking dan pilihan favorit komunitas Votmee.' : 'Discover rankings and community favorites on Votmee.',
+                $isIndexable,
+            ),
             'loginModal' => $request->routeIs('community.login'),
             'registerModal' => $request->routeIs('community.register'),
             'loginStatus' => session('status'),
@@ -47,6 +57,7 @@ class CommunityController extends Controller
     public function explore(Request $request, FeedService $feed, LeaderboardService $leaderboard, ObjectMatchingService $matching): Response
     {
         $filters = [...$this->feedFilters($request), 'sort' => 'latest'];
+        $locale = $this->locale($request);
         $browsing = ! isset($filters['q']) && ! isset($filters['category_id']);
         $spotlight = $browsing && (int) $request->query('page', 1) === 1
             ? $feed->paginate([...$filters, 'sort' => 'popular', 'period' => 'week'], $request->user(), 1)->getCollection()->first()
@@ -54,6 +65,13 @@ class CommunityController extends Controller
 
         return Inertia::render('Community/Explore', [
             ...$this->shared($request),
+            'seo' => app(SeoService::class)->page(
+                $locale,
+                '/explore',
+                $locale === 'id' ? 'Jelajahi ranking dan objek' : 'Explore rankings and objects',
+                $locale === 'id' ? 'Jelajahi ranking, artikel, dan objek pilihan komunitas.' : 'Explore rankings, articles, and objects from the community.',
+                $request->query() === [],
+            ),
             'feed' => Inertia::scroll(fn () => $feed->paginate($filters, $request->user())->withQueryString()),
             'filters' => $filters,
             'spotlight' => $spotlight,
@@ -63,10 +81,18 @@ class CommunityController extends Controller
         ]);
     }
 
-    public function ranking(Request $request, string $locale, RankingPost $post, LeaderboardService $leaderboard): Response
+    public function ranking(Request $request, string $locale, RankingPost $post, LeaderboardService $leaderboard): Response|RedirectResponse
     {
         abort_unless($post->status === 'published', 404);
+        $seoService = app(SeoService::class);
+        $contentLocale = $seoService->locale($post->language_code);
+
+        if ($locale !== $contentLocale) {
+            return redirect()->route('community.ranking', [$contentLocale, $post->slug], 301);
+        }
+
         $post->load(['creator:id,name,username,avatar_path', 'category:id,name,slug', 'entries.object:id,canonical_name,slug,status,image_path']);
+        $coverObject = $post->entries->first(fn ($entry) => $entry->object?->status === 'verified' && $entry->object?->image_path)?->object;
         $scores = DB::table('support_events')->where('status', 'valid')->whereIn('ranking_entry_id', $post->entries->pluck('id'))
             ->selectRaw("ranking_entry_id, SUM(amount) as points, COUNT(DISTINCT CASE WHEN source = 'support' THEN user_id END) as supporters, SUM(CASE WHEN source = 'quick_vote' THEN amount ELSE 0 END) as quick_points")
             ->groupBy('ranking_entry_id')->get()->keyBy('ranking_entry_id');
@@ -105,6 +131,19 @@ class CommunityController extends Controller
 
         return Inertia::render('Community/Ranking', [
             ...$this->shared($request),
+            'seo' => $seoService->page(
+                $locale,
+                '/ranking/'.$post->slug,
+                $post->title,
+                Str::limit($post->criteria, 160),
+                true,
+                [],
+                $coverObject ? '/backend/objects/'.$coverObject->id.'/image?size=thumb' : null,
+                [$seoService->breadcrumbs([
+                    ['name' => 'Votmee', 'url' => $seoService->url($locale)],
+                    ['name' => $post->title, 'url' => $seoService->url($locale, '/ranking/'.$post->slug)],
+                ])],
+            ),
             'post' => $post,
             'isSaved' => $request->user() !== null && SavedRanking::query()
                 ->where('user_id', $request->user()->id)->where('ranking_post_id', $post->id)->exists(),
@@ -127,10 +166,13 @@ class CommunityController extends Controller
         $object->load('aliases');
         $object->setAttribute('translations', DB::table('object_translations')->where('object_id', $object->id)->get(['locale', 'name']));
         $objectIds = $object->mergedFamilyIds();
-        $summary = $object->status === 'verified'
-            ? ObjectContentRevision::query()->where('object_id', $object->id)->whereNull('article_id')->where('status', 'published')
-                ->with('author:id,name,username')->latest('published_at')->first()
-            : null;
+        $seoService = app(SeoService::class);
+        $summary = $seoService->publishedSummary($object);
+        $summary?->load('author:id,name,username');
+
+        if ($summary && $locale !== $seoService->locale($summary->language_code)) {
+            return redirect()->route('community.object', [$seoService->locale($summary->language_code), $object->slug], 301);
+        }
         $articles = $object->status === 'verified'
             ? ObjectArticle::query()->whereIn('object_id', $objectIds)->whereNotNull('published_revision_id')
                 ->with(['author:id,name,username', 'publishedRevision:id,title,body,body_format,language_code,published_at'])
@@ -172,12 +214,27 @@ class CommunityController extends Controller
         $rankings = $rankingsQuery->with(['creator:id,name,username,avatar_path', 'category:id,name,slug'])
             ->orderBy('published_at', $rankingSort === 'oldest' ? 'asc' : 'desc')
             ->orderBy('id', $rankingSort === 'oldest' ? 'asc' : 'desc')
-            ->paginate(10, ['id', 'creator_id', 'category_id', 'slug', 'title', 'published_at'], 'rankings_page')
+            ->paginate(10, ['id', 'creator_id', 'category_id', 'slug', 'title', 'language_code', 'published_at'], 'rankings_page')
             ->withQueryString();
         $rankingTotal ??= $rankings->total();
 
         return Inertia::render('Community/Object', [
             ...$this->shared($request),
+            'seo' => $seoService->page(
+                $locale,
+                '/object/'.$object->slug,
+                $object->translations->firstWhere('locale', $locale)?->name ?? $object->canonical_name,
+                $summary ? $this->contentExcerpt($summary) : ($locale === 'id'
+                    ? 'Lihat informasi dan ranking tentang '.$object->canonical_name.'.'
+                    : 'Explore information and rankings about '.$object->canonical_name.'.'),
+                $summary !== null && $request->query() === [],
+                [],
+                $object->image_path && $object->status === 'verified' ? '/backend/objects/'.$object->id.'/image?size=thumb' : null,
+                $summary ? [$seoService->breadcrumbs([
+                    ['name' => 'Votmee', 'url' => $seoService->url($locale)],
+                    ['name' => $object->canonical_name, 'url' => $seoService->url($locale, '/object/'.$object->slug)],
+                ])] : [],
+            ),
             'object' => $object,
             'summary' => $summary,
             'articles' => $articles,
@@ -194,7 +251,7 @@ class CommunityController extends Controller
         ]);
     }
 
-    public function article(Request $request, string $locale, ObjectArticle $article): Response
+    public function article(Request $request, string $locale, ObjectArticle $article): Response|RedirectResponse
     {
         $article->load(['author:id,name,username', 'object', 'publishedRevision']);
         $revision = $article->publishedRevision;
@@ -208,9 +265,37 @@ class CommunityController extends Controller
         }
 
         abort_unless($object->status === 'verified', 404);
+        $seoService = app(SeoService::class);
+        $contentLocale = $seoService->locale($revision->language_code);
+
+        if ($locale !== $contentLocale) {
+            return redirect()->route('community.article', [$contentLocale, $article->id], 301);
+        }
+
+        $articleUrl = $seoService->url($locale, '/article/'.$article->id);
 
         return Inertia::render('Community/Article', [
             ...$this->shared($request),
+            'seo' => $seoService->page(
+                $locale,
+                '/article/'.$article->id,
+                $revision->title,
+                $this->contentExcerpt($revision),
+                true,
+                [],
+                $object->image_path ? '/backend/objects/'.$object->id.'/image?size=thumb' : null,
+                [[
+                    '@context' => 'https://schema.org',
+                    '@type' => 'Article',
+                    'headline' => $revision->title,
+                    'mainEntityOfPage' => $articleUrl,
+                    'datePublished' => $revision->published_at?->toIso8601String(),
+                    'author' => ['@type' => 'Person', 'name' => $article->author?->name],
+                ], $seoService->breadcrumbs([
+                    ['name' => 'Votmee', 'url' => $seoService->url($locale)],
+                    ['name' => $revision->title, 'url' => $articleUrl],
+                ])],
+            ),
             'article' => $article->only('id', 'type', 'author_id'),
             'author' => $article->author?->only('name', 'username'),
             'revision' => $revision->only('id', 'title', 'body', 'body_format', 'language_code', 'sources', 'published_at'),
@@ -408,14 +493,18 @@ class CommunityController extends Controller
 
     private function shared(Request $request): array
     {
+        $locale = $this->locale($request);
+
         return [
-            'locale' => $this->locale($request),
+            'locale' => $locale,
+            'renderedAt' => now()->toIso8601String(),
+            'seo' => app(SeoService::class)->page($locale, '', 'Votmee', '', false),
             'categories' => Category::query()->withCount(['rankingPosts' => fn ($query) => $query->where('status', 'published')])
                 ->orderBy('name')->get(['id', 'name', 'slug']),
             'recentComments' => Comment::query()
                 ->with([
                     'user:id,name,username,avatar_path',
-                    'rankingPost:id,title,slug',
+                    'rankingPost:id,title,slug,language_code',
                 ])
                 ->where('status', 'visible')
                 ->whereHas('rankingPost', fn ($query) => $query->where('status', 'published'))

@@ -12,6 +12,7 @@ import {
     openLoginModal,
     PageHead,
     path,
+    rankingPath,
     useCommunityAccess,
 } from './Shared';
 import ReportDialog from './ReportDialog';
@@ -305,7 +306,7 @@ export default function ObjectPage({ locale, categories, leaders, object, stats,
                                         </div>
 
                                         <h3 className="vob-stream-title">
-                                            <Link href={path(locale, `/ranking/${post.slug}`)}>
+                                            <Link href={rankingPath(locale, post)}>
                                                 {post.title}
                                             </Link>
                                         </h3>
@@ -325,7 +326,7 @@ export default function ObjectPage({ locale, categories, leaders, object, stats,
                                             </div>
 
                                             <Link
-                                                href={path(locale, `/ranking/${post.slug}`)}
+                                                href={rankingPath(locale, post)}
                                                 className="vob-stream-cta"
                                                 aria-label={`${object.status === 'verified'
                                                     ? (locale === 'id' ? 'Buka ranking dan beri dukungan' : 'Open ranking and support')

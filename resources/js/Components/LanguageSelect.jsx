@@ -10,7 +10,7 @@ function LanguageIcon({ name, size }) {
     return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
 
-export default function LanguageSelect({ language, onChange, mobile = false }) {
+export default function LanguageSelect({ language, onChange, mobile = false, availableLanguages = ['id', 'en'] }) {
     const [open, setOpen] = useState(false);
     const containerRef = useRef(null);
 
@@ -44,14 +44,14 @@ export default function LanguageSelect({ language, onChange, mobile = false }) {
     const current = options.find((option) => option.code === language) || options[0];
 
     return <div ref={containerRef} className={`vm-lang-select-box${mobile ? " vm-mobile-language" : ""}`}>
-        <button type="button" className={`vm-lang-trigger ${open ? "open" : ""}`} onClick={() => setOpen(!open)} aria-haspopup="listbox" aria-expanded={open} aria-label="Pilih bahasa / Select language">
+        <button type="button" className={`vm-lang-trigger ${open ? "open" : ""}`} onClick={() => setOpen(!open)} disabled={availableLanguages.length === 1} title={availableLanguages.length === 1 ? (language === 'id' ? 'Konten ini belum tersedia dalam bahasa Inggris' : 'This content is not available in Indonesian yet') : undefined} aria-haspopup="listbox" aria-expanded={open} aria-label="Pilih bahasa / Select language">
             <span className="vm-lang-flag">{current.flag}</span>
             <span className="vm-lang-code">{current.short}</span>
             <span className={`vm-select-chevron ${open ? "rotate" : ""}`}><LanguageIcon name="chevronDown" size={13} /></span>
         </button>
         {open && <div className="vm-lang-dropdown" role="listbox" aria-label={language === "id" ? "Pilih Bahasa" : "Language"}>
             <div className="vm-select-dropdown-header"><span>{language === "id" ? "Pilih Bahasa" : "Language"}</span></div>
-            {options.map((option) => {
+            {options.filter(option => availableLanguages.includes(option.code)).map((option) => {
                 const selected = language === option.code;
                 return <button key={option.code} type="button" role="option" aria-selected={selected} className={`vm-lang-option ${selected ? "selected" : ""}`} onClick={() => { onChange(option.code); setOpen(false); }}>
                     <span className="vm-lang-opt-main"><span className="vm-lang-opt-flag">{option.flag}</span><span className="vm-lang-opt-label">{option.label}</span></span>

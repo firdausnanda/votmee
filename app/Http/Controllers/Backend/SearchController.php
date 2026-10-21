@@ -29,7 +29,7 @@ class SearchController extends Controller
             ->where('status', 'published')
             ->where(fn ($query) => $query->whereRaw("title LIKE ? ESCAPE '!'", [$like])->orWhereRaw("criteria LIKE ? ESCAPE '!'", [$like]))
             ->with('category:id,name,slug')
-            ->select(['id', 'title', 'slug', 'criteria', 'category_id'])
+            ->select(['id', 'title', 'slug', 'criteria', 'category_id', 'language_code'])
             ->addSelect([
                 'supporters_count' => DB::table('support_events')
                     ->join('ranking_entries', 'ranking_entries.id', '=', 'support_events.ranking_entry_id')
@@ -46,6 +46,7 @@ class SearchController extends Controller
                 'id' => $post->id,
                 'title' => $post->title,
                 'slug' => $post->slug,
+                'language_code' => $post->language_code,
                 'criteria' => $post->criteria,
                 'category' => $post->category?->name,
                 'supporters_count' => (int) $post->supporters_count,

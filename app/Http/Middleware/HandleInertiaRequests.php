@@ -4,9 +4,25 @@ namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class HandleInertiaRequests extends Middleware
 {
+    public function handle(Request $request, \Closure $next): SymfonyResponse
+    {
+        $ssrEnabled = config('inertia.ssr.enabled');
+
+        try {
+            if (! $request->routeIs('community.home', 'community.explore', 'community.ranking', 'community.object', 'community.article')) {
+                config(['inertia.ssr.enabled' => false]);
+            }
+
+            return parent::handle($request, $next);
+        } finally {
+            config(['inertia.ssr.enabled' => $ssrEnabled]);
+        }
+    }
+
     /**
      * The root template that is loaded on the first page visit.
      *

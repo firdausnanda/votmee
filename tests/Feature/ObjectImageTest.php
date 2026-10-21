@@ -37,6 +37,8 @@ test('a new object image stays private until the object is verified', function (
     auth()->logout();
     $this->get(route('backend.objects.image', $object))->assertOk();
     $this->get(route('community.object', ['locale' => 'id', 'object' => $object->slug]))
+        ->assertStatus(301)->assertRedirect('/en/object/'.$object->slug);
+    $this->get(route('community.object', ['locale' => 'en', 'object' => $object->slug]))
         ->assertInertia(fn (Assert $page) => $page->where('object.image_path', $pendingPath)->etc());
 });
 

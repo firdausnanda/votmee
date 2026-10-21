@@ -16,10 +16,16 @@ use App\Http\Controllers\Backend\SocialController;
 use App\Http\Controllers\Backend\WalletController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Web\CommunityController;
+use App\Http\Controllers\Web\SitemapController;
 use App\Http\Middleware\SetRequestLocale;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', [CommunityController::class, 'home'])->middleware(SetRequestLocale::class);
+Route::permanentRedirect('/', '/id');
+Route::get('/robots.txt', [SitemapController::class, 'robots'])->name('robots');
+Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');
+Route::get('/sitemaps/static.xml', [SitemapController::class, 'staticPages'])->name('sitemap.static');
+Route::get('/sitemaps/{type}/{page}.xml', [SitemapController::class, 'content'])
+    ->where(['type' => 'rankings|objects|articles', 'page' => '[1-9][0-9]*'])->name('sitemap.content');
 
 Route::get('/auth/google/callback', [GoogleLoginController::class, 'callback'])
     ->middleware(['guest', 'throttle:10,1'])->name('google.callback');

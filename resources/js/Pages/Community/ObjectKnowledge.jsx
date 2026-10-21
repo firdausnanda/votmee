@@ -615,7 +615,7 @@ export default function ObjectKnowledge({ object, summary, articles, myRevisions
                                 ))}
                                 {articles?.data?.map((article) => (
                                     <article key={article.id} className="vob-article-row">
-                                        <Link className="vob-article-row-link" href={path(locale, `/article/${article.id}`)}>
+                                        <Link className="vob-article-row-link" href={path(article.published_revision?.language_code ?? locale, `/article/${article.id}`)}>
                                             <div className="vob-article-row-labels">
                                                 <span className="vob-article-row-type">
                                                     {article.type === 'experience'

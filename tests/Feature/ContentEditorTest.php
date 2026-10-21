@@ -43,18 +43,18 @@ test('published community articles have a public reading page', function () {
     ]);
     $article->update(['published_revision_id' => $revision->id]);
 
-    foreach (['id', 'en'] as $locale) {
-        $this->get(route('community.article', ['locale' => $locale, 'article' => $article->id]))
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('Community/Article')
-                ->where('locale', $locale)
-                ->where('article.id', $article->id)
-                ->where('revision.id', $revision->id)
-                ->where('revision.body', 'The complete article body is available here.')
-                ->where('object.slug', $object->slug)
-                ->etc());
-    }
+    $this->get(route('community.article', ['locale' => 'en', 'article' => $article->id]))
+        ->assertStatus(301)->assertRedirect('/id/article/'.$article->id);
+    $this->get(route('community.article', ['locale' => 'id', 'article' => $article->id]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Community/Article')
+            ->where('locale', 'id')
+            ->where('article.id', $article->id)
+            ->where('revision.id', $revision->id)
+            ->where('revision.body', 'The complete article body is available here.')
+            ->where('object.slug', $object->slug)
+            ->etc());
 });
 
 test('draft and unpublished community articles cannot be read publicly', function () {

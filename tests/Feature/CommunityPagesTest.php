@@ -110,7 +110,7 @@ test('published ranking detail loads candidates while hidden rankings are not ac
     $object = MasterObject::factory()->create(['category_id' => $post->category_id]);
     $post->entries()->create(['object_id' => $object->id, 'position' => 1]);
 
-    $this->get('/en/ranking/'.$post->slug)->assertOk()->assertInertia(fn (Assert $page) => $page
+    $this->get('/id/ranking/'.$post->slug)->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('Community/Ranking')
         ->where('post.id', $post->id)
         ->where('post.entries.0.object.id', $object->id)

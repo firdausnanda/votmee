@@ -3,7 +3,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
 import SelectBox from '../../Components/SelectBox';
 import { ALLOWED_TYPES, MAX_BYTES, optimizeImage } from './ObjectImageField';
-import { api, categoryHashtag, dateLabel, dictionary, Layout, NavIcon, numberLabel, PageHead, PaginationLinks, path } from './Shared';
+import { api, categoryHashtag, dateLabel, dictionary, Layout, NavIcon, numberLabel, PageHead, PaginationLinks, path, rankingPath } from './Shared';
 
 function formatMemberSince(isoDate, locale) {
     if (!isoDate) return '—';
@@ -22,7 +22,7 @@ const prefersReducedMotion = () => typeof window !== 'undefined'
  * Animate a number from its previous value to the target with an ease-out curve.
  */
 function useCountUp(target, duration = 1100) {
-    const [value, setValue] = useState(() => (prefersReducedMotion() ? target : 0));
+    const [value, setValue] = useState(0);
     const valueRef = useRef(value);
 
     useEffect(() => {
@@ -466,7 +466,7 @@ export default function Profile({ locale, categories = [], leaders = [], profile
                                         </div>
 
                                         <h3 className="vpr-ranking-title">
-                                            <Link href={path(locale, `/ranking/${post.slug}`)}>
+                                            <Link href={rankingPath(locale, post)}>
                                                 {post.title}
                                             </Link>
                                         </h3>

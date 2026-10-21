@@ -9,6 +9,7 @@ import en from '../../i18n/en.json';
 
 export const dictionary = (locale) => locale === 'en' ? en : id;
 export const path = (locale, suffix = '') => `/${locale}${suffix}`;
+export const rankingPath = (locale, post) => path(post.language_code === 'id' || post.language_code === 'en' ? post.language_code : locale, `/ranking/${post.slug}`);
 
 /**
  * Versioned object image URL: the stored file name is unique, so the server can cache it as immutable.
@@ -43,7 +44,7 @@ export function useCommunityAccess() {
 }
 
 export const dateLabel = (value, locale) =>
-    new Intl.DateTimeFormat(locale === 'id' ? 'id-ID' : 'en-US', { dateStyle: 'medium' }).format(new Date(value));
+    new Intl.DateTimeFormat(locale === 'id' ? 'id-ID' : 'en-US', { dateStyle: 'medium', timeZone: 'Asia/Jakarta' }).format(new Date(value));
 
 export const numberLabel = (value, locale) =>
     new Intl.NumberFormat(locale === 'id' ? 'id-ID' : 'en-US').format(Number(value || 0));
@@ -161,22 +162,22 @@ export function sortCategoriesByPopularity(categories) {
         || first.name.localeCompare(second.name));
 }
 
-function relativeDate(value, locale) {
+function relativeDate(value, locale, referenceTime) {
     const publishedAt = new Date(value);
     if (Number.isNaN(publishedAt.getTime())) return '';
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    publishedAt.setHours(0, 0, 0, 0);
-    const days = Math.max(0, Math.round((today.getTime() - publishedAt.getTime()) / 86400000));
+    const jakartaOffset = 7 * 60 * 60 * 1000;
+    const today = Math.floor((new Date(referenceTime).getTime() + jakartaOffset) / 86400000);
+    const publishedDay = Math.floor((publishedAt.getTime() + jakartaOffset) / 86400000);
+    const days = Math.max(0, today - publishedDay);
     if (days === 0) return locale === 'id' ? 'hari ini' : 'today';
     return new Intl.RelativeTimeFormat(locale === 'id' ? 'id-ID' : 'en-US', { numeric: 'auto' }).format(-days, 'day');
 }
 
-function commentTimeAgo(value, locale) {
+function commentTimeAgo(value, locale, referenceTime) {
     if (!value) return '';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
-    const diffMs = Date.now() - date.getTime();
+    const diffMs = new Date(referenceTime).getTime() - date.getTime();
     const diffSec = Math.max(0, Math.floor(diffMs / 1000));
     const diffMin = Math.floor(diffSec / 60);
     const diffHour = Math.floor(diffMin / 60);
@@ -187,7 +188,7 @@ function commentTimeAgo(value, locale) {
     if (diffMin < 60) return `${diffMin}${isId ? 'm lalu' : 'm ago'}`;
     if (diffHour < 24) return `${diffHour}${isId ? 'j lalu' : 'h ago'}`;
     if (diffDay < 7) return `${diffDay}${isId ? 'h lalu' : 'd ago'}`;
-    return relativeDate(value, locale);
+    return relativeDate(value, locale, referenceTime);
 }
 
 export async function api(url, method = 'GET', data) {
@@ -214,14 +215,23 @@ export async function api(url, method = 'GET', data) {
     return result;
 }
 
-export function PageHead({ title, locale, description }) {
-    const pathname = window.location.pathname.replace(/^\/(id|en)(?=\/|$)/, '') || '';
-    const canonical = `${window.location.origin}/${locale}${pathname}`;
-    return <Head title={title}>
-        {description && <meta name="description" content={description} />}
-        <link rel="canonical" href={canonical} />
-        <link rel="alternate" hrefLang="id" href={`${window.location.origin}/id${pathname}`} />
-        <link rel="alternate" hrefLang="en" href={`${window.location.origin}/en${pathname}`} />
+export function PageHead({ title, description }) {
+    const seo = usePage().props.seo;
+    const indexable = seo?.robots === 'index, follow';
+    const pageTitle = indexable ? seo.title : title ?? seo?.title;
+    const pageDescription = indexable ? seo.description : description ?? seo?.description;
+
+    return <Head title={pageTitle}>
+        {pageDescription && <meta head-key="description" name="description" content={pageDescription} />}
+        {seo?.robots && <meta head-key="robots" name="robots" content={seo.robots} />}
+        {indexable && seo?.canonical && <link head-key="canonical" rel="canonical" href={seo.canonical} />}
+        {Object.entries(seo?.alternates ?? {}).map(([locale, url]) => <link key={locale} rel="alternate" hrefLang={locale} href={url} />)}
+        {indexable && <meta head-key="og:type" property="og:type" content={seo?.structuredData?.some(data => data['@type'] === 'Article') ? 'article' : 'website'} />}
+        {indexable && <meta head-key="og:title" property="og:title" content={`${pageTitle} - Votmee`} />}
+        {indexable && pageDescription && <meta head-key="og:description" property="og:description" content={pageDescription} />}
+        {indexable && seo?.canonical && <meta head-key="og:url" property="og:url" content={seo.canonical} />}
+        {indexable && seo?.image && <meta head-key="og:image" property="og:image" content={seo.image} />}
+        {indexable && (seo?.structuredData ?? []).map((data, index) => <script key={index} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, '\\u003c') }} />)}
     </Head>;
 }
 
@@ -329,7 +339,13 @@ export function Layout({ locale, categories = [], leaders = [], children, active
     const user = usePage().props.auth?.user;
     const access = useCommunityAccess();
     useSyncLocalSavedRankings(user);
-    const [query, setQuery] = useState(() => (typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('q') ?? ''));
+    const pageUrl = usePage().url;
+    const seo = usePage().props.seo;
+    const contentHasOneLanguage = seo?.robots === 'index, follow'
+        && /^\/(id|en)\/(ranking|object|article)\//.test(pageUrl)
+        && Object.keys(seo.alternates ?? {}).length === 0;
+    const availableLanguages = contentHasOneLanguage ? [locale] : ['id', 'en'];
+    const [query, setQuery] = useState(() => new URLSearchParams(pageUrl.split('?')[1] ?? '').get('q') ?? '');
     const [menuOpen, setMenuOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
     const [authMode, setAuthMode] = useState(registerModal ? 'register' : loginModal ? 'login' : null);
@@ -348,7 +364,7 @@ export function Layout({ locale, categories = [], leaders = [], children, active
         author: post.creator?.username ? `@${post.creator.username}` : post.creator?.name ?? 'Votmee',
         votes: post.supporters_count ?? 0,
         voteLabel: numberLabel(post.supporters_count ?? 0, locale),
-        href: post.slug ? path(locale, `/ranking/${post.slug}`) : undefined,
+        href: post.slug ? rankingPath(locale, post) : undefined,
     }));
     const fetchSearchSuggestions = useCallback(async (value, signal) => {
         const response = await fetch(`/backend/search?${new URLSearchParams({ q: value })}`, {
@@ -367,7 +383,7 @@ export function Layout({ locale, categories = [], leaders = [], children, active
                 category: post.category ?? '',
                 author: '',
                 votes: numberLabel(post.supporters_count, locale),
-                href: path(locale, `/ranking/${post.slug}`),
+                href: rankingPath(locale, post),
             })),
             leaders: result.objects.map(object => ({
                 name: object.name,
@@ -426,7 +442,7 @@ export function Layout({ locale, categories = [], leaders = [], children, active
                 <Link href={path(locale)} className="vt-wordmark vm-brand" aria-label="Votmee home">votmee</Link>
                 <SearchMenu {...searchMenuProps} />
                 <div className="vt-header-actions vm-header-right">
-                    <LanguageSelect language={locale} onChange={(next) => router.visit(switchLocale(next))} />
+                    <LanguageSelect language={locale} availableLanguages={availableLanguages} onChange={(next) => router.visit(switchLocale(next))} />
                     {user ? <ProfileDropdown user={user} locale={locale} canModerate={access.moderate} />
                         : <><button type="button" className="vt-login" onClick={() => setAuthMode('login')}>{t.login}</button><button type="button" className="vt-register" onClick={() => setAuthMode('register')}>{locale === 'id' ? 'Daftar' : 'Sign up'}</button></>}
                 </div>
@@ -455,7 +471,7 @@ export function Layout({ locale, categories = [], leaders = [], children, active
                 </div>
                 <div className="vt-mobile-account-links">
                     {!user && <><button type="button" onClick={() => { setMenuOpen(false); setAuthMode('login'); }}>{t.login}</button><button type="button" onClick={() => { setMenuOpen(false); setAuthMode('register'); }}>{locale === 'id' ? 'Daftar' : 'Sign up'}</button></>}
-                    <LanguageSelect language={locale} onChange={(next) => router.visit(switchLocale(next))} mobile />
+                    <LanguageSelect language={locale} availableLanguages={availableLanguages} onChange={(next) => router.visit(switchLocale(next))} mobile />
                 </div>
             </aside>
             <main className="vt-main vm-main" id="main-content">{children}</main>
@@ -654,10 +670,10 @@ export function Leaderboard({ locale, initialLeaders = [] }) {
     );
 }
 
-const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+const prefersReducedMotion = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 
 function useCountUp(target, duration = 900) {
-    const [value, setValue] = useState(() => (prefersReducedMotion() ? target : 0));
+    const [value, setValue] = useState(0);
 
     useEffect(() => {
         if (prefersReducedMotion()) {
@@ -750,7 +766,7 @@ function DuelResult({ duel, locale, isId, celebrate }) {
                     </div>
                 </>
             ) : null}
-            <Link className={`vm-duel-cta${celebrate ? ' attention' : ''}`} href={path(locale, `/ranking/${duel.ranking.slug}`)}>
+            <Link className={`vm-duel-cta${celebrate ? ' attention' : ''}`} href={rankingPath(locale, duel.ranking)}>
                 {isId ? 'Dukung dengan poin' : 'Support with points'} <span aria-hidden="true">→</span>
             </Link>
             <DuelCountdown isId={isId} />
@@ -818,7 +834,7 @@ function QuickDuelWidget({ locale }) {
                     {isId ? 'Duel Pilihan Komunitas' : 'Community Faceoff'}
                 </h3>
                 <p className="vm-duel-subtitle">
-                    <Link href={path(locale, `/ranking/${duel.ranking.slug}`)}>{duel.ranking.title}</Link>
+                    <Link href={rankingPath(locale, duel.ranking)}>{duel.ranking.title}</Link>
                 </p>
             </div>
             <div className={`vm-duel-arena${pickingId !== null ? ' is-picking' : ''}`}>
@@ -885,54 +901,14 @@ function QuickDuelWidget({ locale }) {
 
 function DiscussionPanel({ locale, posts = [], categories = [], recentComments = [] }) {
     const isId = locale === 'id';
+    const renderedAt = usePage().props.renderedAt;
     const [activeTab, setActiveTab] = useState('comments');
 
     const discussions = [...posts]
         .sort((first, second) => (second.comments_count ?? 0) - (first.comments_count ?? 0))
         .slice(0, 4);
 
-    const fallbackComments = [
-        {
-            id: 'c1',
-            user: { name: 'Galih Pratama', username: 'galihpratama' },
-            body: isId
-                ? 'Baterai dan suhunya stabil banget buat gaming seharian, worth it!'
-                : 'Battery and temps are super stable for all-day gaming, worth it!',
-            created_at: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
-            ranking_post: {
-                title: isId ? 'Smartphone Flagship Terbaik 2026' : 'Best Gaming Smartphones 2026',
-                slug: posts[0]?.slug ?? 'smartphone-flagship-terbaik-2026',
-            },
-        },
-        {
-            id: 'c2',
-            user: { name: 'Safira Andini', username: 'safirandini' },
-            body: isId
-                ? 'Pemandangan sunrise di Bromo beneran magis, wajib masuk bucket list!'
-                : 'The sunrise at Bromo is truly magical, a must on your bucket list!',
-            created_at: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
-            ranking_post: {
-                title: isId ? 'Destinasi Wisata Alam Terbaik' : 'Best Nature Spots Indonesia',
-                slug: posts[1]?.slug ?? 'destinasi-wisata-alam-terbaik',
-            },
-        },
-        {
-            id: 'c3',
-            user: { name: 'Raditya Kurniawan', username: 'radityakrn' },
-            body: isId
-                ? 'Kuah gulai di Blok M emang paling juara kalau malam-malam.'
-                : 'The curry broth in Blok M is unmatched late at night.',
-            created_at: new Date(Date.now() - 1000 * 60 * 60 * 7).toISOString(),
-            ranking_post: {
-                title: isId ? 'Kuliner Malam Terbaik Jakarta' : 'Best Late-Night Food Jakarta',
-                slug: posts[2]?.slug ?? 'kuliner-malam-terbaik-jakarta',
-            },
-        },
-    ];
-
-    const displayComments = (recentComments && recentComments.length > 0)
-        ? recentComments.slice(0, 3)
-        : fallbackComments;
+    const displayComments = recentComments.slice(0, 3);
 
     return (
         <section className="vm-panel vm-comm-panel" aria-labelledby="vm-discussions-title">
@@ -970,7 +946,7 @@ function DiscussionPanel({ locale, posts = [], categories = [], recentComments =
                         const initial = (authorName || authorUsername).slice(0, 1).toUpperCase();
                         const postTitle = comment.ranking_post?.title ?? comment.rankingPost?.title ?? '';
                         const postSlug = comment.ranking_post?.slug ?? comment.rankingPost?.slug ?? '';
-                        const linkUrl = postSlug ? path(locale, `/ranking/${postSlug}`) : '#';
+                        const linkUrl = postSlug ? rankingPath(locale, { slug: postSlug, language_code: comment.ranking_post?.language_code ?? comment.rankingPost?.language_code }) : '#';
 
                         return (
                             <li key={comment.id} className="vm-comm-comment-item">
@@ -986,7 +962,7 @@ function DiscussionPanel({ locale, posts = [], categories = [], recentComments =
                                             <small className="vm-comm-comment-username">@{authorUsername}</small>
                                         </div>
                                         <span className="vm-comm-comment-time">
-                                            {commentTimeAgo(comment.created_at, locale)}
+                                            {commentTimeAgo(comment.created_at, locale, renderedAt)}
                                         </span>
                                     </div>
                                     <p className="vm-comm-comment-text">{comment.body}</p>
@@ -999,6 +975,7 @@ function DiscussionPanel({ locale, posts = [], categories = [], recentComments =
                             </li>
                         );
                     })}
+                    {displayComments.length === 0 && <li className="vm-comm-comment-item">{isId ? 'Belum ada komentar.' : 'No comments yet.'}</li>}
                 </ul>
             ) : (
                 discussions.length ? (
@@ -1009,7 +986,7 @@ function DiscussionPanel({ locale, posts = [], categories = [], recentComments =
                             return (
                                 <Link
                                     key={post.id}
-                                    href={path(locale, `/ranking/${post.slug}`)}
+                                    href={rankingPath(locale, post)}
                                     className="vm-comm-disc-item"
                                 >
                                     <span className="vm-comm-disc-avatar" aria-hidden="true">
@@ -1078,8 +1055,9 @@ function FeedCover({ entries, categorySlug }) {
 
 export function RankingCard({ post, locale, category, onSavedChange }) {
     const t = dictionary(locale);
+    const renderedAt = usePage().props.renderedAt;
     const categorySlug = post.category?.slug ?? category?.slug ?? '';
-    const rankingUrl = path(locale, `/ranking/${post.slug}`);
+    const rankingUrl = rankingPath(locale, post);
     const author = post.creator?.username ? `@${post.creator.username}` : post.creator?.name ?? 'Votmee';
     const authorUsername = post.creator?.username ?? (typeof post.author === 'string' && post.author.startsWith('@') ? post.author.slice(1) : null);
     const profileUrl = authorUsername ? path(locale, `/profile/${authorUsername}`) : null;
@@ -1128,10 +1106,10 @@ export function RankingCard({ post, locale, category, onSavedChange }) {
             </div>
             <h2><Link href={rankingUrl}>{post.title}</Link></h2>
             <p className="vm-feed-description">{post.criteria}</p>
-            <div className="vm-feed-meta">{avatarElement}<span>{authorLink} <span className="vm-dot">·</span> {relativeDate(post.published_at, locale)}</span><span className="vm-desktop-comments"><span className="vm-dot">·</span><NavIcon name="comment" size={15} /> {numberLabel(post.comments_count ?? 0, locale)} {t.comments}</span></div>
+            <div className="vm-feed-meta">{avatarElement}<span>{authorLink} <span className="vm-dot">·</span> {relativeDate(post.published_at, locale, renderedAt)}</span><span className="vm-desktop-comments"><span className="vm-dot">·</span><NavIcon name="comment" size={15} /> {numberLabel(post.comments_count ?? 0, locale)} {t.comments}</span></div>
         </div>
         <div className="vm-mobile-footer">
-            <span className="vm-mobile-author">{avatarElement}<span>{authorLink} · {relativeDate(post.published_at, locale)}</span></span>
+            <span className="vm-mobile-author">{avatarElement}<span>{authorLink} · {relativeDate(post.published_at, locale, renderedAt)}</span></span>
             <div className="vm-mobile-actions"><Link href={rankingUrl}><NavIcon name="chevronUp" size={15} /> {numberLabel(post.supporters_count ?? 0, locale)} <NavIcon name="chevronDown" size={13} /></Link><Link href={rankingUrl} aria-label={`${numberLabel(post.comments_count ?? 0, locale)} ${t.comments}, ${post.title}`}><NavIcon name="comment" size={15} /> {numberLabel(post.comments_count ?? 0, locale)}</Link></div>
         </div>
     </article>;

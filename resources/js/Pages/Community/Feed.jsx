@@ -42,7 +42,7 @@ export default function Feed({ locale, categories, leaders, feed, filters, login
             loading={() => <p className="vt-feed-scroll-status" role="status">{locale === 'id' ? 'Memuat ranking...' : 'Loading rankings...'}</p>}
             next={({ loading, fetch, hasMore }) => <div className="vt-feed-scroll-footer">
                 {loading ? <span role="status">{locale === 'id' ? 'Memuat ranking...' : 'Loading rankings...'}</span>
-                    : hasMore ? <button type="button" onClick={fetch}>{t.loadMore}</button>
+                    : hasMore ? <a href={feed.next_page_url} onClick={(event) => { event.preventDefault(); fetch(); }}>{t.loadMore}</a>
                         : <span role="status">{locale === 'id' ? 'Semua ranking sudah ditampilkan.' : 'You have seen all rankings.'}</span>}
             </div>}
         >

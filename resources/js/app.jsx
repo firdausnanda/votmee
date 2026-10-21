@@ -4,13 +4,13 @@ import '../css/welcome.css';
 import '../css/welcome-theme.css';
 
 import { createInertiaApp } from '@inertiajs/react';
-import { createRoot } from 'react-dom/client';
+import { createRoot, hydrateRoot } from 'react-dom/client';
 
 const appName = 'Votmee';
 const pages = import.meta.glob('./Pages/**/*.{jsx,tsx}');
 
 createInertiaApp({
-    title: (title) => `${title} - ${appName}`,
+    title: (title) => title.includes(appName) ? title : `${title} - ${appName}`,
     resolve: (name) => {
         const page = pages[`./Pages/${name}.tsx`] ?? pages[`./Pages/${name}.jsx`];
 
@@ -21,9 +21,11 @@ createInertiaApp({
         return page();
     },
     setup({ el, App, props }) {
-        const root = createRoot(el);
-
-        root.render(<App {...props} />);
+        if (el.hasChildNodes()) {
+            hydrateRoot(el, <App {...props} />);
+        } else {
+            createRoot(el).render(<App {...props} />);
+        }
     },
     progress: {
         color: '#4B5563',

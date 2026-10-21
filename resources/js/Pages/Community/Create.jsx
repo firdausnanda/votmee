@@ -154,7 +154,7 @@ export default function Create({ locale, categories, leaders, myObjects = [] }) 
                 region_code: regionCode.trim().toUpperCase() || 'GLOBAL',
                 object_ids: selected.map((item) => item.id),
             });
-            router.visit(path(locale, `/ranking/${post.slug}`));
+            router.visit(path(post.language_code ?? locale, `/ranking/${post.slug}`));
         } catch (error) {
             setMessageType('error');
             setMessage(error.message);
@@ -319,7 +319,7 @@ export default function Create({ locale, categories, leaders, myObjects = [] }) 
                                                 {isId ? 'Ditemukan ranking dengan topik serupa di komunitas:' : 'Similar rankings found in the community:'}
                                             </strong>
                                             {similar.map((post) => (
-                                                <a key={post.id} href={path(locale, `/ranking/${post.slug}`)} target="_blank" rel="noreferrer">
+                                                <a key={post.id} href={path(post.language_code ?? locale, `/ranking/${post.slug}`)} target="_blank" rel="noreferrer">
                                                     <span>{post.title}</span>
                                                     <span aria-hidden="true">↗</span>
                                                 </a>

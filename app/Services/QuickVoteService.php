@@ -297,7 +297,7 @@ class QuickVoteService
         return [
             'id' => $duel->id,
             'date' => $duel->duel_date->toDateString(),
-            'ranking' => ['title' => $duel->post->title, 'slug' => $duel->post->slug],
+            'ranking' => ['title' => $duel->post->title, 'slug' => $duel->post->slug, 'language_code' => $duel->post->language_code],
             'entries' => array_map(fn (RankingEntry $entry): array => [
                 'id' => $entry->id,
                 'name' => $entry->object->canonical_name,

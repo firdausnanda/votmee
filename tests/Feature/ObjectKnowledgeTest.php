@@ -32,7 +32,8 @@ test('new objects require a sourced summary and publish it with object verificat
         'status' => 'verified', 'reason' => 'Identity and source checked.',
     ])->assertOk();
     $this->assertDatabaseHas('object_content_revisions', ['object_id' => $object->id, 'status' => 'published']);
-    $this->get('/id/object/'.$object->slug)->assertOk()->assertInertia(fn (Assert $page) => $page
+    $this->get('/id/object/'.$object->slug)->assertStatus(301)->assertRedirect('/en/object/'.$object->slug);
+    $this->get('/en/object/'.$object->slug)->assertOk()->assertInertia(fn (Assert $page) => $page
         ->where('summary.body', $payload['summary_body'])
         ->where('summary.language_code', 'en')
         ->etc());
@@ -95,7 +96,8 @@ test('summary revisions keep the published text visible until a moderator approv
     $this->actingAs($moderator)->patchJson(route('admin.backend.content-revisions.review', $revisionId), [
         'status' => 'published', 'reason' => 'Duplicate review is not allowed.',
     ])->assertUnprocessable();
-    $this->get('/en/object/'.$object->slug)->assertInertia(fn (Assert $page) => $page->where('summary.id', $revisionId)->etc());
+    $this->get('/en/object/'.$object->slug)->assertStatus(301)->assertRedirect('/id/object/'.$object->slug);
+    $this->get('/id/object/'.$object->slug)->assertInertia(fn (Assert $page) => $page->where('summary.id', $revisionId)->etc());
 });
 
 test('informative articles need sources and revisions remain private until approved', function () {
