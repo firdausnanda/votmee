@@ -131,13 +131,18 @@ class GoogleLoginController extends Controller
             } else {
                 $name = $profileResponse->json('name');
                 $name = is_string($name) && trim($name) !== '' ? Str::limit(trim($name), 255, '') : Str::before($email, '@');
-                $username = Str::slug(Str::limit($name, 180, '')) ?: 'user';
+                $baseUsername = rtrim(Str::limit(Str::slug($name), 240, ''), '-') ?: 'user';
+                $username = $baseUsername;
+
+                while (User::withTrashed()->where('username', $username)->exists()) {
+                    $username = $baseUsername.'-'.random_int(1000, 9999);
+                }
 
                 $user = new User;
                 $user->forceFill([
                     'name' => $name,
                     'email' => $email,
-                    'username' => $username.'-'.Str::lower((string) Str::ulid()),
+                    'username' => $username,
                     'password' => Str::random(64),
                     'locale' => $locale,
                     'region_code' => $locale === 'id' ? 'ID' : 'GLOBAL',

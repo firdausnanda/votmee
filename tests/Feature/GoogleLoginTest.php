@@ -83,12 +83,33 @@ test('google callback creates and verifies a new user', function () {
 
     $this->assertAuthenticatedAs($user);
     expect($user->google_id)->toBe('google-subject-1')
+        ->and($user->username)->toBe('new-voter')
         ->and($user->email_verified_at)->not->toBeNull()
         ->and($user->locale)->toBe('en')
         ->and($user->hasRole('user'))->toBeTrue();
 
     Http::assertSent(fn ($request) => $request->url() === 'https://oauth2.googleapis.com/token'
         && $request['code_verifier'] === 'valid-code-verifier');
+});
+
+test('google callback adds random digits when a username is already taken', function () {
+    User::factory()->create(['username' => 'new-voter']);
+
+    fakeGoogleProfile([
+        'sub' => 'google-subject-7',
+        'email' => 'another@example.com',
+        'email_verified' => true,
+        'name' => 'New Voter',
+    ]);
+
+    $this->withSession(googleOAuthSession())
+        ->get(route('google.callback', ['state' => 'valid-state', 'code' => 'auth-code']))
+        ->assertRedirect(route('community.home', ['locale' => 'id']));
+
+    $user = User::where('email', 'another@example.com')->firstOrFail();
+
+    $this->assertAuthenticatedAs($user);
+    expect($user->username)->toMatch('/^new-voter-[1-9][0-9]{3}$/');
 });
 
 test('google callback links an existing Gmail account', function () {

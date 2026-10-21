@@ -1,4 +1,5 @@
 import { useForm } from '@inertiajs/react';
+import GoogleAuthLink from '@/Components/GoogleAuthLink';
 
 export default function RegisterForm({ locale, onLogin }) {
     const isId = locale === 'id';
@@ -52,6 +53,8 @@ export default function RegisterForm({ locale, onLogin }) {
                 {processing ? (isId ? 'Memproses...' : 'Creating account...') : (isId ? 'Daftar' : 'Sign up')}
             </button>
         </form>
+        <div className="vm-auth-divider"><span>{isId ? 'atau' : 'or'}</span></div>
+        <GoogleAuthLink locale={locale} returnTo={returnTo} register />
         <p className="vm-register-callout">
             <span>{isId ? 'Sudah punya akun?' : 'Already have an account?'}</span>{' '}
             <button type="button" onClick={onLogin}>{isId ? 'Masuk' : 'Sign in'} →</button>
