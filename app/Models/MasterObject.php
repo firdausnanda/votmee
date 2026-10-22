@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 use Mattiverse\Userstamps\Traits\Userstamps;
 
-#[Fillable(['category_id', 'brand_id', 'parent_id', 'submitted_by', 'verified_by', 'merged_into_id', 'canonical_name', 'normalized_name', 'slug', 'identity_attributes', 'image_path', 'pending_image_path', 'pending_image_by', 'status', 'created_by', 'updated_by'])]
+#[Fillable(['category_id', 'brand_id', 'parent_id', 'submitted_by', 'verified_by', 'verified_at', 'merged_into_id', 'canonical_name', 'normalized_name', 'slug', 'identity_attributes', 'image_path', 'pending_image_path', 'pending_image_by', 'status', 'created_by', 'updated_by'])]
 class MasterObject extends Model
 {
     /** @use HasFactory<MasterObjectFactory> */
@@ -22,7 +22,7 @@ class MasterObject extends Model
 
     protected function casts(): array
     {
-        return ['identity_attributes' => 'array'];
+        return ['identity_attributes' => 'array', 'verified_at' => 'datetime'];
     }
 
     public function category(): BelongsTo

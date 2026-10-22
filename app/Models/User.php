@@ -18,7 +18,7 @@ use Illuminate\Notifications\Notifiable;
 use Mattiverse\Userstamps\Traits\Userstamps;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'password', 'username', 'role', 'locale', 'region_code', 'restricted_until', 'deleted_by'])]
+#[Fillable(['name', 'email', 'password', 'username', 'role', 'locale', 'region_code', 'restricted_until', 'trusted_at', 'trust_revoked_at', 'deleted_by'])]
 #[Hidden(['password', 'remember_token', 'google_id', 'avatar_path', 'cover_path'])]
 #[Appends(['avatar_url', 'cover_url'])]
 class User extends Authenticatable implements MustVerifyEmail
@@ -42,6 +42,8 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'restricted_until' => 'datetime',
+            'trusted_at' => 'datetime',
+            'trust_revoked_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
@@ -68,6 +70,12 @@ class User extends Authenticatable implements MustVerifyEmail
     private function profileImageUrl(string $type): ?string
     {
         return ProfileImageProcessor::url($this->id, $type, $this->attributes[ProfileImageProcessor::column($type)] ?? null);
+    }
+
+    /** Trusted contributors publish content revisions without waiting for review. */
+    public function isTrustedContributor(): bool
+    {
+        return $this->trusted_at !== null && $this->canParticipate();
     }
 
     public function canParticipate(): bool

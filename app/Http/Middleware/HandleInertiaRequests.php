@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\AchievementService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
@@ -57,6 +58,7 @@ class HandleInertiaRequests extends Middleware
                     'moderate' => $user?->can('moderate') ?? false,
                 ],
             ],
+            'unseenAchievements' => fn (): array => $user ? app(AchievementService::class)->unseen($user) : [],
         ];
     }
 }

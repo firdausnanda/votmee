@@ -15,10 +15,13 @@ use App\Models\Report;
 use App\Models\SavedRanking;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Services\AchievementService;
 use App\Services\FeedService;
+use App\Services\GamificationService;
 use App\Services\LeaderboardService;
 use App\Services\ObjectMatchingService;
 use App\Services\SeoService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -381,7 +384,7 @@ class CommunityController extends Controller
         ]);
     }
 
-    public function profile(Request $request, string $locale, User $user, LeaderboardService $leaderboard): Response
+    public function profile(Request $request, string $locale, User $user, LeaderboardService $leaderboard, AchievementService $achievements): Response
     {
         $publishedRankingsQuery = RankingPost::query()
             ->where('creator_id', $user->id)
@@ -426,6 +429,25 @@ class CommunityController extends Controller
                 ],
             ],
             'rankings' => $rankings,
+            'achievements' => $achievements->progress($user),
+            'hiddenAchievementsLocked' => $achievements->hiddenLockedCount($user),
+            'trustedContributor' => $user->trusted_at !== null,
+            'leaders' => $leaderboard->leaders(),
+        ]);
+    }
+
+    public function hallOfFame(Request $request, LeaderboardService $leaderboard, AchievementService $achievements): Response
+    {
+        $currentMonth = $achievements->currentMonth();
+        $months = collect(range(0, 11))->map(fn (int $offset): string => $currentMonth->subMonths($offset)->format('Y-m'));
+        $selected = $months->contains($request->query('month')) ? (string) $request->query('month') : $months->first();
+
+        return Inertia::render('Community/HallOfFame', [
+            ...$this->shared($request),
+            'month' => $selected,
+            'months' => $months->all(),
+            'board' => $achievements->hallOfFame(CarbonImmutable::createFromFormat('!Y-m', $selected, 'Asia/Jakarta')),
+            'thresholds' => config('gamification.seasonal'),
             'leaders' => $leaderboard->leaders(),
         ]);
     }
@@ -443,7 +465,7 @@ class CommunityController extends Controller
         ]);
     }
 
-    public function wallet(Request $request, LeaderboardService $leaderboard): Response
+    public function wallet(Request $request, LeaderboardService $leaderboard, GamificationService $gamification): Response
     {
         $flow = in_array($request->query('flow'), ['incoming', 'outgoing'], true) ? $request->query('flow') : 'all';
         $ledger = PointLedger::query()->where('user_id', $request->user()->id)->latest();
@@ -462,6 +484,8 @@ class CommunityController extends Controller
             'flow' => $flow,
             'ledger' => $ledger->paginate(20)->withQueryString(),
             'leaders' => $leaderboard->leaders(),
+            'streak' => $gamification->streak($request->user()),
+            'missions' => $gamification->missions($request->user()),
         ]);
     }
 

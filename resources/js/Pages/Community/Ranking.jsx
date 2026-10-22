@@ -2,6 +2,7 @@ import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { api, categoryHashtag, dateLabel, dictionary, Layout, numberLabel, objectImageSrcSet, objectImageUrl, openLoginModal, PageHead, path, useSavedRanking } from './Shared';
 import { CommentImageAttachButton, CommentImageGallery, CommentImagePreviews, commentPayload, useCommentImages } from './CommentImages';
+import { CommentBadges } from './Achievements';
 import ReportDialog from './ReportDialog';
 import ShareModal from './ShareModal';
 
@@ -549,6 +550,7 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
                             >
                                 {item.name}
                             </Link>
+                            <CommentBadges keys={item.badges} locale={locale} />
                             {isAuthor && (
                                 <span
                                     className="vr-creator-badge"

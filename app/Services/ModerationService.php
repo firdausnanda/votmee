@@ -14,6 +14,8 @@ use Illuminate\Validation\ValidationException;
 
 class ModerationService
 {
+    public function __construct(private AchievementService $achievements) {}
+
     public function reviewObject(User $actor, MasterObject $object, string $status, string $reason): void
     {
         if (! in_array($status, ['verified', 'needs_revision', 'rejected'], true) || $object->status === 'merged'
@@ -23,7 +25,8 @@ class ModerationService
 
         $previousImagePath = $object->image_path;
         $discardedImagePath = null;
-        DB::transaction(function () use ($actor, $object, $status, $reason, &$discardedImagePath): void {
+        $publishedSummaryAuthorId = null;
+        DB::transaction(function () use ($actor, $object, $status, $reason, &$discardedImagePath, &$publishedSummaryAuthorId): void {
             $pendingSummary = $object->contentRevisions()->whereNull('article_id')->where('status', 'pending')->latest()->first();
             if ($pendingSummary && ($object->status !== 'verified' || $status !== 'verified')) {
                 $pendingSummary->update([
@@ -32,8 +35,9 @@ class ModerationService
                     'review_reason' => $reason,
                     'published_at' => $status === 'verified' ? now('UTC') : null,
                 ]);
+                $publishedSummaryAuthorId = $status === 'verified' ? $pendingSummary->author_id : null;
             }
-            $updates = ['status' => $status, 'verified_by' => $status === 'verified' ? $actor->id : null];
+            $updates = ['status' => $status, 'verified_by' => $status === 'verified' ? $actor->id : null, 'verified_at' => $status === 'verified' ? now('UTC') : null];
             if ($status === 'verified' && $object->pending_image_path) {
                 $updates['image_path'] = $object->pending_image_path;
                 $updates['pending_image_path'] = null;
@@ -53,6 +57,11 @@ class ModerationService
             $images->delete($previousImagePath);
         }
         $images->delete($discardedImagePath);
+
+        if ($status === 'verified') {
+            $this->evaluateFor($object->submitted_by, 'curator');
+            $this->evaluateFor($publishedSummaryAuthorId, 'writer');
+        }
     }
 
     public function reviewImage(User $actor, MasterObject $object, string $status, string $reason): void
@@ -103,6 +112,31 @@ class ModerationService
             $this->audit($actor, 'content.review', $revision->article_id ? 'object_article' : 'object_summary', $revision->id, [
                 'status' => $status, 'reason' => $reason,
             ]);
+        });
+
+        if ($status === 'published') {
+            $this->evaluateFor($revision->author_id, 'writer');
+        }
+    }
+
+    /** Publish a trusted contributor's new revision at once, leaving others in the review queue. */
+    public function publishTrustedRevision(User $author, ObjectContentRevision $revision): ObjectContentRevision
+    {
+        if ($author->isTrustedContributor() && $revision->status === 'pending') {
+            $this->reviewContentRevision($author, $revision, 'published', 'Published automatically for a trusted contributor.');
+        }
+
+        return $revision->refresh();
+    }
+
+    /** Grant or revoke trusted contributor status. A revocation also stops it being granted automatically again. */
+    public function setTrust(User $actor, User $user, bool $trusted, string $reason): void
+    {
+        DB::transaction(function () use ($actor, $user, $trusted, $reason): void {
+            $user->forceFill($trusted
+                ? ['trusted_at' => now('UTC'), 'trust_revoked_at' => null]
+                : ['trusted_at' => null, 'trust_revoked_at' => now('UTC')])->save();
+            $this->audit($actor, $trusted ? 'user.trust.grant' : 'user.trust.revoke', 'user', (string) $user->id, ['reason' => $reason]);
         });
     }
 
@@ -185,6 +219,20 @@ class ModerationService
             $report->update(['status' => $status]);
             $this->audit($actor, 'report.'.$status, 'report', (string) $report->id, ['reason' => $reason]);
         });
+
+        if ($status === 'resolved') {
+            $this->evaluateFor($report->reporter_id, 'guardian');
+        }
+    }
+
+    /** Unlock a contributor's badges once a moderation decision credits their work. */
+    private function evaluateFor(?int $userId, string $category): void
+    {
+        $user = $userId ? User::query()->find($userId) : null;
+
+        if ($user !== null) {
+            $this->achievements->evaluate($user, $category);
+        }
     }
 
     /** @param array<string, mixed> $details */

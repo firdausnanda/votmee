@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\GoogleLoginController;
+use App\Http\Controllers\Backend\AchievementController;
 use App\Http\Controllers\Backend\CategoryController;
 use App\Http\Controllers\Backend\ContentImageController;
 use App\Http\Controllers\Backend\LeaderboardController;
@@ -40,6 +41,7 @@ Route::prefix('{locale}')->where(['locale' => 'id|en'])->middleware(SetRequestLo
     Route::get('/object/{object:slug}', [CommunityController::class, 'object'])->name('object');
     Route::get('/article/{article}', [CommunityController::class, 'article'])->name('article');
     Route::get('/profile/{user:username}', [CommunityController::class, 'profile'])->name('profile');
+    Route::get('/hall-of-fame', [CommunityController::class, 'hallOfFame'])->name('hall-of-fame');
     Route::get('/login', [CommunityController::class, 'home'])->middleware('guest')->name('login');
     Route::get('/auth/google', [GoogleLoginController::class, 'redirect'])
         ->middleware(['guest', 'throttle:10,1'])->name('google.redirect');
@@ -100,6 +102,8 @@ Route::prefix('backend')->middleware(SetRequestLocale::class)->name('backend.')-
         Route::post('rankings', [RankingController::class, 'store'])->name('rankings.store');
         Route::get('wallet', [WalletController::class, 'show'])->name('wallet.show');
         Route::post('wallet/claim', [WalletController::class, 'claim'])->name('wallet.claim');
+        Route::put('achievements/featured', [AchievementController::class, 'feature'])->name('achievements.feature');
+        Route::post('achievements/seen', [AchievementController::class, 'seen'])->name('achievements.seen');
         Route::post('support', [WalletController::class, 'support'])->name('support.store');
         Route::post('quick-duel/{duel}/vote', [QuickDuelController::class, 'vote'])->name('quick-duel.vote');
         Route::post('rankings/{post:slug}/comments', [SocialController::class, 'comment'])->name('comments.store')->middleware('throttle:comment-uploads');
@@ -122,6 +126,7 @@ Route::prefix('admin/backend')->middleware(['auth', SetRequestLocale::class, 'ca
     Route::patch('content-revisions/{revision}', [ObjectContentController::class, 'review'])->name('content-revisions.review');
     Route::patch('articles/{article}/hide', [ObjectContentController::class, 'hideArticle'])->name('articles.hide');
     Route::patch('reports/{report}', [ModerationController::class, 'resolveReport'])->name('reports.resolve');
+    Route::patch('users/{user}/trust', [ModerationController::class, 'setTrust'])->name('users.trust');
 });
 
 Route::prefix('admin/backend')->middleware(['auth', SetRequestLocale::class, 'can:administer', 'throttle:30,1'])->name('admin.backend.')->group(function () {

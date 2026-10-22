@@ -4,6 +4,7 @@ import SearchMenu from '../../Components/SearchMenu';
 import LanguageSelect from '../../Components/LanguageSelect';
 import ProfileDropdown from '../../Components/ProfileDropdown';
 import AuthModal from '../../Components/AuthModal';
+import { AchievementBadge, achievementName } from './Achievements';
 import id from '../../i18n/id.json';
 import en from '../../i18n/en.json';
 
@@ -334,7 +335,7 @@ export function Layout({ locale, categories = [], leaders = [], children, active
     const compactLayout = useCompactLayout();
     const t = dictionary(locale);
     const showRankingPanel = active === 'home' || active === 'explore';
-    const useWideContent = ['create', 'wallet', 'profile', 'object', 'ranking', 'settings'].includes(active);
+    const useWideContent = ['create', 'wallet', 'profile', 'object', 'ranking', 'settings', 'hall-of-fame'].includes(active);
     const useFeedFrame = showRankingPanel || useWideContent;
     const user = usePage().props.auth?.user;
     const access = useCommunityAccess();
@@ -460,6 +461,7 @@ export function Layout({ locale, categories = [], leaders = [], children, active
                     <Link className={active === 'explore' ? 'active' : ''} href={path(locale, '/explore')}><NavIcon name="search" />{t.explore}</Link>
                     {access.createRanking && <Link className={active === 'create' ? 'active' : ''} href={path(locale, '/create')}><NavIcon name="plusCircle" />{t.create}</Link>}
                     {access.viewWallet && <Link className={active === 'wallet' ? 'active' : ''} href={path(locale, '/wallet')}><NavIcon name="wallet" />{t.wallet}</Link>}
+                    <Link className={active === 'hall-of-fame' ? 'active' : ''} href={path(locale, '/hall-of-fame')}><NavIcon name="trophy" />Hall of Fame</Link>
                     {user && <Link className={active === 'profile' ? 'active' : ''} href={path(locale, `/profile/${user.username}`)}><NavIcon name="user" />{t.profile}</Link>}
                 </nav>
                 <div className="vt-nav-section vm-side-categories">
@@ -475,6 +477,7 @@ export function Layout({ locale, categories = [], leaders = [], children, active
                 </div>
             </aside>
             <main className="vt-main vm-main" id="main-content">{children}</main>
+            {user && <AchievementToast locale={locale} username={user.username} />}
             {showRankingPanel && <aside className="vm-rightbar vm-ranking-sidebar" aria-label={locale === 'id' ? 'Panel ranking' : 'Ranking panel'}>
                 <Leaderboard locale={locale} initialLeaders={leaders} />
                 {!compactLayout && <QuickDuelWidget locale={locale} />}
@@ -772,6 +775,39 @@ function DuelResult({ duel, locale, isId, celebrate }) {
             <DuelCountdown isId={isId} />
         </div>
     );
+}
+
+/** Announce badges unlocked since the member last dismissed this notice. */
+function AchievementToast({ locale, username }) {
+    const isId = locale === 'id';
+    const unseen = usePage().props.unseenAchievements ?? [];
+    const [dismissed, setDismissed] = useState([]);
+    const pending = unseen.filter((key) => !dismissed.includes(key));
+
+    if (pending.length === 0) return null;
+
+    const badgesUrl = `${path(locale, `/profile/${username}`)}#badges`;
+    const dismiss = () => {
+        setDismissed((current) => [...current, ...pending]);
+        return api('/backend/achievements/seen', 'POST').catch(() => {});
+    };
+    const openBadges = async (event) => {
+        event.preventDefault();
+        await dismiss();
+        router.visit(badgesUrl);
+    };
+    const [first] = pending;
+
+    return <div className="vac-toast" role="status">
+        <AchievementBadge achievementKey={first} size={44} />
+        <div className="vac-toast-body">
+            <span>{isId ? 'Badge baru terbuka!' : 'New badge unlocked!'}</span>
+            <strong>{achievementName(first, locale)}</strong>
+            {pending.length > 1 && <small>{isId ? `dan ${pending.length - 1} badge lainnya` : `and ${pending.length - 1} more`}</small>}
+            <a href={badgesUrl} onClick={openBadges}>{isId ? 'Lihat badge' : 'See badges'}</a>
+        </div>
+        <button type="button" className="vac-toast-close" onClick={dismiss} aria-label={isId ? 'Tutup pemberitahuan' : 'Dismiss notice'}>×</button>
+    </div>;
 }
 
 function QuickDuelWidget({ locale }) {

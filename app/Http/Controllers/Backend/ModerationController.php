@@ -158,6 +158,14 @@ class ModerationController extends Controller
         return response()->json($event->refresh());
     }
 
+    public function setTrust(Request $request, User $user, ModerationService $moderation): JsonResponse
+    {
+        $data = $request->validate(['trusted' => ['required', 'boolean'], 'reason' => ['required', 'string', 'min:5', 'max:2000']]);
+        $moderation->setTrust($request->user(), $user, $data['trusted'], $data['reason']);
+
+        return response()->json(['user_id' => $user->id, 'trusted_at' => $user->trusted_at, 'trust_revoked_at' => $user->trust_revoked_at]);
+    }
+
     public function restrictUser(Request $request, User $user, ModerationService $moderation): JsonResponse
     {
         $data = $request->validate(['until' => ['required', 'date', 'after:now'], 'reason' => ['required', 'string', 'min:5', 'max:2000']]);

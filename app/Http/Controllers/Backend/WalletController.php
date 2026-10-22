@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PointLedger;
 use App\Models\RankingEntry;
 use App\Models\Wallet;
+use App\Services\GamificationService;
 use App\Services\SupportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,14 +21,17 @@ class WalletController extends Controller
         ]);
     }
 
-    public function claim(Request $request, SupportService $support): JsonResponse
+    public function claim(Request $request, SupportService $support, GamificationService $gamification): JsonResponse
     {
         $ledger = $support->claimDaily($request->user());
+        $streak = $gamification->streak($request->user());
 
         return response()->json([
             'ledger' => $ledger,
             'balance' => Wallet::query()->where('user_id', $request->user()->id)->value('balance'),
             'claimed' => $ledger->wasRecentlyCreated,
+            'streak' => $streak,
+            'streak_bonus' => $ledger->wasRecentlyCreated && $streak['cycle_progress'] === $streak['cycle_days'] ? $streak['bonus'] : 0,
         ]);
     }
 

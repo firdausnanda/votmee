@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
 
 class ObjectContentController extends Controller
 {
-    public function storeSummary(Request $request, MasterObject $object, ContentImageService $contentImages): JsonResponse
+    public function storeSummary(Request $request, MasterObject $object, ContentImageService $contentImages, ModerationService $moderation): JsonResponse
     {
         abort_unless($object->status === 'verified' && $request->user()->canParticipate(), 403);
         $data = $request->validate([
@@ -43,10 +43,10 @@ class ObjectContentController extends Controller
             return $revision;
         });
 
-        return response()->json($revision, 201);
+        return response()->json($moderation->publishTrustedRevision($request->user(), $revision), 201);
     }
 
-    public function storeArticle(Request $request, MasterObject $object, ContentImageService $contentImages): JsonResponse
+    public function storeArticle(Request $request, MasterObject $object, ContentImageService $contentImages, ModerationService $moderation): JsonResponse
     {
         abort_unless($object->status === 'verified' && $request->user()->canParticipate(), 403);
         $data = $request->validate([
@@ -64,7 +64,7 @@ class ObjectContentController extends Controller
         }
         $imageIds = $contentImages->referencedIds($data['body'], $request->user());
 
-        $article = DB::transaction(function () use ($object, $request, $data, $contentImages, $imageIds): ObjectArticle {
+        $revision = DB::transaction(function () use ($object, $request, $data, $contentImages, $imageIds): ObjectContentRevision {
             $article = $object->articles()->create(['author_id' => $request->user()->id, 'type' => $data['type']]);
             $revision = $article->revisions()->create([
                 'object_id' => $object->id,
@@ -78,13 +78,14 @@ class ObjectContentController extends Controller
             ]);
             $contentImages->link($revision, $imageIds);
 
-            return $article;
+            return $revision;
         });
+        $moderation->publishTrustedRevision($request->user(), $revision);
 
-        return response()->json($article->load('revisions'), 201);
+        return response()->json($revision->article->load('revisions'), 201);
     }
 
-    public function reviseArticle(Request $request, ObjectArticle $article, ContentImageService $contentImages): JsonResponse
+    public function reviseArticle(Request $request, ObjectArticle $article, ContentImageService $contentImages, ModerationService $moderation): JsonResponse
     {
         abort_unless($article->author_id === $request->user()->id && $article->object->status === 'verified' && $request->user()->canParticipate(), 403);
         $data = $request->validate([
@@ -118,7 +119,7 @@ class ObjectContentController extends Controller
             return $revision;
         });
 
-        return response()->json($revision, 201);
+        return response()->json($moderation->publishTrustedRevision($request->user(), $revision), 201);
     }
 
     public function review(Request $request, ObjectContentRevision $revision, ModerationService $moderation): JsonResponse

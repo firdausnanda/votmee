@@ -9,6 +9,7 @@ return [
     'quick_vote_closed' => 'Duel ini sudah ditutup.',
     'quick_vote_invalid_entry' => 'Pilihan ini bukan bagian dari duel.',
     'account_ineligible' => 'Akun harus terverifikasi dan tidak dibatasi.',
+    'achievement_feature_invalid' => 'Pilih maksimal tiga badge yang sudah Anda buka.',
     'review_invalid' => 'Perubahan status objek tidak valid.',
     'merge_target_invalid' => 'Pilih objek terverifikasi lain.',
     'not_merged' => 'Objek ini tidak sedang digabung.',

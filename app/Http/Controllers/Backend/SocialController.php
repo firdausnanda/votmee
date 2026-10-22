@@ -11,7 +11,10 @@ use App\Models\ObjectArticle;
 use App\Models\RankingPost;
 use App\Models\Report;
 use App\Models\User;
+use App\Models\UserAchievement;
+use App\Services\AchievementService;
 use App\Services\CommentImageProcessor;
+use App\Services\GamificationService;
 use DateTimeImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -90,6 +93,7 @@ class SocialController extends Controller
             return $c;
         });
         CommentImage::attachToComments($comments);
+        UserAchievement::attachToComments($comments);
 
         $totalCount = DB::table('comments')
             ->where('ranking_post_id', $post->id)
@@ -157,6 +161,7 @@ class SocialController extends Controller
             return $comment;
         });
         CommentImage::attachToComments($comments);
+        UserAchievement::attachToComments($comments);
         $total = Comment::query()->whereIn('object_id', $objectIds)->where('status', 'visible')->count();
 
         return response()->json(['comments' => $comments, 'total' => $total, 'has_more' => $offset + $comments->count() < $total]);
@@ -220,6 +225,7 @@ class SocialController extends Controller
             return $comment;
         });
         CommentImage::attachToComments($comments);
+        UserAchievement::attachToComments($comments);
         $total = Comment::query()->where('article_id', $article->id)->where('status', 'visible')->count();
 
         return response()->json(['comments' => $comments, 'total' => $total, 'has_more' => $offset + $comments->count() < $total]);
@@ -251,7 +257,7 @@ class SocialController extends Controller
         ]), 201);
     }
 
-    public function toggleCommentLike(Request $request, Comment $comment): JsonResponse
+    public function toggleCommentLike(Request $request, Comment $comment, GamificationService $gamification, AchievementService $achievements): JsonResponse
     {
         abort_unless($comment->status === 'visible', 404);
         abort_unless($request->user()->canParticipate(), 403);
@@ -274,6 +280,12 @@ class SocialController extends Controller
                 'user_id' => $request->user()->id,
             ]);
             $liked = true;
+
+            if ($comment->user_id !== $request->user()->id && $comment->user !== null) {
+                $gamification->completeMission($comment->user, 'comment_liked');
+                $achievements->evaluate($comment->user, 'voice');
+                $achievements->evaluateComment($comment);
+            }
         }
 
         $likesCount = CommentLike::query()->where('comment_id', $comment->id)->count();

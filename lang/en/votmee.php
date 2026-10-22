@@ -9,6 +9,7 @@ return [
     'quick_vote_invalid_entry' => 'This choice is not part of the duel.',
     'insufficient_points' => 'Insufficient points.',
     'account_ineligible' => 'A verified, unrestricted account is required.',
+    'achievement_feature_invalid' => 'Choose up to three badges you have unlocked.',
     'review_invalid' => 'Invalid object review transition.',
     'merge_target_invalid' => 'Choose a different verified object.',
     'not_merged' => 'This object is not merged.',

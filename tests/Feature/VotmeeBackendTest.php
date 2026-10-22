@@ -95,7 +95,7 @@ test('daily bonus follows Jakarta calendar and remains idempotent', function () 
     $this->actingAs($user)->postJson(route('backend.wallet.claim'))->assertOk()->assertJsonPath('balance', 5);
     expect(PointLedger::query()->where('user_id', $user->id)->count())->toBe(1);
 
-    $this->travelTo(CarbonImmutable::parse('2026-10-18 00:01:00', 'Asia/Jakarta')->utc());
+    $this->travelTo(CarbonImmutable::parse('2026-10-18 01:00:00', 'Asia/Jakarta')->utc());
     $this->actingAs($user)->postJson(route('backend.wallet.claim'))->assertOk()->assertJsonPath('balance', 10);
     expect(PointLedger::query()->where('user_id', $user->id)->count())->toBe(2);
 });
@@ -127,10 +127,10 @@ test('support is idempotent and cannot overdraw the wallet', function () {
 
     $this->actingAs($user)->postJson(route('backend.support.store'), $payload)->assertCreated();
     $this->actingAs($user)->postJson(route('backend.support.store'), $payload)->assertCreated();
-    $this->actingAs($user)->postJson(route('backend.support.store'), [...$payload, 'idempotency_key' => (string) Str::uuid()])->assertUnprocessable();
+    $this->actingAs($user)->postJson(route('backend.support.store'), [...$payload, 'amount' => 5, 'idempotency_key' => (string) Str::uuid()])->assertUnprocessable();
 
     expect(SupportEvent::count())->toBe(1)
-        ->and(Wallet::query()->where('user_id', $user->id)->value('balance'))->toBe(1)
+        ->and(Wallet::query()->where('user_id', $user->id)->value('balance'))->toBe(4)
         ->and(PointLedger::query()->where('type', 'support')->count())->toBe(1);
 });
 
@@ -170,7 +170,7 @@ test('objects cannot receive support until they are verified', function () {
     ])->assertCreated();
 
     expect(SupportEvent::query()->count())->toBe(1)
-        ->and(Wallet::query()->where('user_id', $user->id)->value('balance'))->toBe(4);
+        ->and(Wallet::query()->where('user_id', $user->id)->value('balance'))->toBe(7);
 });
 
 test('feed returns supporter count and top two candidates', function () {
@@ -221,7 +221,7 @@ test('leaderboard counts unique supporters across posts and excludes reversed ev
 
     $support->reverse($event);
     expect($leaders->leaders('all_time', 'support')[0]['score'])->toBe(3)
-        ->and(Wallet::query()->where('user_id', $user->id)->value('balance'))->toBe(2);
+        ->and(Wallet::query()->where('user_id', $user->id)->value('balance'))->toBe(5);
 });
 
 test('leaderboard uses Jakarta day and Monday week boundaries', function () {
