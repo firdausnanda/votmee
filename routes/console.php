@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Services\AchievementService;
 use App\Services\OrphanImagePruner;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -45,6 +46,18 @@ Artisan::command('votmee:grant-role {email} {role}', function () {
 
     return 0;
 })->purpose('Assign a Votmee role to an existing account');
+
+Artisan::command('votmee:achievements-backfill', function (AchievementService $achievements) {
+    $unlocked = 0;
+
+    User::query()->orderBy('id')->each(function (User $user) use ($achievements, &$unlocked): void {
+        foreach (array_keys(config('gamification.achievements')) as $category) {
+            $unlocked += count($achievements->evaluate($user, $category, awardPoints: false));
+        }
+    });
+
+    $this->info("Unlocked {$unlocked} achievements without awarding points.");
+})->purpose('Unlock badges members already earned before achievements existed, without paying their points');
 
 Artisan::command('votmee:prune-images {--hours=24 : Only remove uploads older than this many hours} {--dry-run : Report what would be removed without deleting}', function (OrphanImagePruner $pruner) {
     $hours = max(1, (int) $this->option('hours'));

@@ -35,4 +35,29 @@ return [
 
     'daily_mission_cap' => 10,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Achievements
+    |--------------------------------------------------------------------------
+    |
+    | Each category unlocks a bronze, silver and gold badge as its count
+    | reaches the listed thresholds. A badge pays its tier points once, on
+    | top of the daily mission cap. Keys read "{category}_{tier}".
+    |
+    */
+
+    'achievements' => [
+        'streak' => ['bronze' => 7, 'silver' => 30, 'gold' => 100],
+        'curator' => ['bronze' => 1, 'silver' => 10, 'gold' => 50],
+        'writer' => ['bronze' => 5, 'silver' => 25, 'gold' => 100],
+        'voice' => ['bronze' => 10, 'silver' => 50, 'gold' => 200],
+        'guardian' => ['bronze' => 5, 'silver' => 20, 'gold' => 50],
+    ],
+
+    'achievement_points' => [
+        'bronze' => 5,
+        'silver' => 10,
+        'gold' => 20,
+    ],
+
 ];

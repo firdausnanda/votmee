@@ -2,6 +2,7 @@ import { Link, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 import { api, dateLabel, NavIcon, openLoginModal, path } from './Shared';
 import { CommentImageAttachButton, CommentImageGallery, CommentImagePreviews, commentPayload, useCommentImages } from './CommentImages';
+import { CommentBadges } from './Achievements';
 import ReportDialog from './ReportDialog';
 import ContentBody from './ContentBody';
 import ArticleSources from './ArticleSources';
@@ -128,6 +129,7 @@ export function CommunityDiscussion({ object, article, locale }) {
                             <Link href={path(locale, `/profile/${item.username}`)} className="vr-comment-user-name">
                                 {item.name}
                             </Link>
+                            <CommentBadges keys={item.badges} locale={locale} />
                             <span className="vr-meta-time">
                                 {dateLabel(item.created_at, locale)}
                             </span>

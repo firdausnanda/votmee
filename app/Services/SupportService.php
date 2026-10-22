@@ -12,14 +12,14 @@ use Illuminate\Validation\ValidationException;
 
 class SupportService
 {
-    public function __construct(private GamificationService $gamification) {}
+    public function __construct(private GamificationService $gamification, private AchievementService $achievements) {}
 
     public function claimDaily(User $user): PointLedger
     {
         $this->ensureEligible($user);
         $day = now('Asia/Jakarta')->toDateString();
 
-        return DB::transaction(function () use ($user, $day): PointLedger {
+        $ledger = DB::transaction(function () use ($user, $day): PointLedger {
             $wallet = Wallet::lockedFor($user);
             $existing = PointLedger::query()->where('user_id', $user->id)->where('type', 'daily_bonus')->whereDate('claimed_on', $day)->first();
 
@@ -40,6 +40,12 @@ class SupportService
 
             return $ledger;
         }, 3);
+
+        if ($ledger->wasRecentlyCreated) {
+            $this->achievements->evaluate($user, 'streak');
+        }
+
+        return $ledger;
     }
 
     public function support(User $user, RankingEntry $entry, int $amount, string $idempotencyKey): SupportEvent

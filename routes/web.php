@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\GoogleLoginController;
+use App\Http\Controllers\Backend\AchievementController;
 use App\Http\Controllers\Backend\CategoryController;
 use App\Http\Controllers\Backend\ContentImageController;
 use App\Http\Controllers\Backend\LeaderboardController;
@@ -100,6 +101,8 @@ Route::prefix('backend')->middleware(SetRequestLocale::class)->name('backend.')-
         Route::post('rankings', [RankingController::class, 'store'])->name('rankings.store');
         Route::get('wallet', [WalletController::class, 'show'])->name('wallet.show');
         Route::post('wallet/claim', [WalletController::class, 'claim'])->name('wallet.claim');
+        Route::put('achievements/featured', [AchievementController::class, 'feature'])->name('achievements.feature');
+        Route::post('achievements/seen', [AchievementController::class, 'seen'])->name('achievements.seen');
         Route::post('support', [WalletController::class, 'support'])->name('support.store');
         Route::post('quick-duel/{duel}/vote', [QuickDuelController::class, 'vote'])->name('quick-duel.vote');
         Route::post('rankings/{post:slug}/comments', [SocialController::class, 'comment'])->name('comments.store')->middleware('throttle:comment-uploads');

@@ -14,6 +14,8 @@ use Illuminate\Validation\ValidationException;
 
 class ModerationService
 {
+    public function __construct(private AchievementService $achievements) {}
+
     public function reviewObject(User $actor, MasterObject $object, string $status, string $reason): void
     {
         if (! in_array($status, ['verified', 'needs_revision', 'rejected'], true) || $object->status === 'merged'
@@ -23,7 +25,8 @@ class ModerationService
 
         $previousImagePath = $object->image_path;
         $discardedImagePath = null;
-        DB::transaction(function () use ($actor, $object, $status, $reason, &$discardedImagePath): void {
+        $publishedSummaryAuthorId = null;
+        DB::transaction(function () use ($actor, $object, $status, $reason, &$discardedImagePath, &$publishedSummaryAuthorId): void {
             $pendingSummary = $object->contentRevisions()->whereNull('article_id')->where('status', 'pending')->latest()->first();
             if ($pendingSummary && ($object->status !== 'verified' || $status !== 'verified')) {
                 $pendingSummary->update([
@@ -32,6 +35,7 @@ class ModerationService
                     'review_reason' => $reason,
                     'published_at' => $status === 'verified' ? now('UTC') : null,
                 ]);
+                $publishedSummaryAuthorId = $status === 'verified' ? $pendingSummary->author_id : null;
             }
             $updates = ['status' => $status, 'verified_by' => $status === 'verified' ? $actor->id : null];
             if ($status === 'verified' && $object->pending_image_path) {
@@ -53,6 +57,11 @@ class ModerationService
             $images->delete($previousImagePath);
         }
         $images->delete($discardedImagePath);
+
+        if ($status === 'verified') {
+            $this->evaluateFor($object->submitted_by, 'curator');
+            $this->evaluateFor($publishedSummaryAuthorId, 'writer');
+        }
     }
 
     public function reviewImage(User $actor, MasterObject $object, string $status, string $reason): void
@@ -104,6 +113,10 @@ class ModerationService
                 'status' => $status, 'reason' => $reason,
             ]);
         });
+
+        if ($status === 'published') {
+            $this->evaluateFor($revision->author_id, 'writer');
+        }
     }
 
     public function hideArticle(User $actor, ObjectArticle $article, string $reason): void
@@ -185,6 +198,20 @@ class ModerationService
             $report->update(['status' => $status]);
             $this->audit($actor, 'report.'.$status, 'report', (string) $report->id, ['reason' => $reason]);
         });
+
+        if ($status === 'resolved') {
+            $this->evaluateFor($report->reporter_id, 'guardian');
+        }
+    }
+
+    /** Unlock a contributor's badges once a moderation decision credits their work. */
+    private function evaluateFor(?int $userId, string $category): void
+    {
+        $user = $userId ? User::query()->find($userId) : null;
+
+        if ($user !== null) {
+            $this->achievements->evaluate($user, $category);
+        }
     }
 
     /** @param array<string, mixed> $details */

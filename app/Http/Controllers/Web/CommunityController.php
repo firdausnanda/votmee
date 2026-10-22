@@ -15,6 +15,7 @@ use App\Models\Report;
 use App\Models\SavedRanking;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Services\AchievementService;
 use App\Services\FeedService;
 use App\Services\GamificationService;
 use App\Services\LeaderboardService;
@@ -382,7 +383,7 @@ class CommunityController extends Controller
         ]);
     }
 
-    public function profile(Request $request, string $locale, User $user, LeaderboardService $leaderboard): Response
+    public function profile(Request $request, string $locale, User $user, LeaderboardService $leaderboard, AchievementService $achievements): Response
     {
         $publishedRankingsQuery = RankingPost::query()
             ->where('creator_id', $user->id)
@@ -427,6 +428,7 @@ class CommunityController extends Controller
                 ],
             ],
             'rankings' => $rankings,
+            'achievements' => $achievements->progress($user),
             'leaders' => $leaderboard->leaders(),
         ]);
     }

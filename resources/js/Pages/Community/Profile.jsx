@@ -2,6 +2,7 @@ import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/re
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
 import SelectBox from '../../Components/SelectBox';
+import { AchievementBadge, AchievementGallery, achievementName } from './Achievements';
 import { ALLOWED_TYPES, MAX_BYTES, optimizeImage } from './ObjectImageField';
 import { api, categoryHashtag, dateLabel, dictionary, Layout, NavIcon, numberLabel, PageHead, PaginationLinks, path, rankingPath } from './Shared';
 
@@ -217,7 +218,7 @@ function ProfileImageEditor({ type, hasImage, locale, buttonClassName, label, sh
     </div>;
 }
 
-export default function Profile({ locale, categories = [], leaders = [], profile, rankings }) {
+export default function Profile({ locale, categories = [], leaders = [], profile, rankings, achievements = [] }) {
     const t = dictionary(locale);
     const currentUser = usePage().props.auth?.user;
     const isOwnProfile = currentUser && currentUser.id === profile.id;
@@ -225,6 +226,26 @@ export default function Profile({ locale, categories = [], leaders = [], profile
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('');
     const [imageError, setImageError] = useState('');
+    const [badges, setBadges] = useState(achievements);
+    const [badgeBusy, setBadgeBusy] = useState(false);
+    const [badgeError, setBadgeError] = useState('');
+
+    useEffect(() => setBadges(achievements), [achievements]);
+
+    const featuredBadges = badges.filter((badge) => badge.featured);
+    const featureBadges = async (keys) => {
+        setBadgeBusy(true);
+        setBadgeError('');
+
+        try {
+            const result = await api('/backend/achievements/featured', 'PUT', { keys });
+            setBadges((current) => current.map((badge) => ({ ...badge, featured: result.featured.includes(badge.key) })));
+        } catch (error) {
+            setBadgeError(error.message);
+        } finally {
+            setBadgeBusy(false);
+        }
+    };
 
     const roleName = profile.role === 'admin'
         ? 'Administrator'
@@ -349,6 +370,12 @@ export default function Profile({ locale, categories = [], leaders = [], profile
                                     </div>
                                 </div>
                                 <p className="vpr-handle">@{profile.username}</p>
+                                {featuredBadges.length > 0 && <a href="#badges" className="vac-name-badges" aria-label={locale === 'id' ? 'Badge yang dipajang' : 'Featured badges'}>
+                                    {featuredBadges.map((badge) => <span key={badge.key} className="vac-name-badge">
+                                        <AchievementBadge achievementKey={badge.key} size={20} />
+                                        {achievementName(badge.key, locale)}
+                                    </span>)}
+                                </a>}
 
                                 <div className="vpr-meta-chips">
                                     <span className="vpr-chip">
@@ -380,6 +407,15 @@ export default function Profile({ locale, categories = [], leaders = [], profile
                         </div>
                     </div>
                 </header>
+
+                {badges.length > 0 && <AchievementGallery
+                    achievements={badges}
+                    locale={locale}
+                    isOwn={Boolean(isOwnProfile)}
+                    onFeature={featureBadges}
+                    busy={badgeBusy}
+                    error={badgeError}
+                />}
 
                 {/* 3. Published Rankings Showcase & Filter */}
                 <main className="vpr-content" aria-labelledby="vpr-rankings-heading">

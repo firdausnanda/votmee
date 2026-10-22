@@ -24,7 +24,7 @@ test('daily claims build a streak that pays its bonus once per cycle and resets 
         $this->travel(1)->day();
     }
 
-    expect(balanceOf($user))->toBe(7 * 5 + 10)
+    expect(balanceOf($user))->toBe(7 * 5 + 10 + 5)
         ->and(PointLedger::query()->where('type', 'streak_bonus')->count())->toBe(1);
 
     $this->travel(1)->day();
