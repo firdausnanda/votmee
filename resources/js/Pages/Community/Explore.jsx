@@ -1,6 +1,6 @@
 import { InfiniteScroll, Link } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
-import { categoryHashtag, dictionary, EmptyState, Layout, Leaderboard, MobileQuickDuel, NavIcon, numberLabel, objectImageSrcSet, objectImageUrl, PageHead, RankingCard, path, sortCategoriesByPopularity } from './Shared';
+import { categoryHashtag, dictionary, EmptyState, Layout, NavIcon, numberLabel, objectImageSrcSet, objectImageUrl, PageHead, RankingCard, path, sortCategoriesByPopularity } from './Shared';
 
 const CATEGORY_CARD_LIMIT = 12;
 
@@ -77,9 +77,6 @@ export default function Explore({ locale, categories, leaders, feed, filters, ob
                     {categoryHashtag(category)}
                 </Link>)}
             </nav>}
-
-            <div className="vm-mobile-leaderboard"><Leaderboard locale={locale} initialLeaders={leaders} /></div>
-            <MobileQuickDuel locale={locale} />
 
             {hasActiveFilters && <div className="vx-active-filters" aria-label={isId ? 'Filter aktif' : 'Active filters'}>
                 <span>{isId ? 'Menampilkan hasil untuk' : 'Showing results for'}</span>

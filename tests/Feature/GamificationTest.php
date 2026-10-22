@@ -97,7 +97,8 @@ test('the wallet page shows the streak and today missions', function () {
         ->where('missions.0.key', 'quick_vote')
         ->where('missions.0.earned', null)
         ->where('missions.1.key', 'support')
-        ->where('missions.1.earned', 3));
+        ->where('missions.1.earned', 3)
+        ->where('summary', ['earned' => 8, 'spent' => 0, 'earned_this_month' => 8]));
 
     $this->postJson(route('backend.wallet.claim'))->assertOk()
         ->assertJsonPath('claimed', false)

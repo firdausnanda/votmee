@@ -224,7 +224,7 @@ test('moderators revoke trust and a revoked member is not trusted again automati
     expect($user->refresh()->isTrustedContributor())->toBeTrue();
 });
 
-test('the hall of fame ranks contributors within the chosen month', function () {
+test('the hall of fame ranks contributors within the current month', function () {
     $top = User::factory()->create();
     $runnerUp = User::factory()->create();
     MasterObject::factory()->count(3)->create(['submitted_by' => $top->id]);
@@ -232,12 +232,11 @@ test('the hall of fame ranks contributors within the chosen month', function () 
     MasterObject::factory()->count(5)->create(['submitted_by' => $runnerUp->id, 'verified_at' => now('UTC')->subMonths(2)]);
     $month = now('Asia/Jakarta')->format('Y-m');
 
-    $this->get("/id/hall-of-fame?month={$month}")->assertOk()->assertInertia(fn (Assert $page) => $page
+    $this->get('/id/hall-of-fame')->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('Community/HallOfFame')
         ->where('month', $month)
+        ->missing('months')
         ->where('board.curator.0.user.username', $top->username)
         ->where('board.curator.0.count', 3)
         ->where('board.curator.1.count', 1));
-
-    $this->get('/id/hall-of-fame?month=1999-01')->assertOk()->assertInertia(fn (Assert $page) => $page->where('month', $month));
 });

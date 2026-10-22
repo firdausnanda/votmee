@@ -21,7 +21,6 @@ use App\Services\GamificationService;
 use App\Services\LeaderboardService;
 use App\Services\ObjectMatchingService;
 use App\Services\SeoService;
-use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -438,15 +437,12 @@ class CommunityController extends Controller
 
     public function hallOfFame(Request $request, LeaderboardService $leaderboard, AchievementService $achievements): Response
     {
-        $currentMonth = $achievements->currentMonth();
-        $months = collect(range(0, 11))->map(fn (int $offset): string => $currentMonth->subMonths($offset)->format('Y-m'));
-        $selected = $months->contains($request->query('month')) ? (string) $request->query('month') : $months->first();
+        $month = $achievements->currentMonth();
 
         return Inertia::render('Community/HallOfFame', [
             ...$this->shared($request),
-            'month' => $selected,
-            'months' => $months->all(),
-            'board' => $achievements->hallOfFame(CarbonImmutable::createFromFormat('!Y-m', $selected, 'Asia/Jakarta')),
+            'month' => $month->format('Y-m'),
+            'board' => $achievements->hallOfFame($month),
             'thresholds' => config('gamification.seasonal'),
             'leaders' => $leaderboard->leaders(),
         ]);
@@ -486,7 +482,31 @@ class CommunityController extends Controller
             'leaders' => $leaderboard->leaders(),
             'streak' => $gamification->streak($request->user()),
             'missions' => $gamification->missions($request->user()),
+            'summary' => $this->walletSummary($request->user()),
         ]);
+    }
+
+    /**
+     * Lifetime points received and spent, plus points received this Jakarta month.
+     *
+     * @return array{earned: int, spent: int, earned_this_month: int}
+     */
+    private function walletSummary(User $user): array
+    {
+        $totals = PointLedger::query()
+            ->where('user_id', $user->id)
+            ->selectRaw('COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) as earned')
+            ->selectRaw('COALESCE(SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END), 0) as spent')
+            ->selectRaw('COALESCE(SUM(CASE WHEN amount > 0 AND created_at >= ? THEN amount ELSE 0 END), 0) as earned_this_month', [
+                now('Asia/Jakarta')->startOfMonth()->utc(),
+            ])
+            ->first();
+
+        return [
+            'earned' => (int) $totals->earned,
+            'spent' => (int) $totals->spent,
+            'earned_this_month' => (int) $totals->earned_this_month,
+        ];
     }
 
     public function admin(Request $request, LeaderboardService $leaderboard): Response

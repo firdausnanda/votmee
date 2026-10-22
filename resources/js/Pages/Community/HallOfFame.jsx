@@ -1,4 +1,4 @@
-import { Link, router } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import { AchievementBadge, monthLabel } from './Achievements';
 import { Layout, numberLabel, PageHead, path } from './Shared';
 
@@ -15,11 +15,10 @@ const CATEGORY_COPY = {
     },
 };
 
-export default function HallOfFame({ locale, categories, leaders, month, months, board, thresholds }) {
+export default function HallOfFame({ locale, categories, leaders, month, board, thresholds }) {
     const isId = locale === 'id';
     const copy = CATEGORY_COPY[isId ? 'id' : 'en'];
     const selectedMonthLabel = monthLabel(month, locale);
-    const isCurrentMonth = month === months[0];
 
     return <Layout locale={locale} categories={categories} leaders={leaders} active="hall-of-fame">
         <PageHead
@@ -34,19 +33,10 @@ export default function HallOfFame({ locale, categories, leaders, month, months,
                 <div>
                     <p className="vhf-kicker">{isId ? 'Komunitas' : 'Community'} / Hall of Fame</p>
                     <h1>Hall of Fame</h1>
-                    <p>{isCurrentMonth
-                        ? (isId ? `Kontributor paling aktif sepanjang ${selectedMonthLabel}. Papan ini terus berubah sampai akhir bulan.` : `The most active contributors of ${selectedMonthLabel}. This board keeps moving until the month ends.`)
-                        : (isId ? `Kontributor paling aktif sepanjang ${selectedMonthLabel}.` : `The most active contributors of ${selectedMonthLabel}.`)}</p>
+                    <p>{isId
+                        ? `Kontributor paling aktif sepanjang ${selectedMonthLabel}. Papan ini terus berubah sampai akhir bulan.`
+                        : `The most active contributors of ${selectedMonthLabel}. This board keeps moving until the month ends.`}</p>
                 </div>
-                <label className="vhf-month">
-                    <span>{isId ? 'Bulan' : 'Month'}</span>
-                    <select
-                        value={month}
-                        onChange={(event) => router.get(path(locale, '/hall-of-fame'), { month: event.target.value }, { preserveScroll: true })}
-                    >
-                        {months.map((option) => <option key={option} value={option}>{monthLabel(option, locale)}</option>)}
-                    </select>
-                </label>
             </header>
 
             <div className="vhf-boards">

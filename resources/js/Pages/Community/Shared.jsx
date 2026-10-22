@@ -100,6 +100,16 @@ export function NavIcon({ name, size = 18, className = '' }) {
     return <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
 
+export function CoinIcon() {
+    return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" fill="#CF8627" />
+        <circle cx="12" cy="12" r="8.5" fill="#FFE194" />
+        <circle cx="12" cy="12" r="6.7" fill="#F7BF4D" stroke="#C68124" strokeWidth="1" />
+        <path d="m12 7.5 1.38 2.8 3.09.45-2.23 2.17.53 3.07L12 14.54l-2.77 1.45.53-3.07-2.23-2.17 3.09-.45L12 7.5Z" fill="#174A88" />
+        <path d="M5.2 8.4A8 8 0 0 1 12 4.5" stroke="#FFF6D5" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>;
+}
+
 export function SocialIcon({ name, size = 26 }) {
     switch (name) {
         case 'whatsapp':
@@ -331,6 +341,18 @@ function useSyncLocalSavedRankings(user) {
     }, [user?.id]);
 }
 
+function WalletBalanceLink({ locale, balance, compact = false }) {
+    return <Link
+        className={'vm-wallet-balance-link' + (compact ? ' is-compact' : '')}
+        href={path(locale, '/wallet')}
+        aria-label={locale === 'id' ? `Saldo ${numberLabel(balance, locale)} poin. Buka dompet poin.` : `${numberLabel(balance, locale)} points available. Open point wallet.`}
+    >
+        <span className="vm-wallet-balance-symbol" aria-hidden="true"><CoinIcon /></span>
+        <strong>{numberLabel(balance, locale)}</strong>
+        <span className="vm-wallet-balance-unit">{locale === 'id' ? 'poin' : 'points'}</span>
+    </Link>;
+}
+
 export function Layout({ locale, categories = [], leaders = [], children, active = '', searchPosts = [], loginModal = false, registerModal = false, recentComments: propRecentComments }) {
     const compactLayout = useCompactLayout();
     const t = dictionary(locale);
@@ -350,7 +372,7 @@ export function Layout({ locale, categories = [], leaders = [], children, active
     const [menuOpen, setMenuOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
     const [authMode, setAuthMode] = useState(registerModal ? 'register' : loginModal ? 'login' : null);
-    const { loginStatus, googleAuthError, recentComments: pageRecentComments = [] } = usePage().props;
+    const { loginStatus, googleAuthError, recentComments: pageRecentComments = [], walletBalance } = usePage().props;
     const recentComments = propRecentComments || pageRecentComments || [];
     const orderedCategories = sortCategoriesByPopularity(categories);
     const sidebarCategories = orderedCategories.slice(0, SIDEBAR_CATEGORY_LIMIT);
@@ -443,11 +465,13 @@ export function Layout({ locale, categories = [], leaders = [], children, active
                 <Link href={path(locale)} className="vt-wordmark vm-brand" aria-label="Votmee home">votmee</Link>
                 <SearchMenu {...searchMenuProps} />
                 <div className="vt-header-actions vm-header-right">
+                    {user && <WalletBalanceLink locale={locale} balance={walletBalance ?? 0} />}
                     <LanguageSelect language={locale} availableLanguages={availableLanguages} onChange={(next) => router.visit(switchLocale(next))} />
                     {user ? <ProfileDropdown user={user} locale={locale} canModerate={access.moderate} />
                         : <><button type="button" className="vt-login" onClick={() => setAuthMode('login')}>{t.login}</button><button type="button" className="vt-register" onClick={() => setAuthMode('register')}>{locale === 'id' ? 'Daftar' : 'Sign up'}</button></>}
                 </div>
                 <div className="vm-mobile-header-actions">
+                    {user && <WalletBalanceLink locale={locale} balance={walletBalance ?? 0} compact />}
                     <button type="button" aria-label={t.searchAction} aria-expanded={searchOpen} onClick={() => setSearchOpen(!searchOpen)}><NavIcon name="search" size={21} /></button>
                     <button type="button" aria-label={t.menu} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}><NavIcon name="menu" size={23} /></button>
                 </div>
@@ -850,6 +874,7 @@ function QuickDuelWidget({ locale }) {
             setCelebrate(true);
             navigator.vibrate?.(30);
             setDuel(result.duel);
+            router.reload({ only: ['walletBalance'] });
         } catch (failure) {
             setError(failure.message);
         } finally {

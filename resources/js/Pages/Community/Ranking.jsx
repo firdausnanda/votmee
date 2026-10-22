@@ -1,6 +1,6 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
-import { api, categoryHashtag, dateLabel, dictionary, Layout, numberLabel, objectImageSrcSet, objectImageUrl, openLoginModal, PageHead, path, useSavedRanking } from './Shared';
+import { api, categoryHashtag, CoinIcon, dateLabel, dictionary, Layout, numberLabel, objectImageSrcSet, objectImageUrl, openLoginModal, PageHead, path, useSavedRanking } from './Shared';
 import { CommentImageAttachButton, CommentImageGallery, CommentImagePreviews, commentPayload, useCommentImages } from './CommentImages';
 import { CommentBadges } from './Achievements';
 import ReportDialog from './ReportDialog';
@@ -417,7 +417,7 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
             );
 
             router.reload({
-                only: ['scores'],
+                only: ['scores', 'walletBalance'],
                 preserveScroll: true,
             });
         } catch (error) {
@@ -928,7 +928,7 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
                                     disabled={!canReceiveSupport}
                                     title={canReceiveSupport ? `${t.support} ${entry.object.canonical_name}` : unavailableLabel}
                                 >
-                                    <RankingIcon name="heart" size={14} />
+                                    <span className="vr-support-coin" aria-hidden="true"><CoinIcon /></span>
                                     <span className="vr-pill-label">{canReceiveSupport ? t.support : unavailableLabel}</span>
                                 </button>
                             </div>
@@ -1212,7 +1212,8 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
                                 </div>
                                 <div className="vr-support-balance">
                                     <span>{isId ? 'Saldo poin Anda' : 'Your point balance'}</span>
-                                    <div>
+                                    <div className="vr-support-balance-amount">
+                                        <span className="vr-support-coin" aria-hidden="true"><CoinIcon /></span>
                                         <strong>{balance === null ? '...' : numberLabel(balance, locale)} {t.points}</strong>
                                     </div>
                                 </div>
@@ -1304,7 +1305,7 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
                                 className="vr-btn-primary vr-modal-support-btn"
                                 disabled={busy || amount < 1 || (balance !== null && balance < amount)}
                             >
-                                <RankingIcon name="heart" size={15} />
+                                <span className="vr-support-coin" aria-hidden="true"><CoinIcon /></span>
                                 <span>
                                     {busy ? (isId ? 'Memproses...' : 'Processing...') : (
                                         <>

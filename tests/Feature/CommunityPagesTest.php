@@ -152,6 +152,30 @@ test('community menu permissions match guest, member, and administrator access',
         ->etc());
 });
 
+test('community topbar receives the current point balance for signed-in members', function () {
+    $this->get('/id')->assertInertia(fn (Assert $page) => $page
+        ->where('walletBalance', null)
+        ->etc());
+
+    $member = User::factory()->create();
+    $this->actingAs($member)->get('/id')->assertInertia(fn (Assert $page) => $page
+        ->where('walletBalance', 0)
+        ->etc());
+
+    Wallet::factory()->create(['user_id' => $member->id, 'balance' => 42]);
+    $this->get('/en')->assertInertia(fn (Assert $page) => $page
+        ->where('walletBalance', 42)
+        ->etc());
+
+    $this->withHeaders([
+        'X-Inertia' => 'true',
+        'X-Inertia-Version' => app(HandleInertiaRequests::class)->version(Request::create('/en')),
+        'X-Inertia-Partial-Component' => 'Community/Feed',
+        'X-Inertia-Partial-Data' => 'walletBalance',
+        'X-Requested-With' => 'XMLHttpRequest',
+    ])->get('/en')->assertOk()->assertJsonPath('props.walletBalance', 42);
+});
+
 test('merged object URL redirects to its current master', function () {
     $target = MasterObject::factory()->create();
     $source = MasterObject::factory()->create([
