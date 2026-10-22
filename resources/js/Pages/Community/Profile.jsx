@@ -294,8 +294,36 @@ export default function Profile({ locale, categories = [], leaders = [], profile
     const [badges, setBadges] = useState(achievements);
     const [badgeBusy, setBadgeBusy] = useState(false);
     const [badgeError, setBadgeError] = useState('');
+    const [activeTab, setActiveTab] = useState(() => typeof window !== 'undefined' && window.location.hash === '#badges' ? 'achievements' : 'rankings');
 
     useEffect(() => setBadges(achievements), [achievements]);
+    useEffect(() => {
+        setActiveTab(window.location.hash === '#badges' ? 'achievements' : 'rankings');
+        const syncTabWithHash = () => {
+            if (window.location.hash === '#badges') setActiveTab('achievements');
+            if (window.location.hash === '#rankings') setActiveTab('rankings');
+        };
+        window.addEventListener('hashchange', syncTabWithHash);
+
+        return () => window.removeEventListener('hashchange', syncTabWithHash);
+    }, [profile.id]);
+
+    const hasBadges = badges.length > 0;
+    const selectedTab = hasBadges && activeTab === 'achievements' ? 'achievements' : 'rankings';
+    const selectTab = (tab) => {
+        setActiveTab(tab);
+        window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}#${tab === 'achievements' ? 'badges' : 'rankings'}`);
+    };
+    const handleTabKeyDown = (event) => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+
+        event.preventDefault();
+        const nextTab = event.key === 'Home' ? 'rankings'
+            : event.key === 'End' ? 'achievements'
+                : selectedTab === 'rankings' ? 'achievements' : 'rankings';
+        selectTab(nextTab);
+        document.getElementById(`vpr-tab-${nextTab}`)?.focus();
+    };
 
     const featuredBadges = badges.filter((badge) => badge.featured);
     const featureBadges = async (keys) => {
@@ -435,7 +463,11 @@ export default function Profile({ locale, categories = [], leaders = [], profile
                                     </div>
                                 </div>
                                 <p className="vpr-handle">@{profile.username}</p>
-                                {featuredBadges.length > 0 && <a href="#badges" className="vac-name-badges" aria-label={locale === 'id' ? 'Badge yang dipajang' : 'Featured badges'}>
+                                {featuredBadges.length > 0 && <a href="#badges" className="vac-name-badges" aria-label={locale === 'id' ? 'Lihat badge pencapaian' : 'View achievement badges'} onClick={(event) => {
+                                    event.preventDefault();
+                                    selectTab('achievements');
+                                    requestAnimationFrame(() => document.getElementById('vpr-profile-tabs')?.scrollIntoView({ block: 'start' }));
+                                }}>
                                     {featuredBadges.map((badge) => <span key={badge.key} className="vac-name-badge">
                                         <AchievementBadge achievementKey={badge.key} size={20} />
                                         {achievementName(badge.key, locale)}
@@ -478,18 +510,30 @@ export default function Profile({ locale, categories = [], leaders = [], profile
                     </div>
                 </header>
 
-                {badges.length > 0 && <AchievementGallery
-                    achievements={badges}
-                    hiddenLocked={hiddenAchievementsLocked}
-                    locale={locale}
-                    isOwn={Boolean(isOwnProfile)}
-                    onFeature={featureBadges}
-                    busy={badgeBusy}
-                    error={badgeError}
-                />}
+                {hasBadges && <div className="vpr-tabs" id="vpr-profile-tabs" role="tablist" aria-label={locale === 'id' ? 'Konten profil' : 'Profile content'} onKeyDown={handleTabKeyDown}>
+                    <button type="button" role="tab" id="vpr-tab-rankings" aria-selected={selectedTab === 'rankings'} aria-controls="vpr-panel-rankings" tabIndex={selectedTab === 'rankings' ? 0 : -1} onClick={() => selectTab('rankings')}>
+                        {locale === 'id' ? 'Ranking' : 'Rankings'}
+                    </button>
+                    <button type="button" role="tab" id="vpr-tab-achievements" aria-selected={selectedTab === 'achievements'} aria-controls="vpr-panel-achievements" tabIndex={selectedTab === 'achievements' ? 0 : -1} onClick={() => selectTab('achievements')}>
+                        {locale === 'id' ? 'Pencapaian' : 'Achievements'}
+                        <span>{numberLabel(badges.filter((badge) => badge.unlocked_at).length, locale)}</span>
+                    </button>
+                </div>}
+
+                {hasBadges && <div id="vpr-panel-achievements" role="tabpanel" aria-labelledby="vpr-tab-achievements" hidden={selectedTab !== 'achievements'}>
+                    <AchievementGallery
+                        achievements={badges}
+                        hiddenLocked={hiddenAchievementsLocked}
+                        locale={locale}
+                        isOwn={Boolean(isOwnProfile)}
+                        onFeature={featureBadges}
+                        busy={badgeBusy}
+                        error={badgeError}
+                    />
+                </div>}
 
                 {/* 3. Published Rankings Showcase & Filter */}
-                <main className="vpr-content" aria-labelledby="vpr-rankings-heading">
+                <main className="vpr-content" id="vpr-panel-rankings" role={hasBadges ? 'tabpanel' : undefined} aria-labelledby={hasBadges ? 'vpr-tab-rankings' : 'vpr-rankings-heading'} hidden={selectedTab !== 'rankings'}>
                     <div className="vpr-content-header">
                         <div className="vpr-content-title-wrap">
                             <h2 id="vpr-rankings-heading" className="vpr-content-title">

@@ -11781,6 +11781,51 @@
     margin: 0 auto 60px;
 }
 
+.vpr-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 18px;
+    padding-inline: 4px;
+    border-bottom: 1px solid #dbe3ed;
+    scroll-margin-top: 76px;
+}
+
+.vpr-tabs button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 10px 16px;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    background: transparent;
+    color: #64748b;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.vpr-tabs button[aria-selected="true"] {
+    border-bottom-color: #1044bb;
+    color: #1044bb;
+}
+
+.vpr-tabs button:focus-visible {
+    outline: 2px solid #1044bb;
+    outline-offset: -2px;
+}
+
+.vpr-tabs button span {
+    color: #64748b;
+    font-size: 11px;
+}
+
+.vpr-page [role="tabpanel"][hidden] {
+    display: none;
+}
+
 /* 1. Profile Hero & Cover */
 .vpr-hero {
     position: relative;
@@ -12647,6 +12692,10 @@
 }
 
 @media (max-width: 640px) {
+    .vpr-tabs button {
+        flex: 1;
+    }
+
     .vpr-card {
         margin-inline: 10px;
         padding: 18px;
@@ -16615,6 +16664,14 @@
 @media (max-width: 900px) {
     .vhf-boards {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 767px) {
+    .vm-layout-wide-content .vhf-page {
+        width: calc(100% - 28px);
+        margin-inline: 14px;
+        padding-top: 16px;
     }
 }
 
