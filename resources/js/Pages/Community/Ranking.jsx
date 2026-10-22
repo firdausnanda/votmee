@@ -133,6 +133,7 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
     const [isSupportClosing, setIsSupportClosing] = useState(false);
     const [amount, setAmount] = useState(1);
     const [balance, setBalance] = useState(null);
+    const returnSupportHandled = useRef(false);
     const [supportKey, setSupportKey] = useState(crypto.randomUUID());
     const [localScores, setLocalScores] = useState(scores);
     const [boostedEntryId, setBoostedEntryId] = useState(null);
@@ -326,7 +327,7 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
         }, 180);
     };
 
-    const beginSupport = async (entry) => {
+    const beginSupport = async (entry, startingAmount = 1) => {
         if (!['verified', 'merged'].includes(entry.object?.status)) return;
         if (!user) {
             openLoginModal();
@@ -334,7 +335,7 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
         }
         setIsSupportClosing(false);
         setSelected(entry);
-        setAmount(1);
+        setAmount(startingAmount);
         try {
             const wallet = await api('/backend/wallet');
             setBalance(wallet.balance);
@@ -342,6 +343,24 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
             setBalance(null);
         }
     };
+
+    useEffect(() => {
+        if (returnSupportHandled.current || !user) return;
+        returnSupportHandled.current = true;
+
+        const params = new URLSearchParams(window.location.search);
+        const entryId = Number(params.get('support'));
+        const entry = post.entries.find((candidate) => candidate.id === entryId);
+        if (!entry || !Number.isSafeInteger(entryId)) return;
+
+        const requestedAmount = Number(params.get('amount'));
+        beginSupport(entry, Number.isSafeInteger(requestedAmount) && requestedAmount > 0 ? requestedAmount : 1);
+    }, [post.entries, user]);
+
+    const walletUrl = selected
+        ? `${path(locale, '/wallet')}?${new URLSearchParams({ ranking: post.slug, entry: String(selected.id), amount: String(amount) })}`
+        : path(locale, '/wallet');
+    const needsPoints = balance !== null && balance < amount;
 
     const closeSupport = () => {
         if (!selected || isSupportClosing) return;
@@ -402,6 +421,12 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
             });
         } catch (error) {
             showToast(error.message, 'error');
+            try {
+                const wallet = await api('/backend/wallet');
+                setBalance(wallet.balance);
+            } catch {
+                setBalance(null);
+            }
         } finally {
             setBusy(false);
         }
@@ -1187,16 +1212,27 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
                                     <span>{isId ? 'Saldo poin Anda' : 'Your point balance'}</span>
                                     <div>
                                         <strong>{balance === null ? '...' : numberLabel(balance, locale)} {t.points}</strong>
-                                        {balance !== null && balance < 5 && (
-                                            <Link href={path(locale, '/wallet')} className="vr-claim-link">
-                                                {isId ? 'Tambah poin' : 'Add points'}
-                                            </Link>
-                                        )}
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="vr-field-wrap vr-support-amount">
+                            {needsPoints && (
+                                <div className="vr-support-shortfall" role="status">
+                                    <p>{balance === 0
+                                        ? (isId ? 'Poin Anda habis. Klaim bonus harian di dompet jika tersedia.' : 'You have no points left. Claim your daily bonus in the wallet if available.')
+                                        : (isId ? 'Poin Anda belum cukup untuk dukungan ini. Klaim bonus harian di dompet jika tersedia.' : 'You need more points for this support. Claim your daily bonus in the wallet if available.')}</p>
+                                    <div className="vr-support-shortfall-actions">
+                                        <Link href={walletUrl} className="vr-claim-link">
+                                            {isId ? 'Buka dompet poin' : 'Open points wallet'}
+                                        </Link>
+                                        {balance > 0 && <button type="button" onClick={() => setAmount(balance)}>
+                                            {isId ? `Gunakan ${numberLabel(balance, locale)} poin` : `Use ${numberLabel(balance, locale)} points`}
+                                        </button>}
+                                    </div>
+                                </div>
+                            )}
+
+                            {!needsPoints && <div className="vr-field-wrap vr-support-amount">
                                 <label className="vr-label" htmlFor="support-amount">{t.supportAmount}</label>
                                 <div className="vr-stepper-wrap">
                                     <button
@@ -1250,7 +1286,7 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
                                         </button>
                                     )}
                                 </div>
-                            </div>
+                            </div>}
                         </div>
 
                         <div className="vr-modal-footer">
@@ -1261,7 +1297,7 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
                             >
                                 {t.cancel}
                             </button>
-                            <button
+                            {!needsPoints && <button
                                 type="submit"
                                 className="vr-btn-primary vr-modal-support-btn"
                                 disabled={busy || amount < 1 || (balance !== null && balance < amount)}
@@ -1278,7 +1314,7 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
                                         </>
                                     )}
                                 </span>
-                            </button>
+                            </button>}
                         </div>
                     </form>
                 </div>

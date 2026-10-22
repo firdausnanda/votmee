@@ -8062,6 +8062,49 @@
     font-size: 12px;
 }
 
+.vr-support-shortfall {
+    padding: 12px 14px;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    background: #eff6ff;
+    color: #1e3a8a;
+}
+
+.vr-support-shortfall p {
+    margin: 0 0 8px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.vr-support-shortfall-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+}
+
+.vr-support-shortfall .vr-claim-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: #1044bb;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.vr-support-shortfall-actions button {
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #1044bb;
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+
 .vr-support-amount {
     gap: 9px;
 }
@@ -10255,6 +10298,42 @@
 
 .vwl-alert button:hover {
     background: #0f172a0c;
+}
+
+.vwl-return {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin-top: 15px;
+    padding: 14px 18px;
+    border: 1px solid #bfdbfe;
+    border-radius: 9px;
+    background: #eff6ff;
+}
+
+.vwl-return p {
+    margin: 0;
+    color: #1e3a8a;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.vwl-return a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: #1044bb;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.vwl-return a:focus-visible {
+    outline: 2px solid #1044bb;
+    outline-offset: 2px;
 }
 
 .vwl-history {

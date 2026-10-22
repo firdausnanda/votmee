@@ -1,10 +1,25 @@
-import { Link, router } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { api, dictionary, Layout, numberLabel, PageHead, PaginationLinks, path } from './Shared';
 
 export default function Wallet({ locale, categories, leaders, balance, claimedToday, flow, ledger }) {
     const t = dictionary(locale);
     const isId = locale === 'id';
+    const query = new URLSearchParams(usePage().url.split('?')[1] ?? '');
+    const rankingSlug = query.get('ranking');
+    const entryId = Number(query.get('entry'));
+    const requestedAmount = Number(query.get('amount'));
+    const hasReturnContext = /^[a-z0-9-]+$/i.test(rankingSlug ?? '')
+        && Number.isSafeInteger(entryId) && entryId > 0
+        && Number.isSafeInteger(requestedAmount) && requestedAmount > 0;
+    const returnParams = hasReturnContext ? new URLSearchParams({
+        ranking: rankingSlug,
+        entry: String(entryId),
+        amount: String(requestedAmount),
+    }) : null;
+    const returnUrl = hasReturnContext
+        ? `${path(locale, `/ranking/${encodeURIComponent(rankingSlug)}`)}?${new URLSearchParams({ support: String(entryId), amount: String(requestedAmount) })}`
+        : null;
     const [busy, setBusy] = useState(false);
     const [alert, setAlert] = useState(null);
     const [displayedBalance, setDisplayedBalance] = useState(balance);
@@ -63,6 +78,13 @@ export default function Wallet({ locale, categories, leaders, balance, claimedTo
         { value: 'incoming', label: isId ? 'Poin masuk' : 'Received' },
         { value: 'outgoing', label: isId ? 'Poin keluar' : 'Spent' },
     ];
+    const walletFilterUrl = (filterValue) => {
+        const params = new URLSearchParams(returnParams ?? undefined);
+        if (filterValue !== 'all') params.set('flow', filterValue);
+        const search = params.toString();
+
+        return path(locale, '/wallet') + (search ? `?${search}` : '');
+    };
 
     return (
         <Layout locale={locale} categories={categories} leaders={leaders} active="wallet">
@@ -110,6 +132,15 @@ export default function Wallet({ locale, categories, leaders, balance, claimedTo
                     <button type="button" onClick={() => setAlert(null)} aria-label={isId ? 'Tutup pesan' : 'Dismiss message'}>×</button>
                 </div>}
 
+                {returnUrl && <div className="vwl-return" role="status">
+                    <p>{displayedBalance >= requestedAmount
+                        ? (isId ? 'Poin Anda cukup untuk melanjutkan dukungan.' : 'You have enough points to continue your support.')
+                        : isClaimed
+                            ? (isId ? 'Poin masih kurang. Bonus berikutnya tersedia besok, pukul 00.00 WIB.' : 'You still need more points. The next bonus is available tomorrow at 00:00 Jakarta time.')
+                            : (isId ? 'Klaim bonus harian di atas, lalu kembali ke kandidat pilihan Anda.' : 'Claim the daily bonus above, then return to your chosen candidate.')}</p>
+                    <Link href={returnUrl}>{isId ? 'Kembali ke kandidat' : 'Return to candidate'}</Link>
+                </div>}
+
                 <section className="vwl-history" aria-labelledby="vwl-history-heading">
                     <header className="vwl-history-header">
                         <div>
@@ -123,7 +154,7 @@ export default function Wallet({ locale, categories, leaders, balance, claimedTo
                         {filters.map((filter) => <Link
                             key={filter.value}
                             className={flow === filter.value ? 'is-active' : ''}
-                            href={path(locale, '/wallet') + (filter.value === 'all' ? '' : '?flow=' + filter.value)}
+                            href={walletFilterUrl(filter.value)}
                             preserveScroll
                             aria-current={flow === filter.value ? 'page' : undefined}
                         >{filter.label}</Link>)}
