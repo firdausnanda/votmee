@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Models\PointLedger;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Notifications\StreakReminder;
 use Carbon\CarbonImmutable;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -39,6 +41,13 @@ class GamificationService
             'longest_streak' => max($wallet->longest_streak, $streak),
             'last_claimed_on' => $day,
         ]);
+
+        DatabaseNotification::query()
+            ->where('notifiable_type', (new User)->getMorphClass())
+            ->where('notifiable_id', $wallet->user_id)
+            ->where('type', StreakReminder::class)
+            ->whereNull('read_at')
+            ->update(['read_at' => now('UTC')]);
 
         if ($streak % $this->cycleDays() !== 0) {
             return null;

@@ -19,6 +19,7 @@ use App\Services\AchievementService;
 use App\Services\FeedService;
 use App\Services\GamificationService;
 use App\Services\LeaderboardService;
+use App\Services\NotificationService;
 use App\Services\ObjectMatchingService;
 use App\Services\SeoService;
 use Illuminate\Http\RedirectResponse;
@@ -457,6 +458,16 @@ class CommunityController extends Controller
             'feed' => Inertia::scroll(fn () => $feed->paginate($filters, $request->user())->withQueryString()),
             'savedCount' => SavedRanking::query()->where('user_id', $request->user()->id)
                 ->whereHas('rankingPost', fn ($query) => $query->where('status', 'published'))->count(),
+            'leaders' => $leaderboard->leaders('weekly', 'support'),
+        ]);
+    }
+
+    public function notifications(Request $request, NotificationService $notifications, LeaderboardService $leaderboard): Response
+    {
+        return Inertia::render('Community/Notifications', [
+            ...$this->shared($request),
+            'notifications' => Inertia::scroll(fn () => $request->user()->notifications()->paginate(20)
+                ->through(fn ($notification): array => $notifications->listing($notification))),
             'leaders' => $leaderboard->leaders('weekly', 'support'),
         ]);
     }

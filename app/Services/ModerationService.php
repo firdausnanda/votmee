@@ -58,6 +58,8 @@ class ModerationService
         }
         $images->delete($discardedImagePath);
 
+        app(NotificationService::class)->objectReviewed($actor, $object, $status, $reason);
+
         if ($status === 'verified') {
             $this->evaluateFor($object->submitted_by, 'curator');
             $this->evaluateFor($publishedSummaryAuthorId, 'writer');
@@ -114,6 +116,8 @@ class ModerationService
             ]);
         });
 
+        app(NotificationService::class)->contentReviewed($actor, $revision, $status, $reason);
+
         if ($status === 'published') {
             $this->evaluateFor($revision->author_id, 'writer');
         }
@@ -138,6 +142,10 @@ class ModerationService
                 : ['trusted_at' => null, 'trust_revoked_at' => now('UTC')])->save();
             $this->audit($actor, $trusted ? 'user.trust.grant' : 'user.trust.revoke', 'user', (string) $user->id, ['reason' => $reason]);
         });
+
+        if ($trusted) {
+            app(NotificationService::class)->trustGranted($actor, $user);
+        }
     }
 
     public function hideArticle(User $actor, ObjectArticle $article, string $reason): void
@@ -219,6 +227,8 @@ class ModerationService
             $report->update(['status' => $status]);
             $this->audit($actor, 'report.'.$status, 'report', (string) $report->id, ['reason' => $reason]);
         });
+
+        app(NotificationService::class)->reportResolved($actor, $report, $status);
 
         if ($status === 'resolved') {
             $this->evaluateFor($report->reporter_id, 'guardian');

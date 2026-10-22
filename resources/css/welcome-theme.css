@@ -3724,6 +3724,19 @@
     }
 }
 
+.vm-notifications-page {
+    width: min(100%, 960px);
+    padding-bottom: 48px;
+}
+
+@media (max-width: 767px) {
+    .vm-layout-wide-content .vm-notifications-page {
+        width: calc(100% - 28px);
+        margin-inline: 14px;
+        padding-top: 16px;
+    }
+}
+
 /* Explore discovery */
 .vx-explore {
     padding-bottom: 30px;
@@ -3859,7 +3872,7 @@
     font-size: 12px;
 }
 
-.vx-section-heading .vs-saved-title {
+.vx-section-heading h1 {
     display: flex;
     align-items: center;
     gap: 10px;

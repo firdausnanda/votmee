@@ -15,6 +15,7 @@ use App\Models\UserAchievement;
 use App\Services\AchievementService;
 use App\Services\CommentImageProcessor;
 use App\Services\GamificationService;
+use App\Services\NotificationService;
 use DateTimeImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -49,7 +50,7 @@ class SocialController extends Controller
             'parent_id' => $effectiveParentId,
             'body' => $data['body'],
             'status' => 'visible',
-        ]);
+        ], $targetParent);
     }
 
     public function getComments(Request $request, RankingPost $post): JsonResponse
@@ -127,7 +128,7 @@ class SocialController extends Controller
             'parent_id' => $parent ? ($parent->parent_id ?: $parent->id) : null,
             'body' => $data['body'],
             'status' => 'visible',
-        ]);
+        ], $parent);
     }
 
     public function getObjectComments(Request $request, MasterObject $object): JsonResponse
@@ -189,7 +190,7 @@ class SocialController extends Controller
             'parent_id' => $parent ? ($parent->parent_id ?: $parent->id) : null,
             'body' => $data['body'],
             'status' => 'visible',
-        ]);
+        ], $parent);
     }
 
     public function getArticleComments(Request $request, ObjectArticle $article): JsonResponse
@@ -282,6 +283,7 @@ class SocialController extends Controller
             $liked = true;
 
             if ($comment->user_id !== $request->user()->id && $comment->user !== null) {
+                app(NotificationService::class)->commentLiked($comment, $request->user());
                 $gamification->completeMission($comment->user, 'comment_liked');
                 $achievements->evaluate($comment->user, 'voice');
                 $achievements->evaluateComment($comment);
@@ -349,7 +351,7 @@ class SocialController extends Controller
      *
      * @param  array<string, mixed>  $attributes
      */
-    private function createComment(Request $request, CommentImageProcessor $images, array $attributes): JsonResponse
+    private function createComment(Request $request, CommentImageProcessor $images, array $attributes, ?Comment $replyingTo = null): JsonResponse
     {
         $comment = DB::transaction(function () use ($request, $images, $attributes): Comment {
             $comment = Comment::create($attributes);
@@ -357,6 +359,8 @@ class SocialController extends Controller
 
             return $comment;
         });
+
+        app(NotificationService::class)->commentCreated($comment, $replyingTo);
 
         return response()->json([
             ...$comment->toArray(),

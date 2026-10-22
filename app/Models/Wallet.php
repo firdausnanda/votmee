@@ -6,6 +6,7 @@ use Database\Factories\WalletFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable(['user_id', 'balance', 'streak_days', 'longest_streak', 'last_claimed_on'])]
 class Wallet extends Model
@@ -23,6 +24,11 @@ class Wallet extends Model
         return [
             'last_claimed_on' => 'date',
         ];
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     /** Create the wallet when missing, then lock it for the surrounding transaction. */

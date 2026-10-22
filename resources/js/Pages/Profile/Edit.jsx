@@ -7,6 +7,7 @@ import {
     path,
 } from '../Community/Shared';
 import DeleteUserForm from './Partials/DeleteUserForm';
+import UpdateNotificationPreferencesForm from './Partials/UpdateNotificationPreferencesForm';
 import UpdatePasswordForm from './Partials/UpdatePasswordForm';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm';
 
@@ -16,6 +17,7 @@ export default function Edit({
     leaders = [],
     mustVerifyEmail = false,
     status = null,
+    notificationPreferences = {},
 }) {
     const user = usePage().props.auth.user;
     const isId = locale === 'id';
@@ -104,6 +106,18 @@ export default function Edit({
                                 </button>
 
                                 <button
+                                    id="settings-notifications-tab"
+                                    type="button"
+                                    className={`vst-nav-btn ${activeTab === 'notifications' ? 'is-active' : ''}`}
+                                    onClick={() => setActiveTab('notifications')}
+                                    aria-pressed={activeTab === 'notifications'}
+                                    aria-controls="settings-panel"
+                                >
+                                    <NavIcon name="bell" size={16} />
+                                    <span>{isId ? 'Notifikasi' : 'Notifications'}</span>
+                                </button>
+
+                                <button
                                     id="settings-danger-tab"
                                     type="button"
                                     className={`vst-nav-btn is-danger ${activeTab === 'danger' ? 'is-active' : ''}`}
@@ -133,6 +147,10 @@ export default function Edit({
 
                         {activeTab === 'security' && (
                             <UpdatePasswordForm locale={locale} />
+                        )}
+
+                        {activeTab === 'notifications' && (
+                            <UpdateNotificationPreferencesForm locale={locale} preferences={notificationPreferences} />
                         )}
 
                         {activeTab === 'danger' && (

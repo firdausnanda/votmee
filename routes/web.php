@@ -6,6 +6,7 @@ use App\Http\Controllers\Backend\CategoryController;
 use App\Http\Controllers\Backend\ContentImageController;
 use App\Http\Controllers\Backend\LeaderboardController;
 use App\Http\Controllers\Backend\ModerationController;
+use App\Http\Controllers\Backend\NotificationController;
 use App\Http\Controllers\Backend\ObjectContentController;
 use App\Http\Controllers\Backend\ObjectController;
 use App\Http\Controllers\Backend\ProfileImageController;
@@ -54,6 +55,7 @@ Route::prefix('{locale}')->where(['locale' => 'id|en'])->middleware(SetRequestLo
         Route::get('/article/{article}/edit', [CommunityController::class, 'editObjectArticle'])->name('article.edit');
         Route::get('/wallet', [CommunityController::class, 'wallet'])->name('wallet');
         Route::get('/saved', [CommunityController::class, 'saved'])->name('saved');
+        Route::get('/notifications', [CommunityController::class, 'notifications'])->name('notifications');
     });
 });
 
@@ -63,6 +65,7 @@ Route::get('/dashboard', fn () => redirect()->route('community.home', ['locale' 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::patch('/profile/notifications', [ProfileController::class, 'updateNotifications'])->name('profile.notifications.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
@@ -104,6 +107,11 @@ Route::prefix('backend')->middleware(SetRequestLocale::class)->name('backend.')-
         Route::post('wallet/claim', [WalletController::class, 'claim'])->name('wallet.claim');
         Route::put('achievements/featured', [AchievementController::class, 'feature'])->name('achievements.feature');
         Route::post('achievements/seen', [AchievementController::class, 'seen'])->name('achievements.seen');
+        Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+        Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
+        Route::patch('notifications/{notification}/read', [NotificationController::class, 'read'])->name('notifications.read');
+        Route::delete('notifications', [NotificationController::class, 'clearRead'])->name('notifications.clear-read');
+        Route::delete('notifications/{notification}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
         Route::post('support', [WalletController::class, 'support'])->name('support.store');
         Route::post('quick-duel/{duel}/vote', [QuickDuelController::class, 'vote'])->name('quick-duel.vote');
         Route::post('rankings/{post:slug}/comments', [SocialController::class, 'comment'])->name('comments.store')->middleware('throttle:comment-uploads');

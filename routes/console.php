@@ -70,3 +70,5 @@ Artisan::command('votmee:prune-images {--hours=24 : Only remove uploads older th
 })->purpose('Remove uploaded images that are no longer referenced');
 
 Schedule::command('votmee:prune-images')->dailyAt('03:00')->withoutOverlapping();
+Schedule::command('votmee:prune-notifications')->dailyAt('03:30')->withoutOverlapping();
+Schedule::command('votmee:streak-reminders')->dailyAt('19:00')->timezone('Asia/Jakarta')->withoutOverlapping();

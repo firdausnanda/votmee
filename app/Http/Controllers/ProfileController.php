@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\NotificationPreferencesRequest;
 use App\Http\Requests\ProfileUpdateRequest;
 use App\Models\Category;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -27,7 +28,25 @@ class ProfileController extends Controller
                 ->orderBy('name')->get(['id', 'name', 'slug']),
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => session('status'),
+            'notificationPreferences' => collect(config('notification_preferences.groups'))
+                ->mapWithKeys(fn (string $group): array => [$group => ($request->user()->notification_preferences[$group] ?? true) !== false])
+                ->all(),
         ]);
+    }
+
+    /**
+     * Switch in-app notification groups on or off. Only switched-off groups are stored.
+     */
+    public function updateNotifications(NotificationPreferencesRequest $request): RedirectResponse
+    {
+        $disabled = collect($request->validated('preferences'))
+            ->reject(fn ($enabled): bool => (bool) $enabled)
+            ->map(fn (): bool => false)
+            ->all();
+
+        $request->user()->update(['notification_preferences' => $disabled === [] ? null : $disabled]);
+
+        return Redirect::route('profile.edit');
     }
 
     /**

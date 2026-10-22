@@ -5,6 +5,8 @@ import LanguageSelect from '../../Components/LanguageSelect';
 import ProfileDropdown from '../../Components/ProfileDropdown';
 import AuthModal from '../../Components/AuthModal';
 import { AchievementBadge, achievementName } from './Achievements';
+import { NotificationBell, NotificationPoll, NotificationToasts } from './Notifications';
+import { useNotificationFeed, useNotificationFeedLifecycle } from '../../Components/notificationFeed';
 import id from '../../i18n/id.json';
 import en from '../../i18n/en.json';
 
@@ -96,6 +98,7 @@ export function NavIcon({ name, size = 18, className = '' }) {
         x: <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
         cornerDownRight: <><polyline points="15 10 20 15 15 20" /><path d="M4 4v7a4 4 0 0 0 4 4h12" /></>,
         messageSquare: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
+        bell: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></>,
     };
     return <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
@@ -184,7 +187,7 @@ function relativeDate(value, locale, referenceTime) {
     return new Intl.RelativeTimeFormat(locale === 'id' ? 'id-ID' : 'en-US', { numeric: 'auto' }).format(-days, 'day');
 }
 
-function commentTimeAgo(value, locale, referenceTime) {
+export function commentTimeAgo(value, locale, referenceTime) {
     if (!value) return '';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
@@ -357,11 +360,13 @@ export function Layout({ locale, categories = [], leaders = [], children, active
     const compactLayout = useCompactLayout();
     const t = dictionary(locale);
     const showRankingPanel = active === 'home' || active === 'explore';
-    const useWideContent = ['create', 'wallet', 'profile', 'object', 'ranking', 'settings', 'hall-of-fame'].includes(active);
+    const useWideContent = ['create', 'wallet', 'profile', 'object', 'ranking', 'settings', 'hall-of-fame', 'notifications'].includes(active);
     const useFeedFrame = showRankingPanel || useWideContent;
     const user = usePage().props.auth?.user;
     const access = useCommunityAccess();
     useSyncLocalSavedRankings(user);
+    useNotificationFeedLifecycle(user?.id, active !== 'notifications');
+    const { connected: notificationsConnected } = useNotificationFeed();
     const pageUrl = usePage().url;
     const seo = usePage().props.seo;
     const contentHasOneLanguage = seo?.robots === 'index, follow'
@@ -460,6 +465,8 @@ export function Layout({ locale, categories = [], leaders = [], children, active
 
     return <div className="vt-app vm-page">
         <a className="vm-skip" href="#main-content">{locale === 'id' ? 'Langsung ke konten' : 'Skip to content'}</a>
+        {user && <NotificationToasts locale={locale} />}
+        {user && <NotificationPoll key={notificationsConnected ? 'socket' : 'poll'} interval={notificationsConnected ? 300000 : 60000} />}
         <header className="vt-header vm-header">
             <div className={`vt-header-inner vm-shell vm-header-inner vm-header-2col${useFeedFrame ? ' vm-header-3col' : ''}`}>
                 <Link href={path(locale)} className="vt-wordmark vm-brand" aria-label="Votmee home">votmee</Link>
@@ -467,11 +474,13 @@ export function Layout({ locale, categories = [], leaders = [], children, active
                 <div className="vt-header-actions vm-header-right">
                     {user && <WalletBalanceLink locale={locale} balance={walletBalance ?? 0} />}
                     <LanguageSelect language={locale} availableLanguages={availableLanguages} onChange={(next) => router.visit(switchLocale(next))} />
+                    {user && <NotificationBell locale={locale} />}
                     {user ? <ProfileDropdown user={user} locale={locale} canModerate={access.moderate} />
                         : <><button type="button" className="vt-login" onClick={() => setAuthMode('login')}>{t.login}</button><button type="button" className="vt-register" onClick={() => setAuthMode('register')}>{locale === 'id' ? 'Daftar' : 'Sign up'}</button></>}
                 </div>
                 <div className="vm-mobile-header-actions">
                     {user && <WalletBalanceLink locale={locale} balance={walletBalance ?? 0} compact />}
+                    {user && <NotificationBell locale={locale} compact />}
                     <button type="button" aria-label={t.searchAction} aria-expanded={searchOpen} onClick={() => setSearchOpen(!searchOpen)}><NavIcon name="search" size={21} /></button>
                     <button type="button" aria-label={t.menu} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}><NavIcon name="menu" size={23} /></button>
                 </div>

@@ -15,6 +15,7 @@ return [
     'streak' => [
         'cycle_days' => 7,
         'bonus' => 10,
+        'reminder_min_days' => 3,
     ],
 
     /*

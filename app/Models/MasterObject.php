@@ -30,6 +30,11 @@ class MasterObject extends Model
         return $this->belongsTo(Category::class);
     }
 
+    public function submitter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'submitted_by');
+    }
+
     public function aliases(): HasMany
     {
         return $this->hasMany(ObjectAlias::class, 'object_id');

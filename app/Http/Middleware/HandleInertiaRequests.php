@@ -59,6 +59,7 @@ class HandleInertiaRequests extends Middleware
                 ],
             ],
             'walletBalance' => fn (): ?int => $user ? (int) ($user->wallet()->value('balance') ?? 0) : null,
+            'unreadNotifications' => fn (): ?int => $user?->unreadNotifications()->count(),
             'unseenAchievements' => fn (): array => $user ? app(AchievementService::class)->unseen($user) : [],
         ];
     }

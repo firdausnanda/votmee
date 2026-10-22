@@ -4,9 +4,15 @@ import '../css/welcome.css';
 import '../css/welcome-theme.css';
 
 import { createInertiaApp } from '@inertiajs/react';
+import { configureEcho } from '@laravel/echo-react';
 import { createRoot, hydrateRoot } from 'react-dom/client';
 
 const appName = 'Votmee';
+
+// Without Reverb keys the notification bell falls back to polling.
+if (import.meta.env.VITE_REVERB_APP_KEY) {
+    configureEcho({ broadcaster: 'reverb' });
+}
 const pages = import.meta.glob('./Pages/**/*.{jsx,tsx}');
 
 createInertiaApp({

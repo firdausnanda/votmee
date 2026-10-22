@@ -326,6 +326,10 @@ class AchievementService
 
         if ($isNew) {
             Cache::forget(self::HOLDERS_CACHE_KEY);
+
+            if ($awardPoints) {
+                app(NotificationService::class)->achievementUnlocked($user, $key);
+            }
         }
 
         return $isNew;
