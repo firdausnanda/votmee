@@ -2,7 +2,7 @@ import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { api, dictionary, Layout, numberLabel, PageHead, PaginationLinks, path } from './Shared';
 
-export default function Wallet({ locale, categories, leaders, balance, claimedToday, flow, ledger }) {
+export default function Wallet({ locale, categories, leaders, balance, claimedToday, flow, ledger, streak, missions }) {
     const t = dictionary(locale);
     const isId = locale === 'id';
     const query = new URLSearchParams(usePage().url.split('?')[1] ?? '');
@@ -24,18 +24,20 @@ export default function Wallet({ locale, categories, leaders, balance, claimedTo
     const [alert, setAlert] = useState(null);
     const [displayedBalance, setDisplayedBalance] = useState(balance);
     const [isClaimed, setIsClaimed] = useState(claimedToday);
-    const [showGain, setShowGain] = useState(false);
+    const [gain, setGain] = useState(0);
     const [openEntry, setOpenEntry] = useState(null);
+    const [displayedStreak, setDisplayedStreak] = useState(streak);
 
     useEffect(() => setDisplayedBalance(balance), [balance]);
     useEffect(() => setIsClaimed(claimedToday), [claimedToday]);
+    useEffect(() => setDisplayedStreak(streak), [streak]);
     useEffect(() => setOpenEntry(null), [flow]);
     useEffect(() => {
-        if (!showGain) return undefined;
+        if (!gain) return undefined;
 
-        const timeout = window.setTimeout(() => setShowGain(false), 1600);
+        const timeout = window.setTimeout(() => setGain(0), 1600);
         return () => window.clearTimeout(timeout);
-    }, [showGain]);
+    }, [gain]);
 
     const claim = async () => {
         setBusy(true);
@@ -45,14 +47,17 @@ export default function Wallet({ locale, categories, leaders, balance, claimedTo
             const result = await api('/backend/wallet/claim', 'POST');
             setDisplayedBalance(result.balance);
             setIsClaimed(true);
-            setShowGain(result.claimed);
+            setDisplayedStreak(result.streak);
+            setGain(result.claimed ? 5 + result.streak_bonus : 0);
             setAlert({
                 type: 'success',
-                text: result.claimed
-                    ? (isId ? '5 poin sudah masuk ke dompet Anda.' : '5 points were added to your wallet.')
-                    : (isId ? 'Bonus hari ini sudah Anda klaim.' : 'You have already claimed today’s bonus.'),
+                text: !result.claimed
+                    ? (isId ? 'Bonus hari ini sudah Anda klaim.' : 'You have already claimed today’s bonus.')
+                    : result.streak_bonus > 0
+                        ? (isId ? `5 poin plus bonus streak ${result.streak_bonus} poin sudah masuk ke dompet Anda.` : `5 points plus a ${result.streak_bonus}-point streak bonus were added to your wallet.`)
+                        : (isId ? '5 poin sudah masuk ke dompet Anda.' : '5 points were added to your wallet.'),
             });
-            router.reload({ only: ['balance', 'claimedToday', 'ledger'] });
+            router.reload({ only: ['balance', 'claimedToday', 'ledger', 'streak', 'missions'] });
         } catch (error) {
             setAlert({
                 type: 'error',
@@ -67,7 +72,23 @@ export default function Wallet({ locale, categories, leaders, balance, claimedTo
         daily_bonus: isId ? 'Bonus harian' : 'Daily bonus',
         support: isId ? 'Dukungan ranking' : 'Ranking support',
         reversal: isId ? 'Pengembalian poin' : 'Points returned',
+        streak_bonus: isId ? 'Bonus streak' : 'Streak bonus',
+        mission_reward: isId ? 'Hadiah misi harian' : 'Daily mission reward',
     })[type] ?? type.replace(/_/g, ' ');
+    const missionCopy = {
+        quick_vote: isId
+            ? { title: 'Ikut Quick Vote', text: 'Pilih salah satu kandidat di duel hari ini.' }
+            : { title: 'Join the Quick Vote', text: 'Pick a candidate in today’s duel.' },
+        support: isId
+            ? { title: 'Dukung sebuah ranking', text: 'Beri poin dukungan ke kandidat mana pun.' }
+            : { title: 'Support a ranking', text: 'Give support points to any candidate.' },
+        comment_liked: isId
+            ? { title: 'Komentar disukai', text: 'Dapatkan like dari pengguna lain pada komentar Anda.' }
+            : { title: 'Get a comment liked', text: 'Receive a like from another member on your comment.' },
+    };
+    const missionsEarned = missions.reduce((total, mission) => total + (mission.earned ?? 0), 0);
+    const missionsTotal = missions.reduce((total, mission) => total + mission.points, 0);
+    const claimsToBonus = displayedStreak.cycle_days - displayedStreak.cycle_progress;
     const transactionDateLabel = (value) => new Intl.DateTimeFormat(isId ? 'id-ID' : 'en-US', {
         dateStyle: 'medium',
         timeZone: 'Asia/Jakarta',
@@ -105,7 +126,7 @@ export default function Wallet({ locale, categories, leaders, balance, claimedTo
                         <div className="vwl-balance-amount">
                             <strong key={displayedBalance}>{numberLabel(displayedBalance, locale)}</strong>
                             <span>{t.points}</span>
-                            {showGain && <span className="vwl-gain" aria-hidden="true">+5</span>}
+                            {gain > 0 && <span className="vwl-gain" aria-hidden="true">+{gain}</span>}
                         </div>
                         <div className="vwl-balance-bottom">
                             <p>{isId ? 'Beri dukungan pada kandidat di ranking komunitas.' : 'Support candidates in community rankings.'}</p>
@@ -140,6 +161,53 @@ export default function Wallet({ locale, categories, leaders, balance, claimedTo
                             : (isId ? 'Klaim bonus harian di atas, lalu kembali ke kandidat pilihan Anda.' : 'Claim the daily bonus above, then return to your chosen candidate.')}</p>
                     <Link href={returnUrl}>{isId ? 'Kembali ke kandidat' : 'Return to candidate'}</Link>
                 </div>}
+
+                <div className="vwl-progress">
+                    <section className="vwl-streak" aria-labelledby="vwl-streak-heading">
+                        <header className="vwl-card-heading">
+                            <h2 id="vwl-streak-heading">{isId ? 'Streak harian' : 'Daily streak'}</h2>
+                            <span>{isId ? `Terpanjang ${numberLabel(displayedStreak.longest, locale)} hari` : `Best ${numberLabel(displayedStreak.longest, locale)} days`}</span>
+                        </header>
+                        <div className="vwl-streak-count">
+                            <strong>{numberLabel(displayedStreak.days, locale)}</strong>
+                            <span>{isId ? 'hari berturut-turut' : displayedStreak.days === 1 ? 'day in a row' : 'days in a row'}</span>
+                        </div>
+                        <ol className="vwl-streak-track" aria-label={isId ? `${displayedStreak.cycle_progress} dari ${displayedStreak.cycle_days} hari menuju bonus` : `${displayedStreak.cycle_progress} of ${displayedStreak.cycle_days} days toward the bonus`}>
+                            {Array.from({ length: displayedStreak.cycle_days }, (_, index) => <li
+                                key={index}
+                                className={(index < displayedStreak.cycle_progress ? 'is-done' : '') + (index === displayedStreak.cycle_days - 1 ? ' is-reward' : '')}
+                            >{index === displayedStreak.cycle_days - 1 ? `+${displayedStreak.bonus}` : index + 1}</li>)}
+                        </ol>
+                        <p>{claimsToBonus === 0
+                            ? (isId ? `Bonus streak +${displayedStreak.bonus} poin sudah masuk hari ini. Siklus baru dimulai besok.` : `Your +${displayedStreak.bonus} streak bonus landed today. A new cycle starts tomorrow.`)
+                            : (isId ? `Klaim ${claimsToBonus} hari lagi berturut-turut untuk bonus +${displayedStreak.bonus} poin. Satu hari terlewat, streak dimulai ulang.` : `Claim ${claimsToBonus} more days in a row for a +${displayedStreak.bonus} bonus. Miss a day and the streak restarts.`)}</p>
+                    </section>
+
+                    <section className="vwl-missions" aria-labelledby="vwl-missions-heading">
+                        <header className="vwl-card-heading">
+                            <h2 id="vwl-missions-heading">{isId ? 'Misi harian' : 'Daily missions'}</h2>
+                            <span>{numberLabel(missionsEarned, locale)}/{numberLabel(missionsTotal, locale)} {t.points}</span>
+                        </header>
+                        <ul className="vwl-mission-list">
+                            {missions.map((mission) => {
+                                const copy = missionCopy[mission.key] ?? { title: mission.key.replace(/_/g, ' '), text: '' };
+                                const isDone = mission.earned !== null;
+
+                                return <li key={mission.key} className={isDone ? 'is-done' : ''}>
+                                    <span className="vwl-mission-check" aria-hidden="true">{isDone ? '✓' : ''}</span>
+                                    <span className="vwl-mission-info">
+                                        <strong>{copy.title}</strong>
+                                        <span>{copy.text}</span>
+                                    </span>
+                                    <span className="vwl-mission-points" aria-label={isDone ? (isId ? `Selesai, +${mission.earned} poin` : `Completed, +${mission.earned} points`) : (isId ? `Hadiah +${mission.points} poin` : `Reward +${mission.points} points`)}>
+                                        +{numberLabel(isDone ? mission.earned : mission.points, locale)}
+                                    </span>
+                                </li>;
+                            })}
+                        </ul>
+                        <p>{isId ? 'Misi diatur ulang setiap pukul 00.00 WIB.' : 'Missions reset daily at 00:00 Jakarta time.'}</p>
+                    </section>
+                </div>
 
                 <section className="vwl-history" aria-labelledby="vwl-history-heading">
                     <header className="vwl-history-header">

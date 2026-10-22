@@ -79,7 +79,7 @@ test('an object does not return to a duel for a week and stays out of the same d
         ->and($quickVotes->generate(now('Asia/Jakarta')->addDays(8)->toDateString()))->toBe(1);
 });
 
-test('a quick vote is free, records one point and never touches the wallet', function () {
+test('a quick vote is free, records one point and pays only the daily mission', function () {
     $user = User::factory()->create();
     [, $entries] = rankingWithEntries(2);
     $duel = QuickDuel::factory()->create(['ranking_post_id' => $entries[0]->ranking_post_id, 'entry_a_id' => $entries[0]->id, 'entry_b_id' => $entries[1]->id]);
@@ -97,8 +97,8 @@ test('a quick vote is free, records one point and never touches the wallet', fun
         ->and($event->amount)->toBe(1)
         ->and($event->ledger_id)->toBeNull()
         ->and($event->user_id)->toBe($user->id)
-        ->and(Wallet::query()->where('user_id', $user->id)->exists())->toBeFalse()
-        ->and(PointLedger::query()->count())->toBe(0);
+        ->and(Wallet::query()->where('user_id', $user->id)->value('balance'))->toBe(3)
+        ->and(PointLedger::query()->pluck('type')->all())->toBe(['mission_reward']);
 });
 
 test('only one quick vote per Jakarta day is allowed and a new day restores it', function () {

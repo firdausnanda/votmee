@@ -24,7 +24,7 @@ class QuickVoteService
 
     private const CANDIDATE_POSTS = 300;
 
-    public function __construct(private FeedService $feed) {}
+    public function __construct(private FeedService $feed, private GamificationService $gamification) {}
 
     /** The quick vote day follows the Jakarta calendar, like the daily bonus. */
     public function today(): string
@@ -85,6 +85,8 @@ class QuickVoteService
         if ($event->ranking_entry_id !== $entry->id || $event->status !== 'valid') {
             throw ValidationException::withMessages(['ranking_entry_id' => __('votmee.quick_vote_done')]);
         }
+
+        $this->gamification->completeMission($user, 'quick_vote');
 
         return $this->present($duel, $event);
     }

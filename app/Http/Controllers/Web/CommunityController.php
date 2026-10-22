@@ -16,6 +16,7 @@ use App\Models\SavedRanking;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Services\FeedService;
+use App\Services\GamificationService;
 use App\Services\LeaderboardService;
 use App\Services\ObjectMatchingService;
 use App\Services\SeoService;
@@ -443,7 +444,7 @@ class CommunityController extends Controller
         ]);
     }
 
-    public function wallet(Request $request, LeaderboardService $leaderboard): Response
+    public function wallet(Request $request, LeaderboardService $leaderboard, GamificationService $gamification): Response
     {
         $flow = in_array($request->query('flow'), ['incoming', 'outgoing'], true) ? $request->query('flow') : 'all';
         $ledger = PointLedger::query()->where('user_id', $request->user()->id)->latest();
@@ -462,6 +463,8 @@ class CommunityController extends Controller
             'flow' => $flow,
             'ledger' => $ledger->paginate(20)->withQueryString(),
             'leaders' => $leaderboard->leaders(),
+            'streak' => $gamification->streak($request->user()),
+            'missions' => $gamification->missions($request->user()),
         ]);
     }
 

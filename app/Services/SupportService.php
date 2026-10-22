@@ -12,13 +12,15 @@ use Illuminate\Validation\ValidationException;
 
 class SupportService
 {
+    public function __construct(private GamificationService $gamification) {}
+
     public function claimDaily(User $user): PointLedger
     {
         $this->ensureEligible($user);
         $day = now('Asia/Jakarta')->toDateString();
 
         return DB::transaction(function () use ($user, $day): PointLedger {
-            $wallet = $this->lockedWallet($user);
+            $wallet = Wallet::lockedFor($user);
             $existing = PointLedger::query()->where('user_id', $user->id)->where('type', 'daily_bonus')->whereDate('claimed_on', $day)->first();
 
             if ($existing !== null) {
@@ -34,6 +36,7 @@ class SupportService
                 'claimed_on' => $day,
             ]);
             $wallet->increment('balance', 5);
+            $this->gamification->advanceStreak($wallet, $day);
 
             return $ledger;
         }, 3);
@@ -43,8 +46,8 @@ class SupportService
     {
         $this->ensureEligible($user);
 
-        return DB::transaction(function () use ($user, $entry, $amount, $idempotencyKey): SupportEvent {
-            $wallet = $this->lockedWallet($user);
+        $event = DB::transaction(function () use ($user, $entry, $amount, $idempotencyKey): SupportEvent {
+            $wallet = Wallet::lockedFor($user);
             $existing = PointLedger::query()->where('idempotency_key', $idempotencyKey)->first();
 
             if ($existing !== null) {
@@ -94,6 +97,10 @@ class SupportService
 
             return $event;
         }, 3);
+
+        $this->gamification->completeMission($user, 'support');
+
+        return $event;
     }
 
     public function reverse(SupportEvent $event): void
@@ -111,7 +118,7 @@ class SupportService
                 return;
             }
 
-            $wallet = $this->lockedWallet(User::findOrFail($event->user_id));
+            $wallet = Wallet::lockedFor(User::findOrFail($event->user_id));
 
             PointLedger::create([
                 'wallet_id' => $wallet->id,
@@ -124,13 +131,6 @@ class SupportService
             $wallet->increment('balance', $lockedEvent->amount);
             $lockedEvent->update(['status' => 'reversed']);
         }, 3);
-    }
-
-    private function lockedWallet(User $user): Wallet
-    {
-        Wallet::query()->insertOrIgnore(['user_id' => $user->id, 'balance' => 0, 'created_at' => now('UTC'), 'updated_at' => now('UTC')]);
-
-        return Wallet::query()->where('user_id', $user->id)->lockForUpdate()->firstOrFail();
     }
 
     private function ensureEligible(User $user): void

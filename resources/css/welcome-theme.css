@@ -10798,6 +10798,207 @@
     to { opacity: 1; transform: translateY(0); }
 }
 
+.vwl-progress {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 16px;
+    margin-top: 26px;
+}
+
+.vwl-streak,
+.vwl-missions {
+    display: flex;
+    flex-direction: column;
+    padding: 22px 24px 20px;
+    border: 1px solid #dbe3ed;
+    border-radius: 16px;
+    background: #fff;
+}
+
+.vwl-card-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.vwl-card-heading h2 {
+    margin: 0;
+    color: #0b2046;
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.vwl-card-heading span {
+    flex: none;
+    color: #516174;
+    font-size: 11.5px;
+    font-weight: 700;
+}
+
+.vwl-streak p,
+.vwl-missions > p {
+    margin: auto 0 0;
+    padding-top: 14px;
+    color: #64748b;
+    font-size: 11.5px;
+    line-height: 1.5;
+}
+
+.vwl-streak-count {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 16px 0 14px;
+}
+
+.vwl-streak-count strong {
+    color: #0b2046;
+    font-size: 38px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.05em;
+}
+
+.vwl-streak-count span {
+    color: #475569;
+    font-size: 12.5px;
+    font-weight: 700;
+}
+
+.vwl-streak-track {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.vwl-streak-track li {
+    display: grid;
+    place-items: center;
+    height: 34px;
+    border: 1px dashed #cad5e5;
+    border-radius: 8px;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 750;
+}
+
+.vwl-streak-track li.is-reward {
+    border-style: solid;
+    border-color: #fbbf24;
+    background: #fffbeb;
+    color: #92400e;
+}
+
+.vwl-streak-track li.is-done {
+    border: 1px solid #1044bb;
+    background: #1044bb;
+    color: #fff;
+}
+
+.vwl-streak-track li.is-reward.is-done {
+    border-color: #d97706;
+    background: #f59e0b;
+    color: #fff;
+}
+
+.vwl-mission-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 16px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.vwl-mission-list li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid #edf1f5;
+    border-radius: 10px;
+    background: #f8fafc;
+}
+
+.vwl-mission-check {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 50%;
+    background: #fff;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.vwl-mission-list li.is-done .vwl-mission-check {
+    border-color: #0b5e41;
+    background: #0b5e41;
+}
+
+.vwl-mission-info {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.vwl-mission-info strong {
+    color: #142647;
+    font-size: 12.5px;
+    font-weight: 750;
+}
+
+.vwl-mission-info span {
+    color: #64748b;
+    font-size: 11.5px;
+    line-height: 1.4;
+}
+
+.vwl-mission-list li.is-done .vwl-mission-info strong {
+    color: #475569;
+}
+
+.vwl-mission-points {
+    flex: none;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: #eaf1ff;
+    color: #1044bb;
+    font-size: 11.5px;
+    font-weight: 800;
+}
+
+.vwl-mission-list li.is-done .vwl-mission-points {
+    background: #e7f5ee;
+    color: #0b5e41;
+}
+
+@media (max-width: 720px) {
+    .vwl-progress {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .vwl-streak,
+    .vwl-missions {
+        padding: 20px 18px 18px;
+    }
+
+    .vwl-streak-track {
+        gap: 4px;
+    }
+}
+
 @media (max-width: 767px) {
     .vm-layout-wide-content .vwl-page {
         padding-inline: clamp(18px, 4.5vw, 28px);

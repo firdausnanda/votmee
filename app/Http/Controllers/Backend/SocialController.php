@@ -12,6 +12,7 @@ use App\Models\RankingPost;
 use App\Models\Report;
 use App\Models\User;
 use App\Services\CommentImageProcessor;
+use App\Services\GamificationService;
 use DateTimeImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -251,7 +252,7 @@ class SocialController extends Controller
         ]), 201);
     }
 
-    public function toggleCommentLike(Request $request, Comment $comment): JsonResponse
+    public function toggleCommentLike(Request $request, Comment $comment, GamificationService $gamification): JsonResponse
     {
         abort_unless($comment->status === 'visible', 404);
         abort_unless($request->user()->canParticipate(), 403);
@@ -274,6 +275,10 @@ class SocialController extends Controller
                 'user_id' => $request->user()->id,
             ]);
             $liked = true;
+
+            if ($comment->user_id !== $request->user()->id && $comment->user !== null) {
+                $gamification->completeMission($comment->user, 'comment_liked');
+            }
         }
 
         $likesCount = CommentLike::query()->where('comment_id', $comment->id)->count();
