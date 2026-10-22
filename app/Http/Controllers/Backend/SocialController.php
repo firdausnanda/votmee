@@ -284,6 +284,7 @@ class SocialController extends Controller
             if ($comment->user_id !== $request->user()->id && $comment->user !== null) {
                 $gamification->completeMission($comment->user, 'comment_liked');
                 $achievements->evaluate($comment->user, 'voice');
+                $achievements->evaluateComment($comment);
             }
         }
 

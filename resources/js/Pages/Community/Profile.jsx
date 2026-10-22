@@ -218,9 +218,74 @@ function ProfileImageEditor({ type, hasImage, locale, buttonClassName, label, sh
     </div>;
 }
 
-export default function Profile({ locale, categories = [], leaders = [], profile, rankings, achievements = [] }) {
+/** Lets moderators grant or revoke trusted contributor status, with a reason for the audit log. */
+function TrustControl({ locale, userId, trusted }) {
+    const isId = locale === 'id';
+    const [open, setOpen] = useState(false);
+    const [reason, setReason] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+
+    const submit = async (event) => {
+        event.preventDefault();
+        setBusy(true);
+        setError('');
+
+        try {
+            await api(`/admin/backend/users/${userId}/trust`, 'PATCH', { trusted: !trusted, reason });
+            setOpen(false);
+            setReason('');
+            router.reload({ only: ['trustedContributor'] });
+        } catch (requestError) {
+            setError(requestError.message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return <>
+        <button type="button" className="vac-trust-button" onClick={() => setOpen(true)}>
+            {trusted
+                ? (isId ? 'Cabut status tepercaya' : 'Revoke trusted status')
+                : (isId ? 'Jadikan kontributor tepercaya' : 'Make trusted contributor')}
+        </button>
+        <Dialog open={open} onClose={() => { if (!busy) setOpen(false); }} className="vt-report-overlay">
+            <DialogBackdrop transition className="vt-report-backdrop vpr-confirm-backdrop" />
+            <div className="vt-report-positioner">
+                <DialogPanel as="form" transition className="vt-report-dialog vpr-confirm-dialog" onSubmit={submit}>
+                    <div className="vt-report-header">
+                        <div>
+                            <DialogTitle className="vt-report-title">{trusted
+                                ? (isId ? 'Cabut status tepercaya?' : 'Revoke trusted status?')
+                                : (isId ? 'Jadikan kontributor tepercaya?' : 'Make trusted contributor?')}</DialogTitle>
+                            <p className="vt-report-intro">{trusted
+                                ? (isId ? 'Revisi berikutnya kembali masuk antrean review dan status ini tidak akan diberikan otomatis lagi.' : 'Their next revisions return to the review queue and this status will not be granted automatically again.')
+                                : (isId ? 'Revisi konten dari pengguna ini akan langsung tampil tanpa antrean review.' : 'Content revisions from this member will publish without waiting for review.')}</p>
+                        </div>
+                    </div>
+                    <div className="vac-trust-field">
+                        <label htmlFor="vac-trust-reason">{isId ? 'Alasan (dicatat di log audit)' : 'Reason (recorded in the audit log)'}</label>
+                        <textarea id="vac-trust-reason" value={reason} onChange={(event) => setReason(event.target.value)} minLength={5} maxLength={2000} required rows={3} />
+                        {error && <p className="vpr-image-error" role="alert">{error}</p>}
+                    </div>
+                    <div className="vt-report-footer">
+                        <div className="vt-report-actions">
+                            <button type="button" className="vt-report-cancel" onClick={() => setOpen(false)} disabled={busy}>{isId ? 'Batal' : 'Cancel'}</button>
+                            <button type="submit" className="vt-report-submit" disabled={busy || reason.trim().length < 5}>
+                                {busy ? (isId ? 'Menyimpan…' : 'Saving…') : (isId ? 'Simpan' : 'Save')}
+                            </button>
+                        </div>
+                    </div>
+                </DialogPanel>
+            </div>
+        </Dialog>
+    </>;
+}
+
+export default function Profile({ locale, categories = [], leaders = [], profile, rankings, achievements = [], hiddenAchievementsLocked = 0, trustedContributor = false }) {
     const t = dictionary(locale);
     const currentUser = usePage().props.auth?.user;
+    const canModerate = usePage().props.auth?.can?.moderate ?? false;
     const isOwnProfile = currentUser && currentUser.id === profile.id;
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -389,7 +454,12 @@ export default function Profile({ locale, categories = [], leaders = [], profile
                                     <span className="vpr-chip">
                                         {profile.locale?.toUpperCase() || 'ID'}
                                     </span>
+                                    {trustedContributor && <span className="vpr-chip vac-trusted-chip" title={locale === 'id' ? 'Revisi kontennya langsung tampil tanpa antrean review.' : 'Their content revisions publish without waiting for review.'}>
+                                        <NavIcon name="award" size={13} />
+                                        {locale === 'id' ? 'Kontributor Tepercaya' : 'Trusted Contributor'}
+                                    </span>}
                                 </div>
+                                {canModerate && !isOwnProfile && <TrustControl locale={locale} userId={profile.id} trusted={trustedContributor} />}
                                 {imageError && <p className="vpr-image-error" role="alert">{imageError}</p>}
                             </div>
                             <div className="vpr-inline-stats" aria-label={locale === 'id' ? 'Statistik Poin' : 'Point Statistics'}>
@@ -410,6 +480,7 @@ export default function Profile({ locale, categories = [], leaders = [], profile
 
                 {badges.length > 0 && <AchievementGallery
                     achievements={badges}
+                    hiddenLocked={hiddenAchievementsLocked}
                     locale={locale}
                     isOwn={Boolean(isOwnProfile)}
                     onFeature={featureBadges}

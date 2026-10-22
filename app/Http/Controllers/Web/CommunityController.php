@@ -21,6 +21,7 @@ use App\Services\GamificationService;
 use App\Services\LeaderboardService;
 use App\Services\ObjectMatchingService;
 use App\Services\SeoService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -429,6 +430,24 @@ class CommunityController extends Controller
             ],
             'rankings' => $rankings,
             'achievements' => $achievements->progress($user),
+            'hiddenAchievementsLocked' => $achievements->hiddenLockedCount($user),
+            'trustedContributor' => $user->trusted_at !== null,
+            'leaders' => $leaderboard->leaders(),
+        ]);
+    }
+
+    public function hallOfFame(Request $request, LeaderboardService $leaderboard, AchievementService $achievements): Response
+    {
+        $currentMonth = $achievements->currentMonth();
+        $months = collect(range(0, 11))->map(fn (int $offset): string => $currentMonth->subMonths($offset)->format('Y-m'));
+        $selected = $months->contains($request->query('month')) ? (string) $request->query('month') : $months->first();
+
+        return Inertia::render('Community/HallOfFame', [
+            ...$this->shared($request),
+            'month' => $selected,
+            'months' => $months->all(),
+            'board' => $achievements->hallOfFame(CarbonImmutable::createFromFormat('!Y-m', $selected, 'Asia/Jakarta')),
+            'thresholds' => config('gamification.seasonal'),
             'leaders' => $leaderboard->leaders(),
         ]);
     }

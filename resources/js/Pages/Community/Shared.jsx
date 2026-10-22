@@ -335,7 +335,7 @@ export function Layout({ locale, categories = [], leaders = [], children, active
     const compactLayout = useCompactLayout();
     const t = dictionary(locale);
     const showRankingPanel = active === 'home' || active === 'explore';
-    const useWideContent = ['create', 'wallet', 'profile', 'object', 'ranking', 'settings'].includes(active);
+    const useWideContent = ['create', 'wallet', 'profile', 'object', 'ranking', 'settings', 'hall-of-fame'].includes(active);
     const useFeedFrame = showRankingPanel || useWideContent;
     const user = usePage().props.auth?.user;
     const access = useCommunityAccess();
@@ -461,6 +461,7 @@ export function Layout({ locale, categories = [], leaders = [], children, active
                     <Link className={active === 'explore' ? 'active' : ''} href={path(locale, '/explore')}><NavIcon name="search" />{t.explore}</Link>
                     {access.createRanking && <Link className={active === 'create' ? 'active' : ''} href={path(locale, '/create')}><NavIcon name="plusCircle" />{t.create}</Link>}
                     {access.viewWallet && <Link className={active === 'wallet' ? 'active' : ''} href={path(locale, '/wallet')}><NavIcon name="wallet" />{t.wallet}</Link>}
+                    <Link className={active === 'hall-of-fame' ? 'active' : ''} href={path(locale, '/hall-of-fame')}><NavIcon name="trophy" />Hall of Fame</Link>
                     {user && <Link className={active === 'profile' ? 'active' : ''} href={path(locale, `/profile/${user.username}`)}><NavIcon name="user" />{t.profile}</Link>}
                 </nav>
                 <div className="vt-nav-section vm-side-categories">

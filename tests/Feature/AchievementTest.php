@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\UserAchievement;
 use App\Models\Wallet;
 use App\Services\AchievementService;
+use App\Services\GamificationService;
 use App\Services\ModerationService;
 use App\Services\SupportService;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -117,7 +118,7 @@ test('the profile lists every badge with progress', function () {
     app(AchievementService::class)->evaluate($user, 'curator');
 
     $this->get("/id/profile/{$user->username}")->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->has('achievements', 15)
+        ->has('achievements', 18)
         ->where('achievements.3.key', 'curator_bronze')
         ->where('achievements.3.current', 3)
         ->where('achievements.3.featured', false)
@@ -136,4 +137,107 @@ test('the backfill command unlocks earned badges without paying points', functio
 
     expect(achievementKeys($user))->toBe(['curator_bronze', 'streak_bronze', 'streak_silver'])
         ->and(achievementPoints($user))->toBe(0);
+});
+
+test('seasonal badges count only contributions within the current Jakarta month', function () {
+    $user = User::factory()->create();
+    MasterObject::factory()->count(2)->create(['submitted_by' => $user->id, 'verified_at' => now('UTC')->subMonths(2)]);
+    MasterObject::factory()->count(2)->create(['submitted_by' => $user->id]);
+    $achievements = app(AchievementService::class);
+    $seasonKey = 'season_'.now('Asia/Jakarta')->format('Y_m').'_curator';
+
+    expect($achievements->evaluate($user, 'curator'))->not->toContain($seasonKey);
+
+    MasterObject::factory()->create(['submitted_by' => $user->id]);
+
+    expect($achievements->evaluate($user, 'curator'))->toContain($seasonKey)
+        ->and(PointLedger::query()->where('idempotency_key', "achievement:{$user->id}:{$seasonKey}")->value('amount'))->toBe(10);
+});
+
+test('hidden badges unlock from a late night claim, a perfect mission day and a viral comment', function () {
+    config(['gamification.viral_comment_likes' => 2]);
+    $user = User::factory()->create();
+    $this->travelTo(now('Asia/Jakarta')->setTime(0, 30));
+    app(SupportService::class)->claimDaily($user);
+
+    $gamification = app(GamificationService::class);
+    foreach (array_keys(config('gamification.missions')) as $mission) {
+        $gamification->completeMission($user, $mission);
+    }
+
+    $comment = Comment::factory()->create(['user_id' => $user->id]);
+    foreach (User::factory()->count(2)->create() as $liker) {
+        $this->actingAs($liker)->postJson(route('backend.comments.like', $comment))->assertOk();
+    }
+
+    expect(achievementKeys($user))->toBe(['hidden_night_owl', 'hidden_perfect_day', 'hidden_viral_comment'])
+        ->and(app(AchievementService::class)->hiddenLockedCount($user))->toBe(0);
+});
+
+test('locked hidden badges stay out of the profile progress', function () {
+    $user = User::factory()->create();
+    app(AchievementService::class)->unlockHidden($user, 'night_owl');
+
+    $this->get("/id/profile/{$user->username}")->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->has('achievements', 19)
+        ->where('achievements.18.key', 'hidden_night_owl')
+        ->where('hiddenAchievementsLocked', 2));
+});
+
+test('the silver writer badge makes a trusted contributor whose revisions publish at once', function () {
+    $user = User::factory()->create();
+    $object = MasterObject::factory()->create();
+    ObjectContentRevision::factory()->count(25)->create(['object_id' => $object->id, 'author_id' => $user->id, 'status' => 'published']);
+    app(AchievementService::class)->evaluate($user, 'writer');
+
+    expect($user->refresh()->isTrustedContributor())->toBeTrue();
+
+    $this->actingAs($user)->postJson(route('backend.objects.summary.store', $object), [
+        'body' => str_repeat('A trusted summary with enough detail. ', 2),
+        'language_code' => 'id',
+        'sources' => ['https://example.com/source'],
+    ])->assertCreated()->assertJsonPath('status', 'published');
+
+    $untrusted = User::factory()->create();
+    $this->actingAs($untrusted)->postJson(route('backend.objects.summary.store', MasterObject::factory()->create()), [
+        'body' => str_repeat('An ordinary summary with enough detail. ', 2),
+        'language_code' => 'id',
+        'sources' => ['https://example.com/source'],
+    ])->assertCreated()->assertJsonPath('status', 'pending');
+});
+
+test('moderators revoke trust and a revoked member is not trusted again automatically', function () {
+    $moderator = User::factory()->moderator()->create();
+    $user = User::factory()->create(['trusted_at' => now('UTC')]);
+    UserAchievement::factory()->create(['user_id' => $user->id, 'achievement_key' => 'writer_silver']);
+
+    $this->actingAs(User::factory()->create())->patchJson(route('admin.backend.users.trust', $user), ['trusted' => false, 'reason' => 'Low quality edits.'])
+        ->assertForbidden();
+    $this->actingAs($moderator)->patchJson(route('admin.backend.users.trust', $user), ['trusted' => false, 'reason' => 'Low quality edits.'])
+        ->assertOk();
+    app(AchievementService::class)->evaluate($user->refresh(), 'writer');
+
+    expect($user->refresh()->trusted_at)->toBeNull()
+        ->and($user->trust_revoked_at)->not->toBeNull();
+
+    $this->patchJson(route('admin.backend.users.trust', $user), ['trusted' => true, 'reason' => 'Quality restored.'])->assertOk();
+    expect($user->refresh()->isTrustedContributor())->toBeTrue();
+});
+
+test('the hall of fame ranks contributors within the chosen month', function () {
+    $top = User::factory()->create();
+    $runnerUp = User::factory()->create();
+    MasterObject::factory()->count(3)->create(['submitted_by' => $top->id]);
+    MasterObject::factory()->create(['submitted_by' => $runnerUp->id]);
+    MasterObject::factory()->count(5)->create(['submitted_by' => $runnerUp->id, 'verified_at' => now('UTC')->subMonths(2)]);
+    $month = now('Asia/Jakarta')->format('Y-m');
+
+    $this->get("/id/hall-of-fame?month={$month}")->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('Community/HallOfFame')
+        ->where('month', $month)
+        ->where('board.curator.0.user.username', $top->username)
+        ->where('board.curator.0.count', 3)
+        ->where('board.curator.1.count', 1));
+
+    $this->get('/id/hall-of-fame?month=1999-01')->assertOk()->assertInertia(fn (Assert $page) => $page->where('month', $month));
 });

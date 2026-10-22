@@ -16313,3 +16313,250 @@
         animation: none;
     }
 }
+
+.vac-category-note {
+    margin: -4px 0 10px;
+    color: #64748b;
+    font-size: 11.5px;
+}
+
+.vac-card.is-mystery strong {
+    color: #94a3b8;
+    letter-spacing: 0.12em;
+}
+
+.vac-trusted-chip {
+    border-color: #99f6e4;
+    background: #f0fdfa;
+    color: #115e59;
+    font-weight: 750;
+}
+
+.vac-trust-button {
+    margin-top: 10px;
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    color: #334155;
+    font-size: 11.5px;
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.vac-trust-button:hover {
+    background: #f8fafc;
+}
+
+.vac-trust-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 18px 28px 14px;
+}
+
+.vac-trust-field label {
+    color: #334155;
+    font-size: 12px;
+    font-weight: 750;
+}
+
+.vac-trust-field textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 9px;
+    font: inherit;
+    font-size: 13px;
+    resize: vertical;
+}
+
+/* Hall of fame */
+.vhf-page {
+    width: min(100%, 960px);
+    padding-bottom: 48px;
+}
+
+.vhf-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+.vhf-kicker {
+    margin: 0 0 6px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.vhf-header h1 {
+    margin: 0;
+    color: #0b2046;
+    font-size: clamp(28px, 3.5vw, 38px);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+}
+
+.vhf-header p:not(.vhf-kicker) {
+    max-width: 52ch;
+    margin: 8px 0 0;
+    color: #475569;
+    font-size: 13.5px;
+    line-height: 1.55;
+}
+
+.vhf-month {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 5px;
+    color: #475569;
+    font-size: 11.5px;
+    font-weight: 750;
+}
+
+.vhf-month select {
+    min-height: 40px;
+    padding: 0 34px 0 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 9px;
+    background-color: #fff;
+    color: #0b2046;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.vhf-boards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.vhf-board {
+    padding: 20px;
+    border: 1px solid #dbe3ed;
+    border-radius: 16px;
+    background: #fff;
+}
+
+.vhf-board > header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.vhf-board h2 {
+    margin: 0;
+    color: #0b2046;
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.vhf-board header p {
+    margin: 4px 0 0;
+    color: #64748b;
+    font-size: 11.5px;
+    line-height: 1.45;
+}
+
+.vhf-board ol {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.vhf-board li {
+    display: grid;
+    grid-template-columns: 22px 30px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    min-height: 44px;
+    padding: 6px 8px;
+    border-radius: 10px;
+}
+
+.vhf-board li.is-top {
+    background: #f8fafc;
+}
+
+.vhf-rank {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 800;
+    text-align: center;
+}
+
+.vhf-board li.is-top-1 .vhf-rank { color: #b45309; }
+.vhf-board li.is-top-2 .vhf-rank { color: #64748b; }
+.vhf-board li.is-top-3 .vhf-rank { color: #9a3412; }
+
+.vhf-avatar {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    overflow: hidden;
+    border-radius: 50%;
+    background: #1044bb;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.vhf-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.vhf-board li a {
+    overflow: hidden;
+    color: #142647;
+    font-size: 13px;
+    font-weight: 750;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vhf-board li a:hover {
+    color: #1044bb;
+    text-decoration: underline;
+}
+
+.vhf-count {
+    color: #0b2046;
+    font-size: 13px;
+    font-weight: 800;
+    text-align: right;
+}
+
+.vhf-empty {
+    margin: 0;
+    padding: 18px 8px;
+    color: #64748b;
+    font-size: 12.5px;
+    text-align: center;
+}
+
+@media (max-width: 900px) {
+    .vhf-boards {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .vhf-header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}

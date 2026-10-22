@@ -12,6 +12,8 @@ use InvalidArgumentException;
 
 class GamificationService
 {
+    public function __construct(private AchievementService $achievements) {}
+
     /** Streaks and missions follow the Jakarta calendar, like the daily bonus. */
     public function today(): string
     {
@@ -74,7 +76,7 @@ class GamificationService
 
         $day = $this->today();
 
-        return DB::transaction(function () use ($user, $mission, $points, $day): ?PointLedger {
+        $ledger = DB::transaction(function () use ($user, $mission, $points, $day): ?PointLedger {
             $wallet = Wallet::lockedFor($user);
             $rewards = $this->missionRewards($user, $day);
             $key = $this->missionKey($user, $mission, $day);
@@ -100,6 +102,12 @@ class GamificationService
 
             return $ledger;
         }, 3);
+
+        if ($ledger !== null && $this->missionRewards($user, $day)->count() === count(config('gamification.missions'))) {
+            $this->achievements->unlockHidden($user, 'perfect_day');
+        }
+
+        return $ledger;
     }
 
     /**

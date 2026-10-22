@@ -30,6 +30,7 @@ class MasterObjectFactory extends Factory
             'slug' => Str::slug($name).'-'.Str::lower((string) Str::ulid()),
             'identity_attributes' => [],
             'status' => 'verified',
+            'verified_at' => fn (array $attributes) => in_array($attributes['status'], ['verified', 'merged'], true) ? now('UTC') : null,
         ];
     }
 

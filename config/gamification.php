@@ -60,4 +60,54 @@ return [
         'gold' => 20,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Seasonal Achievements
+    |--------------------------------------------------------------------------
+    |
+    | One badge per category each Jakarta month, earned by reaching the count
+    | within that month only. Keys read "season_{YYYY}_{MM}_{category}".
+    |
+    */
+
+    'seasonal' => [
+        'curator' => 3,
+        'writer' => 5,
+        'voice' => 20,
+    ],
+
+    'seasonal_points' => 10,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Hidden Achievements
+    |--------------------------------------------------------------------------
+    |
+    | Surprise badges that stay out of view until unlocked, with the points
+    | each one pays. Keys read "hidden_{name}".
+    |
+    */
+
+    'hidden' => [
+        'viral_comment' => 15,
+        'perfect_day' => 15,
+        'night_owl' => 15,
+    ],
+
+    'viral_comment_likes' => 100,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Trusted Contributor
+    |--------------------------------------------------------------------------
+    |
+    | Unlocking this badge makes a member a trusted contributor, whose content
+    | revisions publish without review, unless a moderator revoked it before.
+    |
+    */
+
+    'trusted_badge' => 'writer_silver',
+
+    'hall_of_fame_size' => 10,
+
 ];

@@ -37,7 +37,7 @@ class ModerationService
                 ]);
                 $publishedSummaryAuthorId = $status === 'verified' ? $pendingSummary->author_id : null;
             }
-            $updates = ['status' => $status, 'verified_by' => $status === 'verified' ? $actor->id : null];
+            $updates = ['status' => $status, 'verified_by' => $status === 'verified' ? $actor->id : null, 'verified_at' => $status === 'verified' ? now('UTC') : null];
             if ($status === 'verified' && $object->pending_image_path) {
                 $updates['image_path'] = $object->pending_image_path;
                 $updates['pending_image_path'] = null;
@@ -117,6 +117,27 @@ class ModerationService
         if ($status === 'published') {
             $this->evaluateFor($revision->author_id, 'writer');
         }
+    }
+
+    /** Publish a trusted contributor's new revision at once, leaving others in the review queue. */
+    public function publishTrustedRevision(User $author, ObjectContentRevision $revision): ObjectContentRevision
+    {
+        if ($author->isTrustedContributor() && $revision->status === 'pending') {
+            $this->reviewContentRevision($author, $revision, 'published', 'Published automatically for a trusted contributor.');
+        }
+
+        return $revision->refresh();
+    }
+
+    /** Grant or revoke trusted contributor status. A revocation also stops it being granted automatically again. */
+    public function setTrust(User $actor, User $user, bool $trusted, string $reason): void
+    {
+        DB::transaction(function () use ($actor, $user, $trusted, $reason): void {
+            $user->forceFill($trusted
+                ? ['trusted_at' => now('UTC'), 'trust_revoked_at' => null]
+                : ['trusted_at' => null, 'trust_revoked_at' => now('UTC')])->save();
+            $this->audit($actor, $trusted ? 'user.trust.grant' : 'user.trust.revoke', 'user', (string) $user->id, ['reason' => $reason]);
+        });
     }
 
     public function hideArticle(User $actor, ObjectArticle $article, string $reason): void

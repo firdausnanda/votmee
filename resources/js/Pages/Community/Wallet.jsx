@@ -74,6 +74,7 @@ export default function Wallet({ locale, categories, leaders, balance, claimedTo
         reversal: isId ? 'Pengembalian poin' : 'Points returned',
         streak_bonus: isId ? 'Bonus streak' : 'Streak bonus',
         mission_reward: isId ? 'Hadiah misi harian' : 'Daily mission reward',
+        achievement: isId ? 'Hadiah badge' : 'Badge reward',
     })[type] ?? type.replace(/_/g, ' ');
     const missionCopy = {
         quick_vote: isId

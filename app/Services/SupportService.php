@@ -43,6 +43,10 @@ class SupportService
 
         if ($ledger->wasRecentlyCreated) {
             $this->achievements->evaluate($user, 'streak');
+
+            if (now('Asia/Jakarta')->hour === 0) {
+                $this->achievements->unlockHidden($user, 'night_owl');
+            }
         }
 
         return $ledger;

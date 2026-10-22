@@ -95,7 +95,7 @@ test('daily bonus follows Jakarta calendar and remains idempotent', function () 
     $this->actingAs($user)->postJson(route('backend.wallet.claim'))->assertOk()->assertJsonPath('balance', 5);
     expect(PointLedger::query()->where('user_id', $user->id)->count())->toBe(1);
 
-    $this->travelTo(CarbonImmutable::parse('2026-10-18 00:01:00', 'Asia/Jakarta')->utc());
+    $this->travelTo(CarbonImmutable::parse('2026-10-18 01:00:00', 'Asia/Jakarta')->utc());
     $this->actingAs($user)->postJson(route('backend.wallet.claim'))->assertOk()->assertJsonPath('balance', 10);
     expect(PointLedger::query()->where('user_id', $user->id)->count())->toBe(2);
 });
