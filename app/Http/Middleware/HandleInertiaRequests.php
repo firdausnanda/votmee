@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Services\AchievementService;
+use App\Services\MessagingService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
@@ -60,6 +61,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'walletBalance' => fn (): ?int => $user ? (int) ($user->wallet()->value('balance') ?? 0) : null,
             'unreadNotifications' => fn (): ?int => $user?->unreadNotifications()->count(),
+            'unreadMessages' => fn (): ?int => $user ? app(MessagingService::class)->unreadCount($user) + app(MessagingService::class)->pendingRequestCount($user) : null,
             'unseenAchievements' => fn (): array => $user ? app(AchievementService::class)->unseen($user) : [],
         ];
     }

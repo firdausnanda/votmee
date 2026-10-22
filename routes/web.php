@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\Auth\GoogleLoginController;
 use App\Http\Controllers\Backend\AchievementController;
+use App\Http\Controllers\Backend\BlockController;
 use App\Http\Controllers\Backend\CategoryController;
 use App\Http\Controllers\Backend\ContentImageController;
 use App\Http\Controllers\Backend\LeaderboardController;
+use App\Http\Controllers\Backend\MessageController;
 use App\Http\Controllers\Backend\ModerationController;
 use App\Http\Controllers\Backend\NotificationController;
 use App\Http\Controllers\Backend\ObjectContentController;
@@ -56,6 +58,7 @@ Route::prefix('{locale}')->where(['locale' => 'id|en'])->middleware(SetRequestLo
         Route::get('/wallet', [CommunityController::class, 'wallet'])->name('wallet');
         Route::get('/saved', [CommunityController::class, 'saved'])->name('saved');
         Route::get('/notifications', [CommunityController::class, 'notifications'])->name('notifications');
+        Route::get('/messages/{conversation?}', [CommunityController::class, 'messages'])->whereNumber('conversation')->name('messages');
     });
 });
 
@@ -120,6 +123,15 @@ Route::prefix('backend')->middleware(SetRequestLocale::class)->name('backend.')-
         Route::delete('rankings/{post}/save', [SavedRankingController::class, 'destroy'])->name('rankings.unsave');
         Route::post('saved-rankings/sync', [SavedRankingController::class, 'sync'])->name('saved-rankings.sync');
         Route::post('reports', [SocialController::class, 'report'])->name('reports.store');
+        Route::get('messages/conversations', [MessageController::class, 'index'])->name('messages.index');
+        Route::post('messages/conversations', [MessageController::class, 'start'])->name('messages.start')->middleware(['throttle:message-requests', 'throttle:messages']);
+        Route::get('messages/conversations/{conversation}', [MessageController::class, 'show'])->name('messages.show');
+        Route::post('messages/conversations/{conversation}/messages', [MessageController::class, 'store'])->name('messages.store')->middleware('throttle:messages');
+        Route::patch('messages/conversations/{conversation}/accept', [MessageController::class, 'accept'])->name('messages.accept');
+        Route::patch('messages/conversations/{conversation}/decline', [MessageController::class, 'decline'])->name('messages.decline');
+        Route::patch('messages/conversations/{conversation}/read', [MessageController::class, 'read'])->name('messages.read');
+        Route::post('users/{user}/block', [BlockController::class, 'store'])->name('users.block');
+        Route::delete('users/{user}/block', [BlockController::class, 'destroy'])->name('users.unblock');
     });
 });
 
@@ -131,6 +143,7 @@ Route::prefix('admin/backend')->middleware(['auth', SetRequestLocale::class, 'ca
     Route::put('objects/{object}/translations', [ModerationController::class, 'setTranslation'])->name('objects.translations.store');
     Route::patch('rankings/{post}/hide', [ModerationController::class, 'hidePost'])->name('rankings.hide');
     Route::patch('comments/{comment}/hide', [ModerationController::class, 'hideComment'])->name('comments.hide');
+    Route::patch('messages/{message}/hide', [ModerationController::class, 'hideMessage'])->name('messages.hide');
     Route::patch('content-revisions/{revision}', [ObjectContentController::class, 'review'])->name('content-revisions.review');
     Route::patch('articles/{article}/hide', [ObjectContentController::class, 'hideArticle'])->name('articles.hide');
     Route::patch('reports/{report}', [ModerationController::class, 'resolveReport'])->name('reports.resolve');

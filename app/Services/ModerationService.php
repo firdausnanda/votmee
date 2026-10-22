@@ -4,11 +4,13 @@ namespace App\Services;
 
 use App\Models\Comment;
 use App\Models\MasterObject;
+use App\Models\Message;
 use App\Models\ObjectArticle;
 use App\Models\ObjectContentRevision;
 use App\Models\RankingPost;
 use App\Models\Report;
 use App\Models\User;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -215,6 +217,31 @@ class ModerationService
             $comment->update(['status' => 'hidden']);
             $this->audit($actor, 'comment.hide', 'comment', (string) $comment->id, ['reason' => $reason]);
         });
+    }
+
+    public function hideMessage(User $actor, Message $message, string $reason): void
+    {
+        DB::transaction(function () use ($actor, $message, $reason): void {
+            $message->update(['status' => 'hidden']);
+            $this->audit($actor, 'message.hide', 'message', (string) $message->id, ['reason' => $reason]);
+        });
+    }
+
+    /**
+     * Moderators read a private message only once it is reported, so the report carries its text.
+     *
+     * @param  LengthAwarePaginator<int, Report>  $reports
+     * @return LengthAwarePaginator<int, Report>
+     */
+    public function withReportedMessages(LengthAwarePaginator $reports): LengthAwarePaginator
+    {
+        $messages = Message::query()->with('user:id,name,username')
+            ->whereIn('id', $reports->getCollection()->where('target_type', 'message')->pluck('target_id'))
+            ->get()->keyBy('id');
+
+        return $reports->through(fn (Report $report): Report => $report->target_type === 'message'
+            ? $report->setAttribute('message', $messages->get((int) $report->target_id)?->only('id', 'body', 'status', 'user', 'created_at'))
+            : $report);
     }
 
     public function resolveReport(User $actor, Report $report, string $status, string $reason): void

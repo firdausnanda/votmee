@@ -92,7 +92,7 @@ const COIN_BURST = Array.from({ length: 12 }, (_, index) => {
     return { x: Math.round(Math.cos(angle) * distance), y: Math.round(Math.sin(angle) * distance - 30), delay: (index % 4) * 40 };
 });
 
-export default function Wallet({ locale, categories, leaders, balance, claimedToday, flow, ledger, streak, missions, summary }) {
+export default function Wallet({ locale, categories, leaders, balance, claimedToday, flow, ledger, streak, missions }) {
     const t = dictionary(locale);
     const isId = locale === 'id';
     const query = new URLSearchParams(usePage().url.split('?')[1] ?? '');
@@ -158,7 +158,7 @@ export default function Wallet({ locale, categories, leaders, balance, claimedTo
                         ? (isId ? `5 poin plus bonus streak ${result.streak_bonus} poin sudah masuk ke dompet Anda.` : `5 points plus a ${result.streak_bonus}-point streak bonus were added to your wallet.`)
                         : (isId ? '5 poin sudah masuk ke dompet Anda.' : '5 points were added to your wallet.'),
             });
-            router.reload({ only: ['balance', 'claimedToday', 'ledger', 'streak', 'missions', 'summary', 'walletBalance'] });
+            router.reload({ only: ['balance', 'claimedToday', 'ledger', 'streak', 'missions', 'walletBalance'] });
         } catch (error) {
             setAlert({
                 type: 'error',
@@ -221,12 +221,6 @@ export default function Wallet({ locale, categories, leaders, balance, claimedTo
 
         return path(locale, '/wallet') + (search ? `?${search}` : '');
     };
-    const stats = [
-        { key: 'month', label: isId ? 'Masuk bulan ini' : 'Received this month', value: summary.earned_this_month, tone: 'is-incoming' },
-        { key: 'earned', label: isId ? 'Total diterima' : 'Total received', value: summary.earned, tone: 'is-incoming' },
-        { key: 'spent', label: isId ? 'Total dipakai mendukung' : 'Total spent on support', value: summary.spent, tone: 'is-outgoing' },
-    ];
-
     return (
         <Layout locale={locale} categories={categories} leaders={leaders} active="wallet">
             <PageHead title={t.wallet} locale={locale} />
@@ -235,6 +229,20 @@ export default function Wallet({ locale, categories, leaders, balance, claimedTo
                     <p className="vwl-kicker">{t.community} / {t.wallet}</p>
                     <h1>{t.wallet}</h1>
                     <p>{isId ? 'Jaga streak harian, selesaikan misi, dan kumpulkan poin untuk mendukung pilihan Anda.' : 'Keep your daily streak, complete missions, and earn points to support your choices.'}</p>
+                    <section className="vwl-balance-card" aria-label={t.balance}>
+                        <div className="vwl-balance-main">
+                            <span className="vwl-balance-symbol" aria-hidden="true"><CoinIcon /></span>
+                            <div>
+                                <span className="vwl-balance-label">{t.balance}</span>
+                                <div className="vwl-balance-amount">
+                                    <strong aria-live="polite">{numberLabel(animatedBalance, locale)}</strong>
+                                    <span>{t.points}</span>
+                                    {gain > 0 && <span className="vwl-gain" aria-hidden="true">+{gain}</span>}
+                                </div>
+                            </div>
+                        </div>
+                        <Link className="vwl-explore-link" href={path(locale, '/explore')}>{isId ? 'Lihat ranking' : 'See rankings'} <span aria-hidden="true">↗</span></Link>
+                    </section>
                 </header>
 
                 {alert && <div className={'vwl-alert is-' + alert.type} role={alert.type === 'error' ? 'alert' : 'status'}>
@@ -331,29 +339,6 @@ export default function Wallet({ locale, categories, leaders, balance, claimedTo
                         <p>{isId ? `Misi diatur ulang dalam ${hours}:${minutes}:${seconds}.` : `Missions reset in ${hours}:${minutes}:${seconds}.`}</p>
                     </section>
                 </div>
-
-                <section className="vwl-balance-card" aria-label={t.balance}>
-                    <div className="vwl-balance-main">
-                        <span className="vwl-balance-symbol" aria-hidden="true"><CoinIcon /></span>
-                        <div>
-                            <span className="vwl-balance-label">{t.balance}</span>
-                            <div className="vwl-balance-amount">
-                                <strong aria-live="polite">{numberLabel(animatedBalance, locale)}</strong>
-                                <span>{t.points}</span>
-                                {gain > 0 && <span className="vwl-gain" aria-hidden="true">+{gain}</span>}
-                            </div>
-                        </div>
-                    </div>
-                    <p>{isId ? 'Gunakan poin untuk mendukung kandidat pilihan Anda.' : 'Use points to support your favorite candidates.'}</p>
-                    <Link className="vwl-explore-link" href={path(locale, '/explore')}>{isId ? 'Lihat ranking' : 'See rankings'} <span aria-hidden="true">↗</span></Link>
-                </section>
-
-                <ul className="vwl-stats" aria-label={isId ? 'Ringkasan poin' : 'Point summary'}>
-                    {stats.map((stat) => <li key={stat.key} className={stat.tone}>
-                        <span>{stat.label}</span>
-                        <strong>{numberLabel(stat.value, locale)} <small>{t.points}</small></strong>
-                    </li>)}
-                </ul>
 
                 <section className="vwl-history" aria-labelledby="vwl-history-heading">
                     <header className="vwl-history-header">

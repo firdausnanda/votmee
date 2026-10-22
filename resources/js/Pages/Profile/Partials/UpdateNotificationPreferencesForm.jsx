@@ -10,6 +10,10 @@ const groups = {
         id: ['Suka', 'Seseorang menyukai komentar Anda.'],
         en: ['Likes', 'Someone likes your comment.'],
     },
+    messages: {
+        id: ['Permintaan pesan', 'Seseorang mengirim pesan pribadi pertama kepada Anda.'],
+        en: ['Message requests', 'Someone sends you a first private message.'],
+    },
     badges: {
         id: ['Lencana & status', 'Lencana baru terbuka atau Anda menjadi kontributor tepercaya.'],
         en: ['Badges & status', 'You unlock a badge or become a trusted contributor.'],

@@ -25,4 +25,5 @@ return [
     'content_image_invalid' => 'One of the images is unavailable. Remove it and upload it again.',
     'content_image_limit' => 'Use at most :max images in one text.',
     'image_too_large' => 'The image is too large. Use an image of at most 8000 px per side and 24 megapixels.',
+    'message_request_pending' => 'Wait until your message request is accepted before sending more.',
 ];

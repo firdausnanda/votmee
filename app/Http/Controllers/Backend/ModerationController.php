@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Backend;
 use App\Http\Controllers\Controller;
 use App\Models\Comment;
 use App\Models\MasterObject;
+use App\Models\Message;
 use App\Models\ObjectAlias;
 use App\Models\ObjectContentRevision;
 use App\Models\PointLedger;
@@ -22,14 +23,14 @@ use Illuminate\Validation\ValidationException;
 
 class ModerationController extends Controller
 {
-    public function queue(): JsonResponse
+    public function queue(ModerationService $moderation): JsonResponse
     {
         return response()->json([
             'objects' => MasterObject::query()->where(fn ($query) => $query->whereIn('status', ['pending', 'needs_revision'])
                 ->orWhere(fn ($images) => $images->where('status', 'verified')->whereNotNull('pending_image_path')))->oldest()->paginate(20),
             'content' => ObjectContentRevision::query()->where('status', 'pending')->whereHas('object', fn ($query) => $query->where('status', 'verified'))
                 ->with(['author:id,name,username', 'article:id,type', 'object:id,canonical_name,slug'])->oldest()->paginate(20),
-            'reports' => Report::query()->where('status', 'open')->oldest()->paginate(20),
+            'reports' => $moderation->withReportedMessages(Report::query()->where('status', 'open')->oldest()->paginate(20)),
         ]);
     }
 
@@ -115,6 +116,14 @@ class ModerationController extends Controller
         $moderation->hideComment($request->user(), $comment, $data['reason']);
 
         return response()->json($comment->refresh());
+    }
+
+    public function hideMessage(Request $request, Message $message, ModerationService $moderation): JsonResponse
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'min:5', 'max:2000']]);
+        $moderation->hideMessage($request->user(), $message, $data['reason']);
+
+        return response()->json($message->refresh());
     }
 
     public function auditLogs(Request $request): JsonResponse

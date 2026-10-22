@@ -49,6 +49,8 @@ export function notificationText(notification, locale) {
             return isId ? `Laporan Anda ${status}` : `Your report was ${status}`;
         case 'streak_reminder':
             return isId ? `Streak ${numberLabel(data.days, locale)} harianmu hampir putus. Klaim bonus hari ini!` : `Your ${numberLabel(data.days, locale)}-day streak is about to break. Claim today's bonus!`;
+        case 'message_request':
+            return isId ? `${actor} ingin mengirim pesan kepada Anda` : `${actor} wants to message you`;
         case 'trust_granted':
             return isId ? 'Anda kini menjadi kontributor tepercaya' : 'You are now a trusted contributor';
         default:
@@ -224,7 +226,7 @@ export function NotificationToasts({ locale }) {
 
 /** Cadangan saat WebSocket tidak tersambung: ambil jumlah belum dibaca dari server secara berkala. */
 export function NotificationPoll({ interval }) {
-    usePoll(interval, { only: ['unreadNotifications'] });
+    usePoll(interval, { only: ['unreadNotifications', 'unreadMessages'] });
 
     return null;
 }

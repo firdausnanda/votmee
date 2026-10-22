@@ -6,7 +6,7 @@ import ProfileDropdown from '../../Components/ProfileDropdown';
 import AuthModal from '../../Components/AuthModal';
 import { AchievementBadge, achievementName } from './Achievements';
 import { NotificationBell, NotificationPoll, NotificationToasts } from './Notifications';
-import { useNotificationFeed, useNotificationFeedLifecycle } from '../../Components/notificationFeed';
+import { useNotificationFeed, useNotificationFeedLifecycle, useUnreadMessages } from '../../Components/notificationFeed';
 import id from '../../i18n/id.json';
 import en from '../../i18n/en.json';
 
@@ -344,9 +344,9 @@ function useSyncLocalSavedRankings(user) {
     }, [user?.id]);
 }
 
-function WalletBalanceLink({ locale, balance, compact = false }) {
+function WalletBalanceLink({ locale, balance }) {
     return <Link
-        className={'vm-wallet-balance-link' + (compact ? ' is-compact' : '')}
+        className="vm-wallet-balance-link"
         href={path(locale, '/wallet')}
         aria-label={locale === 'id' ? `Saldo ${numberLabel(balance, locale)} poin. Buka dompet poin.` : `${numberLabel(balance, locale)} points available. Open point wallet.`}
     >
@@ -356,17 +356,34 @@ function WalletBalanceLink({ locale, balance, compact = false }) {
     </Link>;
 }
 
+/** Header shortcut to private messages; the badge counts unread threads and pending requests. */
+function MessagesLink({ locale, active, count }) {
+    const isId = locale === 'id';
+
+    return <div className="vm-notification-wrap">
+        <Link
+            href={path(locale, '/messages')}
+            className={'vm-notification-trigger' + (active ? ' is-open' : '')}
+            aria-label={isId ? `Pesan, ${count} belum dibaca` : `Messages, ${count} unread`}
+        >
+            <NavIcon name="mail" size={20} />
+            {count > 0 && <span key={count} className="vm-notification-badge">{count > 99 ? '99+' : count}</span>}
+        </Link>
+    </div>;
+}
+
 export function Layout({ locale, categories = [], leaders = [], children, active = '', searchPosts = [], loginModal = false, registerModal = false, recentComments: propRecentComments }) {
     const compactLayout = useCompactLayout();
     const t = dictionary(locale);
     const showRankingPanel = active === 'home' || active === 'explore';
-    const useWideContent = ['create', 'wallet', 'profile', 'object', 'ranking', 'settings', 'hall-of-fame', 'notifications'].includes(active);
+    const useWideContent = ['create', 'wallet', 'profile', 'object', 'ranking', 'settings', 'hall-of-fame', 'notifications', 'messages'].includes(active);
     const useFeedFrame = showRankingPanel || useWideContent;
     const user = usePage().props.auth?.user;
     const access = useCommunityAccess();
     useSyncLocalSavedRankings(user);
     useNotificationFeedLifecycle(user?.id, active !== 'notifications');
     const { connected: notificationsConnected } = useNotificationFeed();
+    const unreadMessages = useUnreadMessages();
     const pageUrl = usePage().url;
     const seo = usePage().props.seo;
     const contentHasOneLanguage = seo?.robots === 'index, follow'
@@ -375,6 +392,7 @@ export function Layout({ locale, categories = [], leaders = [], children, active
     const availableLanguages = contentHasOneLanguage ? [locale] : ['id', 'en'];
     const [query, setQuery] = useState(() => new URLSearchParams(pageUrl.split('?')[1] ?? '').get('q') ?? '');
     const [menuOpen, setMenuOpen] = useState(false);
+    const menuButtonRef = useRef(null);
     const [searchOpen, setSearchOpen] = useState(false);
     const [authMode, setAuthMode] = useState(registerModal ? 'register' : loginModal ? 'login' : null);
     const { loginStatus, googleAuthError, recentComments: pageRecentComments = [], walletBalance } = usePage().props;
@@ -428,6 +446,19 @@ export function Layout({ locale, categories = [], leaders = [], children, active
     }, [locale]);
     useEffect(() => { localStorage.setItem('votmee.locale', locale); }, [locale]);
     useEffect(() => {
+        if (!menuOpen) return undefined;
+
+        const closeOnEscape = (event) => {
+            if (event.key !== 'Escape') return;
+            setMenuOpen(false);
+            menuButtonRef.current?.focus();
+        };
+
+        document.addEventListener('keydown', closeOnEscape);
+
+        return () => document.removeEventListener('keydown', closeOnEscape);
+    }, [menuOpen]);
+    useEffect(() => {
         const open = () => setAuthMode('login');
         window.addEventListener('votmee:open-login', open);
         return () => window.removeEventListener('votmee:open-login', open);
@@ -474,26 +505,28 @@ export function Layout({ locale, categories = [], leaders = [], children, active
                 <div className="vt-header-actions vm-header-right">
                     {user && <WalletBalanceLink locale={locale} balance={walletBalance ?? 0} />}
                     <LanguageSelect language={locale} availableLanguages={availableLanguages} onChange={(next) => router.visit(switchLocale(next))} />
+                    {user && <MessagesLink locale={locale} active={active === 'messages'} count={unreadMessages} />}
                     {user && <NotificationBell locale={locale} />}
                     {user ? <ProfileDropdown user={user} locale={locale} canModerate={access.moderate} />
                         : <><button type="button" className="vt-login" onClick={() => setAuthMode('login')}>{t.login}</button><button type="button" className="vt-register" onClick={() => setAuthMode('register')}>{locale === 'id' ? 'Daftar' : 'Sign up'}</button></>}
                 </div>
                 <div className="vm-mobile-header-actions">
-                    {user && <WalletBalanceLink locale={locale} balance={walletBalance ?? 0} compact />}
-                    {user && <NotificationBell locale={locale} compact />}
                     <button type="button" aria-label={t.searchAction} aria-expanded={searchOpen} onClick={() => setSearchOpen(!searchOpen)}><NavIcon name="search" size={21} /></button>
-                    <button type="button" aria-label={t.menu} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}><NavIcon name="menu" size={23} /></button>
+                    {user && <NotificationBell locale={locale} compact />}
+                    <button ref={menuButtonRef} type="button" aria-label={menuOpen ? (locale === 'id' ? 'Tutup menu' : 'Close menu') : t.menu} aria-expanded={menuOpen} aria-controls="community-mobile-menu" onClick={() => setMenuOpen(!menuOpen)}><NavIcon name={menuOpen ? 'x' : 'menu'} size={23} /></button>
                 </div>
             </div>
             {searchOpen && <div className="vm-mobile-search-wrapper"><SearchMenu {...searchMenuProps} isMobile autoFocus onClose={() => setSearchOpen(false)} /></div>}
         </header>
+        <button type="button" className={`vt-mobile-menu-backdrop${menuOpen ? ' is-open' : ''}`} aria-label={locale === 'id' ? 'Tutup menu' : 'Close menu'} tabIndex={menuOpen ? 0 : -1} onClick={() => { setMenuOpen(false); menuButtonRef.current?.focus(); }} />
         <div className={`vt-shell vm-shell vm-layout vm-layout-2col${useFeedFrame ? ' vm-layout-3col' : ''}${useWideContent ? ' vm-layout-wide-content' : ''}`}>
-            <aside className={`vt-left vm-sidebar ${menuOpen ? 'vt-left-open' : ''}`} aria-label={t.menu}>
+            <aside id="community-mobile-menu" className={`vt-left vm-sidebar ${menuOpen ? 'vt-left-open' : ''}`} aria-label={t.menu} onClick={(event) => { if (event.target.closest('a')) setMenuOpen(false); }}>
                 <nav className="vt-main-nav vm-side-nav">
                     <Link className={active === 'home' ? 'active' : ''} href={path(locale)}><NavIcon name="home" />{t.home}</Link>
                     <Link className={active === 'explore' ? 'active' : ''} href={path(locale, '/explore')}><NavIcon name="search" />{t.explore}</Link>
                     {access.createRanking && <Link className={active === 'create' ? 'active' : ''} href={path(locale, '/create')}><NavIcon name="plusCircle" />{t.create}</Link>}
                     {access.viewWallet && <Link className={active === 'wallet' ? 'active' : ''} href={path(locale, '/wallet')}><NavIcon name="wallet" />{t.wallet}</Link>}
+                    {user && <Link className={`vt-mobile-messages-link${active === 'messages' ? ' active' : ''}`} href={path(locale, '/messages')} onClick={() => setMenuOpen(false)} aria-label={locale === 'id' ? `Pesan, ${unreadMessages} belum dibaca` : `Messages, ${unreadMessages} unread`}><NavIcon name="mail" />{locale === 'id' ? 'Pesan' : 'Messages'}{unreadMessages > 0 && <span className="vt-mobile-messages-count" aria-hidden="true">{unreadMessages > 99 ? '99+' : unreadMessages}</span>}</Link>}
                     <Link className={active === 'hall-of-fame' ? 'active' : ''} href={path(locale, '/hall-of-fame')}><NavIcon name="trophy" />Hall of Fame</Link>
                     {user && <Link className={active === 'profile' ? 'active' : ''} href={path(locale, `/profile/${user.username}`)}><NavIcon name="user" />{t.profile}</Link>}
                 </nav>

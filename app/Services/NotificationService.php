@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Events\NotificationRefreshed;
 use App\Models\Comment;
+use App\Models\Conversation;
 use App\Models\MasterObject;
 use App\Models\ObjectContentRevision;
 use App\Models\Report;
@@ -13,6 +14,7 @@ use App\Notifications\CommentLiked;
 use App\Notifications\CommentReplied;
 use App\Notifications\ContentRevisionReviewed;
 use App\Notifications\InAppNotification;
+use App\Notifications\MessageRequested;
 use App\Notifications\ObjectReviewed;
 use App\Notifications\RankingCommented;
 use App\Notifications\ReportResolved;
@@ -128,6 +130,17 @@ class NotificationService
         $this->send($user, $actor, new TrustGranted(['url' => "/profile/{$user->username}"]));
     }
 
+    /** Only the first message of a new thread rings the bell; later messages update the inbox badge. */
+    public function messageRequested(User $sender, User $recipient, Conversation $conversation, string $body): void
+    {
+        $this->send($recipient, $sender, new MessageRequested([
+            'actor' => $this->actor($sender),
+            'conversation_id' => $conversation->id,
+            'url' => "/messages/{$conversation->id}",
+            'excerpt' => Str::limit($body, 120),
+        ]));
+    }
+
     public function streakReminder(User $user, int $days): void
     {
         $this->send($user, null, new StreakReminder(['days' => $days, 'url' => '/wallet']));
@@ -160,7 +173,7 @@ class NotificationService
     /**
      * @return array{id: int, name: string, username: string|null, avatar_url: string|null}
      */
-    private function actor(User $user): array
+    public function actor(User $user): array
     {
         return [
             'id' => $user->id,

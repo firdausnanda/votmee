@@ -25,4 +25,5 @@ return [
     'content_image_invalid' => 'Salah satu gambar tidak tersedia. Hapus lalu unggah ulang gambarnya.',
     'content_image_limit' => 'Gunakan maksimal :max gambar dalam satu tulisan.',
     'image_too_large' => 'Gambar terlalu besar. Gunakan gambar maksimal 8000 px per sisi dan 24 megapiksel.',
+    'message_request_pending' => 'Tunggu sampai permintaan pesanmu diterima sebelum mengirim lagi.',
 ];

@@ -122,4 +122,23 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasMany(Report::class, 'reporter_id');
     }
+
+    public function conversationParticipations(): HasMany
+    {
+        return $this->hasMany(ConversationParticipant::class);
+    }
+
+    public function blocks(): HasMany
+    {
+        return $this->hasMany(UserBlock::class, 'blocker_id');
+    }
+
+    /** A block in either direction stops both members from messaging each other. */
+    public function hasBlockedOrIsBlockedBy(User $other): bool
+    {
+        return UserBlock::query()
+            ->where(fn ($query) => $query->where('blocker_id', $this->id)->where('blocked_id', $other->id))
+            ->orWhere(fn ($query) => $query->where('blocker_id', $other->id)->where('blocked_id', $this->id))
+            ->exists();
+    }
 }

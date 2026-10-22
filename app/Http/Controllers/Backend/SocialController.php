@@ -7,6 +7,7 @@ use App\Models\Comment;
 use App\Models\CommentImage;
 use App\Models\CommentLike;
 use App\Models\MasterObject;
+use App\Models\Message;
 use App\Models\ObjectArticle;
 use App\Models\RankingPost;
 use App\Models\Report;
@@ -235,7 +236,7 @@ class SocialController extends Controller
     public function report(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'target_type' => ['required', 'in:ranking_post,comment,object,object_article'],
+            'target_type' => ['required', 'in:ranking_post,comment,object,object_article,message'],
             'target_id' => ['required', 'string', 'max:40'],
             'reason' => ['required', 'string', 'min:10', 'max:2000'],
         ]);
@@ -244,9 +245,13 @@ class SocialController extends Controller
             'comment' => Comment::class,
             'object' => MasterObject::class,
             'object_article' => ObjectArticle::class,
+            'message' => Message::class,
         };
+        // A private message can only be reported from inside its own thread.
+        $target = $model::query()->whereKey($data['target_id'])
+            ->when($model === Message::class, fn ($query) => $query->whereHas('conversation.participants', fn ($participants) => $participants->where('user_id', $request->user()->id)));
 
-        if (! $model::query()->whereKey($data['target_id'])->exists()) {
+        if (! $target->exists()) {
             throw ValidationException::withMessages(['target_id' => __('votmee.report_target_missing')]);
         }
 

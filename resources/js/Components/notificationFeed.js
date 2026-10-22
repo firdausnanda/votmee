@@ -8,7 +8,7 @@ import { api } from '../Pages/Community/Shared';
  */
 const TOAST_LIMIT = 3;
 const LIVE_LIMIT = 50;
-const EMPTY = { userId: null, count: null, live: [], removed: [], read: [], toasts: [], connected: false, toastsEnabled: true };
+const EMPTY = { userId: null, count: null, messageCount: null, lastMessage: null, live: [], removed: [], read: [], toasts: [], connected: false, toastsEnabled: true };
 
 let state = EMPTY;
 let channelName = null;
@@ -63,6 +63,20 @@ function receive({ notification, unread_count: unreadCount }, created) {
     }));
 }
 
+/** Private messages share the member's channel; the open thread reads `lastMessage`, the header reads the count. */
+function receiveMessage({ message, unread_messages: unread, pending_requests: pending }) {
+    update({ lastMessage: message, messageCount: unread + pending });
+}
+
+/** Unread threads plus pending requests: the live value once an event or action set it, otherwise the shared one. */
+export function useUnreadMessages() {
+    const shared = usePage().props.unreadMessages ?? 0;
+
+    return useNotificationFeed().messageCount ?? shared;
+}
+
+export const setMessageCount = ({ unread_messages: unread, pending_requests: pending }) => update({ messageCount: unread + pending });
+
 export async function startNotificationFeed(userId) {
     if (typeof window === 'undefined' || state.userId === userId) return;
 
@@ -77,7 +91,8 @@ export async function startNotificationFeed(userId) {
 
     connection.private(name)
         .notification((payload) => receive(payload, true))
-        .listen('.notification.refreshed', (payload) => receive(payload, false));
+        .listen('.notification.refreshed', (payload) => receive(payload, false))
+        .listen('.message.sent', receiveMessage);
     channelName = name;
     const { connector } = connection;
     update({ userId, connected: connector.connectionStatus() === 'connected' });
@@ -87,7 +102,7 @@ export async function startNotificationFeed(userId) {
         wasDown = wasDown || status !== 'connected';
         if (status === 'connected' && wasDown) {
             wasDown = false;
-            router.reload({ only: ['unreadNotifications'] });
+            router.reload({ only: ['unreadNotifications', 'unreadMessages'] });
         }
     });
 }
@@ -135,7 +150,11 @@ export const clearReadNotifications = (ids) => api('/backend/notifications?scope
 /** Wires the feed to the signed in member: subscribes to their channel and keeps toasts and the server count in step. */
 export function useNotificationFeedLifecycle(userId, toastsEnabled) {
     const shared = usePage().props.unreadNotifications;
+    const sharedMessages = usePage().props.unreadMessages;
 
+    useEffect(() => {
+        if (state.messageCount !== null) update({ messageCount: null });
+    }, [sharedMessages]);
     useEffect(() => {
         if (userId) {
             startNotificationFeed(userId);

@@ -13,12 +13,13 @@ export default function ReportDialog({ locale, targetType, onClose, onSubmit }) 
         comment: isId ? 'komentar' : 'comment',
         object: isId ? 'objek' : 'object',
         object_article: isId ? 'artikel' : 'article',
+        message: isId ? 'pesan' : 'message',
     }[targetType];
     const reasons = [
         isId ? 'Informasi menyesatkan' : 'Misleading information',
         isId ? 'Spam atau promosi' : 'Spam or promotion',
         isId ? 'Pelecehan atau ujaran kebencian' : 'Harassment or hate speech',
-        ...(targetType === 'comment' ? [] : [isId ? 'Duplikat atau kategori salah' : 'Duplicate or wrong category']),
+        ...(['comment', 'message'].includes(targetType) ? [] : [isId ? 'Duplikat atau kategori salah' : 'Duplicate or wrong category']),
         isId ? 'Alasan lainnya' : 'Another reason',
     ];
     const needsDetails = selectedReason === reasons[reasons.length - 1];

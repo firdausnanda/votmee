@@ -226,6 +226,8 @@ export default function Admin({
                 ? `/admin/backend/articles/${report.target_id}/hide`
                 : report.target_type === 'comment'
                 ? `/admin/backend/comments/${report.target_id}/hide`
+                : report.target_type === 'message'
+                ? `/admin/backend/messages/${report.target_id}/hide`
                 : `/admin/backend/objects/${report.target_id}`;
 
         setBusy(true);
@@ -618,6 +620,15 @@ export default function Admin({
                                                         <span className="vap-reason-label">{isId ? 'Alasan pelapor:' : 'Report reason:'}</span>
                                                         <p className="vap-report-reason-text">{report.reason}</p>
                                                     </div>
+                                                    {report.message && (
+                                                        <div className="vap-report-reason-box">
+                                                            <span className="vap-reason-label">
+                                                                {isId ? 'Pesan dari' : 'Message from'} @{report.message.user?.username ?? '-'}
+                                                                {report.message.status === 'hidden' && ` (${isId ? 'disembunyikan' : 'hidden'})`}:
+                                                            </span>
+                                                            <p className="vap-report-reason-text">{report.message.body}</p>
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 <div className="vap-report-actions">

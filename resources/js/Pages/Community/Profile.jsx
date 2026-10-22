@@ -218,6 +218,84 @@ function ProfileImageEditor({ type, hasImage, locale, buttonClassName, label, sh
     </div>;
 }
 
+/** Starts (or continues) a private thread with this member, and blocks or unblocks them. */
+function MessageControls({ locale, profile, blocked, bodyMax = 2000 }) {
+    const isId = locale === 'id';
+    const [open, setOpen] = useState(false);
+    const [body, setBody] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+    const [isBlocked, setIsBlocked] = useState(blocked);
+
+    useEffect(() => setIsBlocked(blocked), [blocked]);
+
+    const send = async (event) => {
+        event.preventDefault();
+        setBusy(true);
+        setError('');
+
+        try {
+            const result = await api('/backend/messages/conversations', 'POST', { recipient_id: profile.id, body });
+            router.visit(path(locale, `/messages/${result.conversation.id}`));
+        } catch (requestError) {
+            setError(requestError.message);
+            setBusy(false);
+        }
+    };
+
+    const toggleBlock = async () => {
+        setBusy(true);
+        setError('');
+
+        try {
+            const result = await api(`/backend/users/${profile.id}/block`, isBlocked ? 'DELETE' : 'POST');
+            setIsBlocked(result.blocked);
+        } catch (requestError) {
+            setError(requestError.message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return <div className="vdm-profile-actions">
+        {!isBlocked && <button type="button" className="vdm-profile-message" onClick={() => setOpen(true)} disabled={busy}>
+            <NavIcon name="mail" size={14} />{isId ? 'Kirim pesan' : 'Message'}
+        </button>}
+        <button type="button" className="vac-trust-button" onClick={toggleBlock} disabled={busy}>
+            {isBlocked ? (isId ? 'Buka blokir' : 'Unblock') : (isId ? 'Blokir' : 'Block')}
+        </button>
+        {error && !open && <p className="vpr-image-error" role="alert">{error}</p>}
+        <Dialog open={open} onClose={() => { if (!busy) setOpen(false); }} className="vt-report-overlay">
+            <DialogBackdrop transition className="vt-report-backdrop vpr-confirm-backdrop" />
+            <div className="vt-report-positioner">
+                <DialogPanel as="form" transition className="vt-report-dialog vpr-confirm-dialog" onSubmit={send}>
+                    <div className="vt-report-header">
+                        <div>
+                            <DialogTitle className="vt-report-title">{isId ? `Kirim pesan ke ${profile.name}` : `Message ${profile.name}`}</DialogTitle>
+                            <p className="vt-report-intro">{isId
+                                ? 'Pesan pertama masuk sebagai permintaan. Anda bisa mengirim lagi setelah permintaan diterima.'
+                                : 'Your first message arrives as a request. You can send more once it is accepted.'}</p>
+                        </div>
+                    </div>
+                    <div className="vac-trust-field">
+                        <label htmlFor="vdm-first-message">{isId ? 'Pesan' : 'Message'}</label>
+                        <textarea id="vdm-first-message" value={body} onChange={(event) => setBody(event.target.value)} maxLength={bodyMax} required rows={4} />
+                        {error && <p className="vpr-image-error" role="alert">{error}</p>}
+                    </div>
+                    <div className="vt-report-footer">
+                        <div className="vt-report-actions">
+                            <button type="button" className="vt-report-cancel" onClick={() => setOpen(false)} disabled={busy}>{isId ? 'Batal' : 'Cancel'}</button>
+                            <button type="submit" className="vt-report-submit" disabled={busy || !body.trim()}>
+                                {busy ? (isId ? 'Mengirim…' : 'Sending…') : (isId ? 'Kirim' : 'Send')}
+                            </button>
+                        </div>
+                    </div>
+                </DialogPanel>
+            </div>
+        </Dialog>
+    </div>;
+}
+
 /** Lets moderators grant or revoke trusted contributor status, with a reason for the audit log. */
 function TrustControl({ locale, userId, trusted }) {
     const isId = locale === 'id';
@@ -282,7 +360,7 @@ function TrustControl({ locale, userId, trusted }) {
     </>;
 }
 
-export default function Profile({ locale, categories = [], leaders = [], profile, rankings, achievements = [], hiddenAchievementsLocked = 0, trustedContributor = false }) {
+export default function Profile({ locale, categories = [], leaders = [], profile, rankings, achievements = [], hiddenAchievementsLocked = 0, trustedContributor = false, blockedByViewer = false }) {
     const t = dictionary(locale);
     const currentUser = usePage().props.auth?.user;
     const canModerate = usePage().props.auth?.can?.moderate ?? false;
@@ -491,6 +569,7 @@ export default function Profile({ locale, categories = [], leaders = [], profile
                                         {locale === 'id' ? 'Kontributor Tepercaya' : 'Trusted Contributor'}
                                     </span>}
                                 </div>
+                                {currentUser && !isOwnProfile && <MessageControls locale={locale} profile={profile} blocked={blockedByViewer} />}
                                 {canModerate && !isOwnProfile && <TrustControl locale={locale} userId={profile.id} trusted={trustedContributor} />}
                                 {imageError && <p className="vpr-image-error" role="alert">{imageError}</p>}
                             </div>

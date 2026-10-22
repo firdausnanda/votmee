@@ -42,6 +42,10 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(5)->by('comment-uploads:minute:'.($request->user()?->id ?? $request->ip())),
             Limit::perDay(40)->by('comment-uploads:day:'.($request->user()?->id ?? $request->ip())),
         ] : [Limit::none()]);
+        RateLimiter::for('message-requests', fn (Request $request): Limit => Limit::perDay(config('messaging.new_conversations_per_day'))
+            ->by('message-requests:'.($request->user()?->id ?? $request->ip())));
+        RateLimiter::for('messages', fn (Request $request): Limit => Limit::perMinute(config('messaging.messages_per_minute'))
+            ->by('messages:'.($request->user()?->id ?? $request->ip())));
         Gate::define('moderate', fn (User $user): bool => $user->hasRole('administrator') || in_array($user->role, ['moderator', 'admin'], true));
         Gate::define('administer', fn (User $user): bool => $user->hasRole('administrator') || $user->role === 'admin');
     }

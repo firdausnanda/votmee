@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Comment;
 use App\Models\CommentImage;
+use App\Models\Conversation;
 use App\Models\MasterObject;
 use App\Models\ObjectArticle;
 use App\Models\ObjectContentRevision;
@@ -19,6 +20,8 @@ use App\Services\AchievementService;
 use App\Services\FeedService;
 use App\Services\GamificationService;
 use App\Services\LeaderboardService;
+use App\Services\MessagingService;
+use App\Services\ModerationService;
 use App\Services\NotificationService;
 use App\Services\ObjectMatchingService;
 use App\Services\SeoService;
@@ -432,7 +435,23 @@ class CommunityController extends Controller
             'achievements' => $achievements->progress($user),
             'hiddenAchievementsLocked' => $achievements->hiddenLockedCount($user),
             'trustedContributor' => $user->trusted_at !== null,
+            'blockedByViewer' => $request->user() !== null && $request->user()->blocks()->where('blocked_id', $user->id)->exists(),
             'leaders' => $leaderboard->leaders(),
+        ]);
+    }
+
+    public function messages(Request $request, string $locale, MessagingService $messaging, LeaderboardService $leaderboard, ?Conversation $conversation = null): Response
+    {
+        if ($conversation !== null) {
+            $messaging->participantOrFail($conversation, $request->user());
+        }
+
+        return Inertia::render('Community/Messages', [
+            ...$this->shared($request),
+            'activeConversationId' => $conversation?->id,
+            'pendingRequests' => $messaging->pendingRequestCount($request->user()),
+            'bodyMax' => config('messaging.body_max'),
+            'leaders' => $leaderboard->leaders('weekly', 'support'),
         ]);
     }
 
@@ -532,7 +551,7 @@ class CommunityController extends Controller
             'contentQueue' => ObjectContentRevision::query()->where('status', 'pending')
                 ->whereHas('object', fn ($query) => $query->where('status', 'verified'))
                 ->with(['author:id,name,username', 'article:id,type', 'object:id,canonical_name,slug'])->oldest()->paginate(20, ['*'], 'content_page'),
-            'reports' => Report::query()->where('status', 'open')->oldest()->paginate(20, ['*'], 'reports_page'),
+            'reports' => app(ModerationService::class)->withReportedMessages(Report::query()->where('status', 'open')->oldest()->paginate(20, ['*'], 'reports_page')),
             'mergedObjects' => MasterObject::query()->where('status', 'merged')->latest()->limit(20)->get(['id', 'canonical_name', 'status']),
             'isAdmin' => $request->user()->can('administer'),
             'stats' => [
