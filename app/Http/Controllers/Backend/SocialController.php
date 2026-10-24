@@ -16,8 +16,8 @@ use App\Models\User;
 use App\Models\UserAchievement;
 use App\Services\AchievementService;
 use App\Services\CommentImageProcessor;
-use App\Services\GamificationService;
 use App\Services\MentionService;
+use App\Services\MissionService;
 use App\Services\NotificationService;
 use DateTimeImmutable;
 use Illuminate\Http\JsonResponse;
@@ -268,7 +268,7 @@ class SocialController extends Controller
         ]), 201);
     }
 
-    public function toggleCommentLike(Request $request, Comment $comment, GamificationService $gamification, AchievementService $achievements): JsonResponse
+    public function toggleCommentLike(Request $request, Comment $comment, MissionService $missions, AchievementService $achievements): JsonResponse
     {
         abort_unless($comment->status === 'visible', 404);
         abort_unless($request->user()->canParticipate(), 403);
@@ -294,7 +294,8 @@ class SocialController extends Controller
 
             if ($comment->user_id !== $request->user()->id && $comment->user !== null) {
                 app(NotificationService::class)->commentLiked($comment, $request->user());
-                $gamification->completeMission($comment->user, 'comment_liked');
+                $missions->record($request->user(), 'like_comments');
+                $missions->record($comment->user, 'liked_comment', $comment->created_at);
                 $achievements->evaluate($comment->user, 'voice');
                 $achievements->evaluateComment($comment);
             }
@@ -356,6 +357,29 @@ class SocialController extends Controller
         return $response;
     }
 
+    /** Advance the author's comment missions and the challenge of the content the comment lands on. */
+    private function recordCommentMissions(Comment $comment, bool $mentionsSomeone): void
+    {
+        $missions = app(MissionService::class);
+        $missions->record($comment->user, 'write_comments');
+
+        if ($mentionsSomeone) {
+            $missions->record($comment->user, 'mention_friend');
+        }
+
+        if ($comment->article_id !== null) {
+            $missions->record($comment->user, 'article_comment');
+
+            if ($comment->article?->author !== null) {
+                $missions->record($comment->article->author, 'read_article', $comment->article->created_at);
+            }
+        }
+
+        if ($comment->rankingPost?->creator !== null) {
+            $missions->record($comment->rankingPost->creator, 'discussed_ranking', $comment->rankingPost->created_at);
+        }
+    }
+
     /**
      * Create a comment together with its uploaded images.
      *
@@ -372,6 +396,7 @@ class SocialController extends Controller
         });
 
         app(NotificationService::class)->commentCreated($comment, $replyingTo, $mentionService->notifiable($comment, $mentioned));
+        $this->recordCommentMissions($comment, $mentioned->isNotEmpty());
 
         return response()->json([
             ...$comment->toArray(),

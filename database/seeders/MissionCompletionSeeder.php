@@ -23,7 +23,7 @@ class MissionCompletionSeeder extends Seeder
 
             MissionCompletion::query()->firstOrCreate(
                 ['user_id' => $user->id, 'mission' => 'quick_vote', 'completed_on' => $day],
-                ['amount' => (int) config('gamification.missions.quick_vote')],
+                ['period' => 'daily', 'amount' => (int) config('gamification.missions.daily.pool.quick_vote.points')],
             );
         });
     }

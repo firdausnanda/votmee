@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 
 class SupportService
 {
-    public function __construct(private GamificationService $gamification, private AchievementService $achievements) {}
+    public function __construct(private GamificationService $gamification, private AchievementService $achievements, private MissionService $missions) {}
 
     public function claimDaily(User $user): PointLedger
     {
@@ -108,7 +108,11 @@ class SupportService
             return $event;
         }, 3);
 
-        $this->gamification->completeMission($user, 'support');
+        $this->missions->record($user, 'support');
+
+        if ($entry->post->creator !== null) {
+            $this->missions->record($entry->post->creator, 'popular_ranking', $entry->post->created_at);
+        }
 
         return $event;
     }

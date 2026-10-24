@@ -10,13 +10,14 @@ use App\Models\ObjectContentRevision;
 use App\Models\RankingPost;
 use App\Models\Report;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ModerationService
 {
-    public function __construct(private AchievementService $achievements) {}
+    public function __construct(private AchievementService $achievements, private MissionService $missions) {}
 
     public function reviewObject(User $actor, MasterObject $object, string $status, string $reason): void
     {
@@ -28,7 +29,8 @@ class ModerationService
         $previousImagePath = $object->image_path;
         $discardedImagePath = null;
         $publishedSummaryAuthorId = null;
-        DB::transaction(function () use ($actor, $object, $status, $reason, &$discardedImagePath, &$publishedSummaryAuthorId): void {
+        $publishedSummaryCreatedAt = null;
+        DB::transaction(function () use ($actor, $object, $status, $reason, &$discardedImagePath, &$publishedSummaryAuthorId, &$publishedSummaryCreatedAt): void {
             $pendingSummary = $object->contentRevisions()->whereNull('article_id')->where('status', 'pending')->latest()->first();
             if ($pendingSummary && ($object->status !== 'verified' || $status !== 'verified')) {
                 $pendingSummary->update([
@@ -38,6 +40,7 @@ class ModerationService
                     'published_at' => $status === 'verified' ? now('UTC') : null,
                 ]);
                 $publishedSummaryAuthorId = $status === 'verified' ? $pendingSummary->author_id : null;
+                $publishedSummaryCreatedAt = $pendingSummary->created_at;
             }
             $updates = ['status' => $status, 'verified_by' => $status === 'verified' ? $actor->id : null, 'verified_at' => $status === 'verified' ? now('UTC') : null];
             if ($status === 'verified' && $object->pending_image_path) {
@@ -65,6 +68,8 @@ class ModerationService
         if ($status === 'verified') {
             $this->evaluateFor($object->submitted_by, 'curator');
             $this->evaluateFor($publishedSummaryAuthorId, 'writer');
+            $this->recordMissionFor($object->submitted_by, 'submit_object', $object->created_at);
+            $this->recordMissionFor($publishedSummaryAuthorId, 'improve_summary', $publishedSummaryCreatedAt);
         }
     }
 
@@ -122,6 +127,12 @@ class ModerationService
 
         if ($status === 'published') {
             $this->evaluateFor($revision->author_id, 'writer');
+
+            if ($revision->article_id === null) {
+                $this->recordMissionFor($revision->author_id, 'improve_summary', $revision->created_at);
+            } elseif ($revision->article->author_id === $revision->author_id) {
+                $this->recordMissionFor($revision->author_id, 'write_article', $revision->article->created_at);
+            }
         }
     }
 
@@ -269,6 +280,16 @@ class ModerationService
 
         if ($user !== null) {
             $this->achievements->evaluate($user, $category);
+        }
+    }
+
+    /** Re-check a contributor's content mission once a moderation decision publishes their work. */
+    private function recordMissionFor(?int $userId, string $mission, ?CarbonInterface $contentCreatedAt): void
+    {
+        $user = $userId ? User::query()->find($userId) : null;
+
+        if ($user !== null && $contentCreatedAt !== null) {
+            $this->missions->record($user, $mission, $contentCreatedAt);
         }
     }
 

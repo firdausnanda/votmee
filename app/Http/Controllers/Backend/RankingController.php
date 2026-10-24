@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Backend;
 use App\Http\Controllers\Controller;
 use App\Models\RankingPost;
 use App\Services\FeedService;
+use App\Services\MissionService;
 use App\Services\RankingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -42,7 +43,7 @@ class RankingController extends Controller
         return response()->json(['post' => $post, 'scores' => $scores]);
     }
 
-    public function store(Request $request, RankingService $rankings): JsonResponse
+    public function store(Request $request, RankingService $rankings, MissionService $missions): JsonResponse
     {
         $data = $request->validate([
             'title' => ['required', 'string', 'min:5', 'max:255'],
@@ -54,6 +55,9 @@ class RankingController extends Controller
             'object_ids.*' => ['required', 'ulid', 'distinct', 'exists:objects,id'],
         ]);
 
-        return response()->json($rankings->publish($request->user(), $data), 201);
+        $post = $rankings->publish($request->user(), $data);
+        $missions->record($request->user(), 'create_ranking', $post->created_at);
+
+        return response()->json($post, 201);
     }
 }

@@ -7,6 +7,7 @@ use App\Models\PointLedger;
 use App\Models\RankingEntry;
 use App\Models\Wallet;
 use App\Services\GamificationService;
+use App\Services\MissionService;
 use App\Services\SupportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -35,9 +36,9 @@ class WalletController extends Controller
         ]);
     }
 
-    public function claimMission(Request $request, int $completion, GamificationService $gamification): JsonResponse
+    public function claimMission(Request $request, int $completion, MissionService $missions): JsonResponse
     {
-        $ledger = $gamification->claimMission($request->user(), $completion);
+        $ledger = $missions->claim($request->user(), $completion);
 
         return response()->json([
             'claimed' => $ledger !== null,

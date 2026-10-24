@@ -22,6 +22,7 @@ use App\Services\FeedService;
 use App\Services\GamificationService;
 use App\Services\LeaderboardService;
 use App\Services\MessagingService;
+use App\Services\MissionService;
 use App\Services\ModerationService;
 use App\Services\NotificationService;
 use App\Services\ObjectMatchingService;
@@ -493,7 +494,7 @@ class CommunityController extends Controller
         ]);
     }
 
-    public function wallet(Request $request, LeaderboardService $leaderboard, GamificationService $gamification): Response
+    public function wallet(Request $request, LeaderboardService $leaderboard, GamificationService $gamification, MissionService $missions): Response
     {
         $flow = in_array($request->query('flow'), ['incoming', 'outgoing'], true) ? $request->query('flow') : 'all';
         $ledger = PointLedger::query()->where('user_id', $request->user()->id)->latest();
@@ -513,8 +514,7 @@ class CommunityController extends Controller
             'ledger' => $ledger->paginate(20)->withQueryString(),
             'leaders' => $leaderboard->leaders(),
             'streak' => $gamification->streak($request->user()),
-            'missions' => $gamification->missions($request->user()),
-            'pendingMissions' => $gamification->pendingMissions($request->user()),
+            'missions' => fn (): array => $missions->overview($request->user()),
             'summary' => $this->walletSummary($request->user()),
         ]);
     }

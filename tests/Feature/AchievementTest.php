@@ -10,7 +10,7 @@ use App\Models\User;
 use App\Models\UserAchievement;
 use App\Models\Wallet;
 use App\Services\AchievementService;
-use App\Services\GamificationService;
+use App\Services\MissionService;
 use App\Services\ModerationService;
 use App\Services\SupportService;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -155,15 +155,17 @@ test('seasonal badges count only contributions within the current Jakarta month'
 });
 
 test('hidden badges unlock from a late night claim, a perfect mission day and a viral comment', function () {
-    config(['gamification.viral_comment_likes' => 2]);
+    config([
+        'gamification.viral_comment_likes' => 2,
+        'gamification.missions.daily.always' => ['write_comments'],
+        'gamification.missions.daily.slots' => 1,
+    ]);
     $user = User::factory()->create();
     $this->travelTo(now('Asia/Jakarta')->setTime(0, 30));
     app(SupportService::class)->claimDaily($user);
 
-    $gamification = app(GamificationService::class);
-    foreach (array_keys(config('gamification.missions')) as $mission) {
-        $gamification->completeMission($user, $mission);
-    }
+    Comment::factory()->count(2)->create(['user_id' => $user->id]);
+    app(MissionService::class)->record($user, 'write_comments');
 
     $comment = Comment::factory()->create(['user_id' => $user->id]);
     foreach (User::factory()->count(2)->create() as $liker) {

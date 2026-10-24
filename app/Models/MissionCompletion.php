@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['user_id', 'mission', 'completed_on', 'amount', 'claimed_at'])]
+#[Fillable(['user_id', 'mission', 'period', 'completed_on', 'amount', 'claimed_at'])]
 class MissionCompletion extends Model
 {
     /** @use HasFactory<MissionCompletionFactory> */

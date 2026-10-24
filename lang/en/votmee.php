@@ -9,6 +9,8 @@ return [
     'quick_vote_invalid_entry' => 'This choice is not part of the duel.',
     'insufficient_points' => 'Insufficient points.',
     'account_ineligible' => 'A verified, unrestricted account is required.',
+    'mission_expired' => 'The claim window for this mission reward has ended.',
+    'mission_invalid' => 'This mission no longer qualifies because its content is no longer available.',
     'achievement_feature_invalid' => 'Choose up to three badges you have unlocked.',
     'review_invalid' => 'Invalid object review transition.',
     'merge_target_invalid' => 'Choose a different verified object.',

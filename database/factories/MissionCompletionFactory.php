@@ -21,6 +21,7 @@ class MissionCompletionFactory extends Factory
         return [
             'user_id' => User::factory(),
             'mission' => 'quick_vote',
+            'period' => 'daily',
             'completed_on' => now('Asia/Jakarta')->toDateString(),
             'amount' => 3,
             'claimed_at' => null,

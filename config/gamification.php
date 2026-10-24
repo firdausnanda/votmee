@@ -20,21 +20,67 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Daily Missions
+    | Missions
     |--------------------------------------------------------------------------
     |
-    | Each mission reserves points once per Jakarta day. Members claim completed
-    | rewards to add them to the wallet. The cap limits each day's total.
+    | Each mission reserves its points once per period when its progress reaches
+    | the target; members claim completed rewards to add them to the wallet.
+    |
+    | Daily: each Jakarta day assigns the "always" missions plus a rotating pick
+    | from the pool, up to "slots". Finishing every assigned mission reserves
+    | the "complete_bonus" on top of the daily cap.
+    |
+    | Weekly (Monday to Sunday, Jakarta): content counts toward the week it was
+    | created in, only once it is published, and only if that happened within
+    | "review_grace_days" after the week ended.
+    |
+    | Challenges: content created in a week earns the challenge from what other
+    | members do within "window_days" of its publication. Only members whose
+    | account was "min_account_age_days" old at the time count.
+    |
+    | Unclaimed rewards expire "claim_days" after their period closes.
     |
     */
 
     'missions' => [
-        'quick_vote' => 3,
-        'support' => 3,
-        'comment_liked' => 4,
+        'daily' => [
+            'slots' => 4,
+            'cap' => 15,
+            'always' => ['quick_vote'],
+            'complete_bonus' => 5,
+            'pool' => [
+                'quick_vote' => ['target' => 1, 'points' => 3],
+                'support' => ['target' => 1, 'points' => 3],
+                'write_comments' => ['target' => 2, 'points' => 4],
+                'like_comments' => ['target' => 3, 'points' => 3],
+                'save_ranking' => ['target' => 1, 'points' => 2],
+                'mention_friend' => ['target' => 1, 'points' => 3],
+                'article_comment' => ['target' => 1, 'points' => 3],
+            ],
+        ],
+        'weekly' => [
+            'cap' => 60,
+            'review_grace_days' => 3,
+            'pool' => [
+                'create_ranking' => ['target' => 1, 'points' => 10],
+                'write_article' => ['target' => 1, 'points' => 15],
+                'improve_summary' => ['target' => 1, 'points' => 10],
+                'submit_object' => ['target' => 1, 'points' => 10],
+                'daily_complete' => ['target' => 5, 'points' => 15],
+            ],
+        ],
+        'challenges' => [
+            'window_days' => 7,
+            'min_account_age_days' => 3,
+            'pool' => [
+                'popular_ranking' => ['target' => 5, 'points' => 15],
+                'discussed_ranking' => ['target' => 10, 'distinct' => 5, 'points' => 15],
+                'read_article' => ['target' => 3, 'points' => 10],
+                'liked_comment' => ['target' => 5, 'points' => 5],
+            ],
+        ],
+        'claim_days' => 7,
     ],
-
-    'daily_mission_cap' => 10,
 
     /*
     |--------------------------------------------------------------------------

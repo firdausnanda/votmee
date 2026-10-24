@@ -17343,115 +17343,878 @@
     opacity: 1;
 }
 
+/* ==========================================================================
+   Gamified Mission Hub / Quest Board
+   ========================================================================== */
+
 .vwl-missions {
-    border-color: #cad9e8;
-    background: #fff;
-    box-shadow: 0 5px 18px rgba(16, 43, 83, 0.05);
+    position: relative;
+    padding: 26px;
+    border: 1px solid #d4e0ee;
+    border-radius: 20px;
+    background: #ffffff;
+    box-shadow: 0 8px 30px rgba(16, 43, 83, 0.06);
+    overflow: hidden;
+    container: vwl-missions / inline-size;
 }
 
-.vwl-missions .vwl-card-heading h2 {
-    font-size: 18px;
+/* Quest Hub Header */
+.vwl-quest-hub-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #eef3f8;
 }
 
-.vwl-mission-ring circle:last-child {
-    stroke: #e89138;
-}
-
-.vwl-mission-list {
-    counter-reset: daily-quest;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-    margin-top: 19px;
-}
-
-.vwl-mission-list li {
-    counter-increment: daily-quest;
+.vwl-quest-hub-main {
+    display: flex;
     align-items: flex-start;
+    gap: 14px;
     min-width: 0;
-    padding: 17px 15px;
-    border-color: #d8e3ee;
-    background: #f7faff;
+    flex: 1 1 300px;
 }
 
-.vwl-mission-list li.is-done {
-    border-color: #c7dfd1;
-    background: #f5fbf7;
+.vwl-quest-hub-crest {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border: 1px solid #bfdbfe;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
-.vwl-mission-list li:not(.is-done) .vwl-mission-check {
-    border-color: #afc2db;
-    background: #e5eefb;
-    color: #235087;
+.vwl-quest-hub-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
 }
 
-.vwl-mission-list li:not(.is-done) .vwl-mission-check::before {
-    content: counter(daily-quest);
-}
-
-.vwl-mission-info strong {
-    font-size: 14px;
-}
-
-.vwl-mission-info span {
-    font-size: 12px;
-}
-
-.vwl-mission-info .vwl-mission-link {
+.vwl-quest-hub-badge {
     display: inline-flex;
     align-items: center;
-    align-self: flex-start;
-    min-height: 44px;
-    padding-block: 10px;
 }
 
-.vwl-mission-claim {
-    align-self: flex-start;
+.vwl-quest-hub-badge span {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1d4ed8;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.vwl-quest-hub-text h2 {
+    margin: 2px 0 0;
+    color: #0b2046;
+    font-size: clamp(20px, 2.4vw, 24px);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+
+.vwl-quest-hub-text p {
+    margin: 0;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+/* Quest Tabs */
+.vwl-quest-tabs {
+    display: flex;
+    gap: 8px;
+    margin: 20px 0 18px;
+    padding: 5px;
+    border-radius: 14px;
+    background: #f1f5f9;
+}
+
+.vwl-quest-tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex: 1;
     min-height: 44px;
-    margin-top: 8px;
-    padding: 9px 13px;
-    border: 1px solid #174a88;
-    border-radius: 8px;
-    background: #174a88;
-    color: #fff;
+    padding: 9px 14px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: #475569;
     font: inherit;
-    font-size: 12px;
+    font-size: 13.5px;
     font-weight: 700;
     cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
 }
 
-.vwl-mission-claim:hover {
-    background: #123b6d;
+.vwl-quest-tab:hover:not(.is-active) {
+    background: rgba(255, 255, 255, 0.5);
+    color: #0f172a;
 }
 
-.vwl-mission-claim:focus-visible {
-    outline: 3px solid #e89138;
-    outline-offset: 2px;
+.vwl-quest-tab.is-active {
+    background: #ffffff;
+    color: #0b2046;
+    font-weight: 800;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
-.vwl-mission-claim:disabled {
-    cursor: wait;
-    opacity: 0.65;
+.vwl-quest-tab-icon {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    color: #64748b;
+    transition: color 0.18s ease;
 }
 
-.vwl-mission-claimed {
-    color: #0b5e41 !important;
+.vwl-quest-tab:hover .vwl-quest-tab-icon {
+    color: #1e293b;
+}
+
+.vwl-quest-tab.is-active .vwl-quest-tab-icon {
+    color: #1d4ed8;
+}
+
+.vwl-quest-tab-label {
+    white-space: nowrap;
+}
+
+.vwl-quest-tab-loot-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+    color: #ffffff;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    box-shadow: 0 2px 6px rgba(234, 88, 12, 0.35);
+    animation: vwl-badge-bounce 2.2s infinite ease-in-out;
+}
+
+@keyframes vwl-badge-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-2px); }
+}
+
+/* ==========================================================================
+   Grand Daily Chest: Hari Sempurna (Perfect Day) Milestone
+   ========================================================================== */
+
+.vwl-grand-chest {
+    position: relative;
+    margin-bottom: 20px;
+    padding: 20px 22px;
+    border-radius: 18px;
+    border: 2px solid #fde68a;
+    background: radial-gradient(circle at 10% 20%, #fffbeb 0%, #fef3c7 60%, #fffdf5 100%);
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.12);
+    overflow: hidden;
+    transition: all 0.25s ease;
+}
+
+.vwl-grand-chest.is-ready {
+    border-color: #f59e0b;
+    box-shadow: 0 8px 30px rgba(245, 158, 11, 0.28), 0 0 0 1px rgba(245, 158, 11, 0.3);
+    animation: vwl-gold-glow 2.8s infinite ease-in-out;
+}
+
+.vwl-grand-chest.is-done {
+    border-color: #a7f3d0;
+    background: radial-gradient(circle at 10% 20%, #f0fdf4 0%, #ecfdf5 60%, #ffffff 100%);
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.08);
+}
+
+@keyframes vwl-gold-glow {
+    0%, 100% { box-shadow: 0 8px 26px rgba(245, 158, 11, 0.25); }
+    50% { box-shadow: 0 10px 36px rgba(245, 158, 11, 0.45); }
+}
+
+.vwl-grand-chest-badge-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.vwl-grand-chest-badge-row:empty {
+    display: none;
+}
+
+.vwl-grand-chest-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    color: #92400e;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.vwl-grand-chest.is-done .vwl-grand-chest-badge {
+    background: #dcfce7;
+    border-color: #bbf7d0;
+    color: #166534;
+}
+
+.vwl-grand-chest-ready-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: #10b981;
+    color: #fff;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+}
+
+.vwl-grand-chest-done-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: #e2e8f0;
+    color: #475569;
+    font-size: 10.5px;
     font-weight: 700;
 }
 
-.vwl-pending-missions {
-    margin-top: 18px;
-    padding-top: 16px;
-    border-top: 1px solid #d8e3ee;
+.vwl-grand-chest-content {
+    display: grid;
+    grid-template-columns: 68px minmax(0, 1fr);
+    align-items: start;
+    column-gap: 18px;
+    row-gap: 14px;
 }
 
-.vwl-pending-missions h3 {
-    margin: 0 0 8px;
-    color: #142647;
+.vwl-grand-chest-visual {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 68px;
+    height: 68px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.12);
+}
+
+.vwl-grand-chest.is-done .vwl-grand-chest-visual {
+    border-color: rgba(16, 185, 129, 0.25);
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.1);
+}
+
+.vwl-grand-chest-details {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.vwl-grand-chest-header-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+    flex-wrap: wrap;
+}
+
+.vwl-grand-chest-title {
+    margin: 0;
+    color: #78350f;
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+
+.vwl-grand-chest.is-done .vwl-grand-chest-title {
+    color: #065f46;
+}
+
+.vwl-grand-chest-reward-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #fef08a 0%, #fde047 100%);
+    border: 1px solid #facc15;
+    color: #713f12;
     font-size: 13px;
+    font-weight: 800;
+    box-shadow: 0 2px 6px rgba(202, 138, 4, 0.2);
 }
 
-.vwl-pending-missions ul {
+.vwl-grand-chest-coin {
+    display: grid;
+    place-items: center;
+    width: 17px;
+    height: 17px;
+}
+
+.vwl-grand-chest-desc {
+    margin: 0;
+    color: #92400e;
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+
+.vwl-grand-chest.is-done .vwl-grand-chest-desc {
+    color: #047857;
+}
+
+.vwl-grand-chest-tracker {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "count count"
+        "steps action";
+    align-items: start;
+    gap: 8px 16px;
+    margin-top: 8px;
+}
+
+.vwl-grand-chest-steps {
+    grid-area: steps;
+}
+
+.vwl-grand-chest-count-badge {
+    grid-area: count;
+}
+
+.vwl-grand-chest-steps {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.vwl-grand-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid #fde68a;
+    color: #92400e;
+    font-size: 11.5px;
+    font-weight: 700;
+    transition: all 0.18s ease;
+}
+
+.vwl-grand-step.is-done {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+    color: #047857;
+}
+
+.vwl-grand-step-icon {
+    display: grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fde68a;
+    color: #78350f;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.vwl-grand-step.is-done .vwl-grand-step-icon {
+    background: #10b981;
+    color: #ffffff;
+}
+
+.vwl-grand-chest-count-badge {
+    color: #78350f;
+    font-size: 11.5px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.vwl-grand-chest.is-done .vwl-grand-chest-count-badge {
+    color: #047857;
+}
+
+.vwl-grand-chest-action {
+    grid-area: action;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.vwl-grand-chest-claim-btn {
+    position: relative;
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 46px;
+    padding: 10px 18px;
+    border: 0;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: #ffffff;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 4px 18px rgba(217, 119, 6, 0.4);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vwl-grand-chest-claim-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 22px rgba(217, 119, 6, 0.5);
+}
+
+.vwl-grand-chest-claim-btn:disabled {
+    cursor: wait;
+    opacity: 0.7;
+}
+
+.vwl-grand-chest-claimed-msg {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #047857;
+    font-size: 12.5px;
+    font-weight: 800;
+}
+
+.vwl-grand-chest-locked-msg {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid #fde68a;
+    color: #92400e;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* ==========================================================================
+   Gamified Quest Cards Grid
+   ========================================================================== */
+
+.vwl-quest-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+    gap: 14px;
+}
+
+.vwl-qcard {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 200px;
+    padding: 16px;
+    border-radius: 16px;
+    border: 1.5px solid #e2e8f0;
+    background: #ffffff;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.vwl-qcard:hover {
+    transform: translateY(-3px);
+    border-color: #cbd5e1;
+    box-shadow: 0 10px 24px -4px rgba(15, 23, 42, 0.08);
+}
+
+/* State: Ready to Claim */
+.vwl-qcard--ready {
+    border-color: #10b981;
+    background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 55%);
+    box-shadow: 0 8px 24px -4px rgba(16, 185, 129, 0.22);
+    animation: vwl-card-ready-pulse 2.6s infinite ease-in-out;
+}
+
+@keyframes vwl-card-ready-pulse {
+    0%, 100% { border-color: #10b981; box-shadow: 0 8px 24px -4px rgba(16, 185, 129, 0.22); }
+    50% { border-color: #34d399; box-shadow: 0 10px 30px -2px rgba(16, 185, 129, 0.38); }
+}
+
+/* State: Done & Claimed */
+.vwl-qcard--done {
+    border-color: #eef2f6;
+    background: #f8fafc;
+    opacity: 0.9;
+}
+
+.vwl-qcard--done:hover {
+    opacity: 1;
+}
+
+/* Card Top Area */
+.vwl-qcard-top {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.vwl-qcard-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.vwl-qcard-emblem {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    transition: transform 0.2s ease;
+}
+
+.vwl-qcard:hover .vwl-qcard-emblem {
+    transform: scale(1.05);
+}
+
+.vwl-qcard-meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.vwl-qcard-tag {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.vwl-qcard-title {
+    color: #0b2046;
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.vwl-qcard--done .vwl-qcard-title {
+    color: #475569;
+}
+
+.vwl-qcard-reward {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border: 1px solid #fde68a;
+    color: #b45309;
+    font-size: 12px;
+    font-weight: 800;
+    box-shadow: 0 1px 3px rgba(245, 158, 11, 0.12);
+}
+
+.vwl-qcard-coin {
+    display: grid;
+    place-items: center;
+    width: 14px;
+    height: 14px;
+}
+
+.vwl-qcard--done .vwl-qcard-reward {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+    color: #047857;
+    box-shadow: none;
+}
+
+.vwl-qcard-text {
+    margin: 0;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+/* Card Bottom Area */
+.vwl-qcard-bottom {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.vwl-qcard-progress-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.vwl-qcard-progress-track {
+    position: relative;
+    width: 100%;
+    height: 6px;
+    border-radius: 999px;
+    background: #eef2f6;
+    overflow: hidden;
+}
+
+.vwl-qcard-progress-fill {
+    position: relative;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #3b82f6 0%, #1044bb 100%);
+    transition: width 0.4s ease;
+}
+
+.vwl-qcard-progress-fill.is-complete {
+    background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+}
+
+.vwl-qcard-progress-labels {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+}
+
+.vwl-qcard-progress-status {
+    color: #64748b;
+    font-weight: 600;
+}
+
+.vwl-qcard--ready .vwl-qcard-progress-status {
+    color: #047857;
+    font-weight: 700;
+}
+
+.vwl-qcard-progress-nums {
+    color: #1e293b;
+    font-weight: 750;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Card Action / Footer */
+.vwl-qcard-footer {
+    display: flex;
+    align-items: center;
+}
+
+.vwl-qcard-claim-btn {
+    position: relative;
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+    min-height: 42px;
+    padding: 9px 14px;
+    border: 0;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #ffffff;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vwl-qcard-claim-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45);
+}
+
+.vwl-qcard-claim-btn:disabled {
+    cursor: wait;
+    opacity: 0.7;
+}
+
+/* Button Shine Sweep Effect */
+.vwl-btn-shine {
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    transform: skewX(-20deg);
+    animation: vwl-btn-shine 2.8s infinite ease-in-out;
+}
+
+@keyframes vwl-btn-shine {
+    0% { left: -100%; }
+    25%, 100% { left: 160%; }
+}
+
+.vwl-qcard-action-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    border: 1.5px solid #dbeafe;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 12.5px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.vwl-qcard-action-link:hover {
+    background: #dbeafe;
+    border-color: #bfdbfe;
+    color: #1e40af;
+}
+
+.vwl-qcard-hint {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 38px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: #f1f5f9;
+    color: #64748b;
+    font-size: 11.5px;
+    font-weight: 600;
+}
+
+.vwl-qcard-claimed-stamp {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    min-height: 38px;
+    border-radius: 8px;
+    background: #ecfdf5;
+    border: 1px solid #d1fae5;
+    color: #047857;
+    font-size: 12px;
+    font-weight: 750;
+}
+
+/* ==========================================================================
+   Mission Theme Color Tokens
+   ========================================================================== */
+
+.theme-crimson.vwl-qcard-emblem { background: #fee2e2; border-color: #fecaca; color: #dc2626; }
+.theme-crimson .vwl-qcard-tag { color: #b91c1c; }
+
+.theme-amber.vwl-qcard-emblem { background: #fef3c7; border-color: #fde68a; color: #d97706; }
+.theme-amber .vwl-qcard-tag { color: #b45309; }
+
+.theme-blue.vwl-qcard-emblem { background: #dbeafe; border-color: #bfdbfe; color: #2563eb; }
+.theme-blue .vwl-qcard-tag { color: #1d4ed8; }
+
+.theme-rose.vwl-qcard-emblem { background: #fce7f3; border-color: #fbcfe8; color: #db2777; }
+.theme-rose .vwl-qcard-tag { color: #be185d; }
+
+.theme-purple.vwl-qcard-emblem { background: #ede9fe; border-color: #ddd6fe; color: #7c3aed; }
+.theme-purple .vwl-qcard-tag { color: #6d28d9; }
+
+.theme-teal.vwl-qcard-emblem { background: #ccfbf1; border-color: #99f6e4; color: #0d9488; }
+.theme-teal .vwl-qcard-tag { color: #0f766e; }
+
+.theme-emerald.vwl-qcard-emblem { background: #d1fae5; border-color: #a7f3d0; color: #059669; }
+.theme-emerald .vwl-qcard-tag { color: #047857; }
+
+.theme-orange.vwl-qcard-emblem { background: #ffedd5; border-color: #fed7aa; color: #ea580c; }
+.theme-orange .vwl-qcard-tag { color: #c2410c; }
+
+.theme-gold.vwl-qcard-emblem { background: #fef9c3; border-color: #fef08a; color: #ca8a04; }
+.theme-gold .vwl-qcard-tag { color: #854d0e; }
+
+/* ==========================================================================
+   Loot Stash: Earlier Unclaimed Rewards
+   ========================================================================== */
+
+.vwl-loot-stash {
+    margin-top: 20px;
+    padding: 18px 20px;
+    border-radius: 16px;
+    border: 1.5px solid #fde68a;
+    background: #fffbeb;
+}
+
+.vwl-loot-stash-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.vwl-loot-stash-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.vwl-loot-stash-icon {
+    font-size: 22px;
+}
+
+.vwl-loot-stash-title h3 {
+    margin: 0;
+    color: #78350f;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.vwl-loot-stash-title p {
+    margin: 2px 0 0;
+    color: #92400e;
+    font-size: 12px;
+}
+
+.vwl-loot-stash-count {
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: #fde68a;
+    color: #78350f;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.vwl-loot-stash-list {
     display: grid;
     gap: 8px;
     margin: 0;
@@ -17459,22 +18222,188 @@
     list-style: none;
 }
 
-.vwl-pending-missions li {
+.vwl-loot-stash-item {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 8px 12px;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: #ffffff;
+    border: 1px solid #fef3c7;
+}
+
+.vwl-loot-stash-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.vwl-loot-stash-item-info strong {
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.vwl-loot-stash-item-info span {
+    color: #64748b;
+    font-size: 11.5px;
+}
+
+.vwl-loot-stash-item-action {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.vwl-loot-stash-points {
+    color: #0b5e41;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.vwl-loot-stash-claim-btn {
+    min-height: 36px;
+    padding: 6px 14px;
+    border: 0;
+    border-radius: 8px;
+    background: #10b981;
+    color: #ffffff;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.vwl-loot-stash-claim-btn:hover {
+    background: #059669;
+}
+
+/* ==========================================================================
+   Quest Tip Banner
+   ========================================================================== */
+
+.vwl-quest-tip {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-top: 18px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+.vwl-quest-tip-icon {
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+.vwl-quest-tip p {
+    margin: 0;
     color: #475569;
     font-size: 12px;
+    line-height: 1.5;
 }
 
-.vwl-pending-missions .vwl-mission-claim {
-    margin-top: 0;
+/* The mission board sits beside the sidebar, so these rules follow the board's own
+   width instead of the viewport. */
+@container vwl-missions (max-width: 560px) {
+    .vwl-quest-hub-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .vwl-quest-hub-main {
+        flex: 0 1 auto;
+    }
+
+    .vwl-grand-chest {
+        padding: 16px;
+    }
+
+    .vwl-grand-chest-content {
+        grid-template-columns: 52px minmax(0, 1fr);
+        column-gap: 14px;
+    }
+
+    .vwl-grand-chest-visual {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+    }
+
+    .vwl-grand-chest-tracker {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+            "count"
+            "steps"
+            "action";
+    }
+
+    .vwl-grand-chest-claim-btn,
+    .vwl-grand-chest-claimed-msg,
+    .vwl-grand-chest-locked-msg {
+        width: 100%;
+        text-align: center;
+        justify-content: center;
+    }
+
+    .vwl-quest-tab-label {
+        font-size: 12.5px;
+    }
 }
 
-.vwl-missions > p {
-    color: #53657d;
+@container vwl-missions (max-width: 400px) {
+    .vwl-quest-tabs {
+        gap: 4px;
+    }
+
+    .vwl-quest-tab {
+        flex-direction: column;
+        min-width: 0;
+        min-height: 54px;
+        gap: 2px;
+        padding: 7px 4px;
+        font-size: 12px;
+    }
+
+    .vwl-quest-tab-label {
+        max-width: 100%;
+        overflow: hidden;
+        font-size: 12px;
+        text-overflow: ellipsis;
+    }
+
+    .vwl-quest-tab-loot-badge {
+        position: absolute;
+        top: -7px;
+        right: 2px;
+        padding: 1px 6px;
+        font-size: 10px;
+    }
+
+    .vwl-quest-tab-loot-text {
+        display: none;
+    }
+
+    .vwl-grand-chest-title {
+        font-size: 16px;
+    }
+
+    .vwl-grand-chest-header-line {
+        align-items: flex-start;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vwl-quest-tab-loot-badge,
+    .vwl-grand-chest.is-ready,
+    .vwl-qcard--ready,
+    .vwl-btn-shine {
+        animation: none !important;
+    }
 }
 
 .vwl-balance-card {

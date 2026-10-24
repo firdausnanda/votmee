@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Backend;
 use App\Http\Controllers\Controller;
 use App\Models\RankingPost;
 use App\Models\SavedRanking;
+use App\Services\MissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -15,7 +16,7 @@ class SavedRankingController extends Controller
      */
     public const SYNC_LIMIT = 200;
 
-    public function store(Request $request, RankingPost $post): JsonResponse
+    public function store(Request $request, RankingPost $post, MissionService $missions): JsonResponse
     {
         abort_unless($post->status === 'published', 404);
 
@@ -23,6 +24,7 @@ class SavedRankingController extends Controller
             'user_id' => $request->user()->id,
             'ranking_post_id' => $post->id,
         ]);
+        $missions->record($request->user(), 'save_ranking');
 
         return response()->json(['saved' => true]);
     }
