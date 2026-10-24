@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\GoogleLoginController;
+use App\Http\Controllers\Auth\UsernameController;
 use App\Http\Controllers\Backend\AchievementController;
 use App\Http\Controllers\Backend\BlockController;
 use App\Http\Controllers\Backend\CategoryController;
@@ -49,7 +50,11 @@ Route::prefix('{locale}')->where(['locale' => 'id|en'])->middleware(SetRequestLo
     Route::get('/auth/google', [GoogleLoginController::class, 'redirect'])
         ->middleware(['guest', 'throttle:10,1'])->name('google.redirect');
     Route::get('/register', [CommunityController::class, 'home'])->middleware('guest')->name('register');
+    Route::get('/username/suggestion', [UsernameController::class, 'suggest'])
+        ->middleware('throttle:30,1')->name('username.suggest');
     Route::middleware('auth')->group(function () {
+        Route::get('/choose-username', [UsernameController::class, 'create'])->name('username.create');
+        Route::post('/choose-username', [UsernameController::class, 'store'])->name('username.store');
         Route::get('/create', [CommunityController::class, 'create'])->name('create');
         Route::get('/object/{object:slug}/write', [CommunityController::class, 'writeObjectArticle'])->name('object.write');
         Route::get('/object/{object:slug}/summary/edit', [CommunityController::class, 'editObjectSummary'])->name('object.summary.edit');
@@ -108,6 +113,7 @@ Route::prefix('backend')->middleware(SetRequestLocale::class)->name('backend.')-
         Route::post('rankings', [RankingController::class, 'store'])->name('rankings.store');
         Route::get('wallet', [WalletController::class, 'show'])->name('wallet.show');
         Route::post('wallet/claim', [WalletController::class, 'claim'])->name('wallet.claim');
+        Route::post('wallet/missions/{completion}/claim', [WalletController::class, 'claimMission'])->whereNumber('completion')->name('wallet.missions.claim');
         Route::put('achievements/featured', [AchievementController::class, 'feature'])->name('achievements.feature');
         Route::post('achievements/seen', [AchievementController::class, 'seen'])->name('achievements.seen');
         Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');

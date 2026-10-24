@@ -305,3 +305,16 @@ body{margin:0;background:var(--vt-ground);color:var(--vt-ink)}
     .vdm-back { display: grid; }
     .vdm-message { max-width: 85%; }
 }
+
+/* Comment mentions */
+.vm-mention { color: #1d5fb8; font-weight: 700; text-decoration: none; }
+.vm-mention:hover { text-decoration: underline; }
+.vr-chat-bar { position: relative; }
+.vm-mention-menu { position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 30; width: min(320px, 100%); margin: 0; padding: 4px; border: 1px solid #d7e2ef; border-radius: 12px; background: #fff; box-shadow: 0 12px 32px rgba(15, 35, 70, .16); list-style: none; animation: vm-notification-menu-in 160ms cubic-bezier(.16, 1, .3, 1); }
+.vm-mention-menu li { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 8px; cursor: pointer; }
+.vm-mention-menu li.is-active, .vm-mention-menu li:hover { background: #edf4fe; }
+.vm-mention-avatar { display: grid; flex: none; place-items: center; width: 28px; height: 28px; border-radius: 999px; background: #e8f0fb; color: #173e70; font-size: 12px; font-weight: 800; overflow: hidden; }
+.vm-mention-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.vm-mention-copy { display: flex; flex-direction: column; min-width: 0; font-size: 13px; line-height: 1.3; }
+.vm-mention-copy span { overflow: hidden; color: #8392a6; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .vm-mention-menu { animation: none; } }

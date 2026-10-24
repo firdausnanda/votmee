@@ -92,7 +92,7 @@ const COIN_BURST = Array.from({ length: 12 }, (_, index) => {
     return { x: Math.round(Math.cos(angle) * distance), y: Math.round(Math.sin(angle) * distance - 30), delay: (index % 4) * 40 };
 });
 
-export default function Wallet({ locale, categories, leaders, balance, claimedToday, flow, ledger, streak, missions }) {
+export default function Wallet({ locale, categories, leaders, balance, claimedToday, flow, ledger, streak, missions, pendingMissions = [] }) {
     const t = dictionary(locale);
     const isId = locale === 'id';
     const query = new URLSearchParams(usePage().url.split('?')[1] ?? '');
@@ -111,6 +111,7 @@ export default function Wallet({ locale, categories, leaders, balance, claimedTo
         ? `${path(locale, `/ranking/${encodeURIComponent(rankingSlug)}`)}?${new URLSearchParams({ support: String(entryId), amount: String(requestedAmount) })}`
         : null;
     const [busy, setBusy] = useState(false);
+    const [busyMission, setBusyMission] = useState(null);
     const [alert, setAlert] = useState(null);
     const [displayedBalance, setDisplayedBalance] = useState(balance);
     const [isClaimed, setIsClaimed] = useState(claimedToday);
@@ -119,7 +120,7 @@ export default function Wallet({ locale, categories, leaders, balance, claimedTo
     const [openEntry, setOpenEntry] = useState(null);
     const [displayedStreak, setDisplayedStreak] = useState(streak);
     const animatedBalance = useCountUp(displayedBalance);
-    const untilMidnight = useJakartaMidnightCountdown(() => router.reload({ only: ['claimedToday', 'streak', 'missions'] }));
+    const untilMidnight = useJakartaMidnightCountdown(() => router.reload({ only: ['claimedToday', 'streak', 'missions', 'pendingMissions'] }));
     const [hours, minutes, seconds] = countdownParts(untilMidnight);
 
     useEffect(() => setDisplayedBalance(balance), [balance]);
@@ -166,6 +167,31 @@ export default function Wallet({ locale, categories, leaders, balance, claimedTo
             });
         } finally {
             setBusy(false);
+        }
+    };
+
+    const claimMission = async (completionId) => {
+        setBusyMission(completionId);
+        setAlert(null);
+
+        try {
+            const result = await api(`/backend/wallet/missions/${completionId}/claim`, 'POST');
+            setDisplayedBalance(result.balance);
+            setGain(result.amount);
+            setAlert({
+                type: 'success',
+                text: result.claimed
+                    ? (isId ? `${result.amount} poin hadiah misi masuk ke dompet Anda.` : `${result.amount} mission points were added to your wallet.`)
+                    : (isId ? 'Hadiah misi ini sudah diklaim.' : 'This mission reward was already claimed.'),
+            });
+            router.reload({ only: ['balance', 'ledger', 'missions', 'pendingMissions', 'summary', 'walletBalance'] });
+        } catch (error) {
+            setAlert({
+                type: 'error',
+                text: error.message || (isId ? 'Hadiah misi belum dapat diklaim. Coba lagi.' : 'Mission reward could not be claimed. Please try again.'),
+            });
+        } finally {
+            setBusyMission(null);
         }
     };
 
@@ -310,7 +336,7 @@ export default function Wallet({ locale, categories, leaders, balance, claimedTo
                                 <h2 id="vwl-missions-heading">{isId ? 'Misi harian' : 'Daily missions'}</h2>
                                 <span>{isId ? `${missionsDone} dari ${missions.length} selesai` : `${missionsDone} of ${missions.length} done`}</span>
                             </div>
-                            <div className="vwl-mission-ring" role="img" aria-label={`${missionsEarned}/${missionsTotal} ${t.points}`}>
+                            <div className="vwl-mission-ring" role="img" aria-label={isId ? `${missionsEarned}/${missionsTotal} poin misi selesai` : `${missionsEarned}/${missionsTotal} mission points completed`}>
                                 <svg viewBox="0 0 44 44" aria-hidden="true">
                                     <circle cx="22" cy="22" r="18" />
                                     <circle cx="22" cy="22" r="18" style={{ strokeDashoffset: 113.1 * (1 - missionRatio) }} />
@@ -329,6 +355,10 @@ export default function Wallet({ locale, categories, leaders, balance, claimedTo
                                         <strong>{copy.title}</strong>
                                         <span>{copy.text}</span>
                                         {!isDone && copy.href && <Link href={copy.href} className="vwl-mission-link">{copy.action} <span aria-hidden="true">→</span></Link>}
+                                        {isDone && !mission.claimed && <button type="button" className="vwl-mission-claim" disabled={busyMission !== null} onClick={() => claimMission(mission.completion_id)}>
+                                            {busyMission === mission.completion_id ? (isId ? 'Memproses...' : 'Processing...') : (isId ? 'Klaim poin' : 'Claim points')}
+                                        </button>}
+                                        {isDone && mission.claimed && <span className="vwl-mission-claimed">{isId ? 'Poin diklaim' : 'Points claimed'}</span>}
                                     </span>
                                     <span className="vwl-mission-points" aria-label={isDone ? (isId ? `Selesai, +${mission.earned} poin` : `Completed, +${mission.earned} points`) : (isId ? `Hadiah +${mission.points} poin` : `Reward +${mission.points} points`)}>
                                         +{numberLabel(isDone ? mission.earned : mission.points, locale)}
@@ -336,6 +366,17 @@ export default function Wallet({ locale, categories, leaders, balance, claimedTo
                                 </li>;
                             })}
                         </ul>
+                        {pendingMissions.length > 0 && <div className="vwl-pending-missions">
+                            <h3>{isId ? 'Hadiah misi sebelumnya' : 'Earlier mission rewards'}</h3>
+                            <ul>
+                                {pendingMissions.map((mission) => <li key={mission.id}>
+                                    <span>{missionCopy[mission.key]?.title ?? mission.key.replace(/_/g, ' ')} · {dayLabel(mission.completed_on)} · +{numberLabel(mission.amount, locale)} {t.points}</span>
+                                    <button type="button" className="vwl-mission-claim" disabled={busyMission !== null} onClick={() => claimMission(mission.id)}>
+                                        {busyMission === mission.id ? (isId ? 'Memproses...' : 'Processing...') : (isId ? 'Klaim poin' : 'Claim points')}
+                                    </button>
+                                </li>)}
+                            </ul>
+                        </div>}
                         <p>{isId ? `Misi diatur ulang dalam ${hours}:${minutes}:${seconds}.` : `Missions reset in ${hours}:${minutes}:${seconds}.`}</p>
                     </section>
                 </div>

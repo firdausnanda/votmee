@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, dateLabel, NavIcon, openLoginModal, path } from './Shared';
 import { CommentImageAttachButton, CommentImageGallery, CommentImagePreviews, commentPayload, useCommentImages } from './CommentImages';
 import { CommentBadges } from './Achievements';
+import { MentionInput, MentionText } from './Mentions';
 import ReportDialog from './ReportDialog';
 import ContentBody from './ContentBody';
 import ArticleSources from './ArticleSources';
@@ -114,6 +115,8 @@ export function CommunityDiscussion({ object, article, locale }) {
         return { rootComments: roots, repliesByParent: replies, orphanReplies: orphans };
     }, [comments]);
 
+    const mentionParticipants = [article?.author, ...comments];
+
     const renderComment = (item, isReply = false) => {
         const parentComment = item.parent_id ? commentMap[item.parent_id] : null;
         const isReplyingThis = replyTo?.id === item.id;
@@ -155,7 +158,7 @@ export function CommunityDiscussion({ object, article, locale }) {
                         </div>
                     )}
 
-                    <p className="vr-comment-text">{item.body}</p>
+                    <p className="vr-comment-text"><MentionText body={item.body} mentions={item.mentions} locale={locale} /></p>
                     <CommentImageGallery images={item.images} locale={locale} authorName={item.name} />
 
                     <div className="vr-comment-actions">
@@ -213,12 +216,14 @@ export function CommunityDiscussion({ object, article, locale }) {
                                 </button>
                             </div>
                             <div className="vr-chat-bar">
-                                <input
+                                <MentionInput
                                     type="text"
                                     className="vr-chat-input"
                                     placeholder={isId ? `Balas @${replyTo.name}...` : `Reply to @${replyTo.name}...`}
                                     value={replyBody}
-                                    onChange={(e) => setReplyBody(e.target.value)}
+                                    onValueChange={setReplyBody}
+                                    participants={mentionParticipants}
+                                    locale={locale}
                                     autoFocus
                                     autoComplete="off"
                                     required
@@ -286,7 +291,7 @@ export function CommunityDiscussion({ object, article, locale }) {
             {user ? (
                 <form className="vr-chat-composer" onSubmit={(e) => submit(e, null, body)}>
                     <div className="vr-chat-bar">
-                        <input
+                        <MentionInput
                             type="text"
                             className="vr-chat-input"
                             id={isArticle ? 'article-comment-input' : 'object-discussion-input'}
@@ -295,7 +300,9 @@ export function CommunityDiscussion({ object, article, locale }) {
                                 : (isId ? 'Ketik pesan diskusi tentang objek ini...' : 'Type a discussion message about this object...')}
                             value={body}
                             maxLength={3000}
-                            onChange={(e) => setBody(e.target.value)}
+                            onValueChange={setBody}
+                            participants={mentionParticipants}
+                            locale={locale}
                             autoComplete="off"
                             required
                         />

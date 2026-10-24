@@ -23,8 +23,8 @@ return [
     | Daily Missions
     |--------------------------------------------------------------------------
     |
-    | Each mission pays its points once per Jakarta day. The cap limits the
-    | total mission points a user can earn in one day, whatever is listed.
+    | Each mission reserves points once per Jakarta day. Members claim completed
+    | rewards to add them to the wallet. The cap limits each day's total.
     |
     */
 

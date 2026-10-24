@@ -35,6 +35,17 @@ class WalletController extends Controller
         ]);
     }
 
+    public function claimMission(Request $request, int $completion, GamificationService $gamification): JsonResponse
+    {
+        $ledger = $gamification->claimMission($request->user(), $completion);
+
+        return response()->json([
+            'claimed' => $ledger !== null,
+            'amount' => $ledger?->amount ?? 0,
+            'balance' => Wallet::query()->where('user_id', $request->user()->id)->value('balance') ?? 0,
+        ]);
+    }
+
     public function support(Request $request, SupportService $support): JsonResponse
     {
         $data = $request->validate([

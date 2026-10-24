@@ -13,11 +13,12 @@ return [
     |
     */
 
-    'groups' => ['replies', 'likes', 'messages', 'badges', 'reviews', 'streak'],
+    'groups' => ['replies', 'mentions', 'likes', 'messages', 'badges', 'reviews', 'streak'],
 
     'types' => [
         'comment_reply' => 'replies',
         'ranking_comment' => 'replies',
+        'comment_mention' => 'mentions',
         'comment_liked' => 'likes',
         'message_request' => 'messages',
         'achievement_unlocked' => 'badges',

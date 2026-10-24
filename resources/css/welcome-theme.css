@@ -1723,6 +1723,40 @@
     margin-top: 4px;
 }
 
+.vm-username-help {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    color: #64748b;
+    font-size: 11.5px;
+    line-height: 1.4;
+}
+
+.vm-username-input {
+    padding-left: 14px;
+}
+
+.vm-username-help button {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: #1044bb;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.vm-username-help strong {
+    color: #334155;
+    font-weight: 700;
+}
+
+.vm-username-help button:hover,
+.vm-username-help button:focus-visible {
+    text-decoration: underline;
+}
+
 .vm-auth-actions-row {
     display: flex;
     align-items: center;
@@ -3916,6 +3950,13 @@
 
 .vs-saved-heading {
     margin-bottom: 18px;
+}
+
+@media (max-width: 767px) {
+    .vs-saved-heading {
+        margin-inline: 14px;
+        padding-top: 16px;
+    }
 }
 
 .vs-saved-heading p {
@@ -17362,6 +17403,74 @@
     align-self: flex-start;
     min-height: 44px;
     padding-block: 10px;
+}
+
+.vwl-mission-claim {
+    align-self: flex-start;
+    min-height: 44px;
+    margin-top: 8px;
+    padding: 9px 13px;
+    border: 1px solid #174a88;
+    border-radius: 8px;
+    background: #174a88;
+    color: #fff;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.vwl-mission-claim:hover {
+    background: #123b6d;
+}
+
+.vwl-mission-claim:focus-visible {
+    outline: 3px solid #e89138;
+    outline-offset: 2px;
+}
+
+.vwl-mission-claim:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
+.vwl-mission-claimed {
+    color: #0b5e41 !important;
+    font-weight: 700;
+}
+
+.vwl-pending-missions {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid #d8e3ee;
+}
+
+.vwl-pending-missions h3 {
+    margin: 0 0 8px;
+    color: #142647;
+    font-size: 13px;
+}
+
+.vwl-pending-missions ul {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.vwl-pending-missions li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+    color: #475569;
+    font-size: 12px;
+}
+
+.vwl-pending-missions .vwl-mission-claim {
+    margin-top: 0;
 }
 
 .vwl-missions > p {

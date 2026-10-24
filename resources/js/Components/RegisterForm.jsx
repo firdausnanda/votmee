@@ -1,4 +1,5 @@
 import { useForm } from '@inertiajs/react';
+import { useEffect, useRef, useState } from 'react';
 import GoogleAuthLink from '@/Components/GoogleAuthLink';
 
 export default function RegisterForm({ locale, onLogin }) {
@@ -6,12 +7,44 @@ export default function RegisterForm({ locale, onLogin }) {
     const returnTo = /\/(login|register)$/.test(window.location.pathname)
         ? `/${locale}`
         : `${window.location.pathname}${window.location.search}`;
+    const usernameWasEdited = useRef(false);
+    const [suggestedUsername, setSuggestedUsername] = useState('');
     const { data, setData, post, processing, errors, reset } = useForm({
         name: '',
+        username: '',
         email: '',
         password: '',
         password_confirmation: '',
     });
+
+    useEffect(() => {
+        if (!data.name.trim()) {
+            setSuggestedUsername('');
+            return;
+        }
+
+        const controller = new AbortController();
+        const timer = window.setTimeout(async () => {
+            try {
+                const response = await fetch(route('community.username.suggest', { locale, name: data.name }), {
+                    signal: controller.signal,
+                    headers: { Accept: 'application/json' },
+                });
+                if (!response.ok) return;
+
+                const { username } = await response.json();
+                setSuggestedUsername(username);
+                if (!usernameWasEdited.current) setData('username', username);
+            } catch (error) {
+                if (error.name !== 'AbortError') setSuggestedUsername('');
+            }
+        }, 300);
+
+        return () => {
+            window.clearTimeout(timer);
+            controller.abort();
+        };
+    }, [data.name, locale]);
 
     const submit = (event) => {
         event.preventDefault();
@@ -22,7 +55,8 @@ export default function RegisterForm({ locale, onLogin }) {
 
     const fields = [
         { name: 'name', label: isId ? 'Nama' : 'Name', type: 'text', autoComplete: 'name' },
-        { name: 'email', label: 'Email', type: 'email', autoComplete: 'username' },
+        { name: 'username', label: 'Username', type: 'text', autoComplete: 'username' },
+        { name: 'email', label: 'Email', type: 'email', autoComplete: 'email' },
         { name: 'password', label: isId ? 'Kata sandi' : 'Password', type: 'password', autoComplete: 'new-password' },
         { name: 'password_confirmation', label: isId ? 'Konfirmasi kata sandi' : 'Confirm password', type: 'password', autoComplete: 'new-password' },
     ];
@@ -42,11 +76,39 @@ export default function RegisterForm({ locale, onLogin }) {
                     autoComplete={field.autoComplete}
                     autoFocus={field.name === 'name'}
                     required
+                    minLength={field.name === 'username' ? 3 : undefined}
+                    maxLength={field.name === 'username' ? 30 : undefined}
+                    pattern={field.name === 'username' ? '[a-z0-9][a-z0-9_-]*' : undefined}
                     className={`vm-auth-input${errors[field.name] ? ' has-error' : ''}`}
                     aria-invalid={Boolean(errors[field.name])}
-                    aria-describedby={errors[field.name] ? `register-${field.name}-error` : undefined}
-                    onChange={(event) => setData(field.name, event.target.value)}
+                    aria-describedby={field.name === 'username'
+                        ? `register-username-help${errors.username ? ' register-username-error' : ''}`
+                        : (errors[field.name] ? `register-${field.name}-error` : undefined)}
+                    onChange={(event) => {
+                        if (field.name === 'username') {
+                            usernameWasEdited.current = true;
+                            setData('username', event.target.value.toLowerCase().replace(/^@/, ''));
+                        } else {
+                            setData(field.name, event.target.value);
+                        }
+                    }}
                 />
+                {field.name === 'username' && (
+                    <div id="register-username-help" className="vm-username-help">
+                        <span>{isId ? '3–30 karakter: huruf kecil, angka, - atau _.' : '3–30 characters: lowercase letters, numbers, - or _.'}</span>
+                        {suggestedUsername && (
+                            <span>
+                                {isId ? 'Saran kami: ' : 'Our suggestion: '}
+                                {data.username === suggestedUsername
+                                    ? <strong>@{suggestedUsername}</strong>
+                                    : <button type="button" onClick={() => {
+                                        usernameWasEdited.current = true;
+                                        setData('username', suggestedUsername);
+                                    }}>@{suggestedUsername}</button>}
+                            </span>
+                        )}
+                    </div>
+                )}
                 {errors[field.name] && <div id={`register-${field.name}-error`} className="vm-form-error" role="alert">{errors[field.name]}</div>}
             </div>)}
             <button type="submit" className="vm-submit-button" disabled={processing}>

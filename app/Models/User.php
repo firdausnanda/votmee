@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Str;
 use Mattiverse\Userstamps\Traits\Userstamps;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -31,6 +32,21 @@ class User extends Authenticatable implements MustVerifyEmail
     public const UPDATED_BY = null;
 
     public const DELETED_BY = 'deleted_by';
+
+    public static function suggestedUsername(string $name): string
+    {
+        $baseUsername = rtrim(Str::limit(Str::slug($name), 24, ''), '-');
+        $baseUsername = strlen($baseUsername) >= 3 ? $baseUsername : 'user';
+        $username = $baseUsername;
+        $suffix = 2;
+
+        while (self::withTrashed()->where('username', $username)->exists()) {
+            $username = $baseUsername.'-'.$suffix;
+            $suffix++;
+        }
+
+        return $username;
+    }
 
     /**
      * Get the attributes that should be cast.

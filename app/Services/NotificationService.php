@@ -11,6 +11,7 @@ use App\Models\Report;
 use App\Models\User;
 use App\Notifications\AchievementUnlocked;
 use App\Notifications\CommentLiked;
+use App\Notifications\CommentMentioned;
 use App\Notifications\CommentReplied;
 use App\Notifications\ContentRevisionReviewed;
 use App\Notifications\InAppNotification;
@@ -21,6 +22,7 @@ use App\Notifications\ReportResolved;
 use App\Notifications\StreakReminder;
 use App\Notifications\TrustGranted;
 use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 /**
@@ -29,8 +31,13 @@ use Illuminate\Support\Str;
  */
 class NotificationService
 {
-    /** Tell the replied-to author, or the ranking creator for a top-level ranking comment. */
-    public function commentCreated(Comment $comment, ?Comment $replyingTo = null): void
+    /**
+     * Tell the replied-to author, or the ranking creator for a top-level ranking comment,
+     * then everyone mentioned who was not already told by those.
+     *
+     * @param  Collection<int, User>  $mentioned
+     */
+    public function commentCreated(Comment $comment, ?Comment $replyingTo = null, ?Collection $mentioned = null): void
     {
         $author = $comment->user;
 
@@ -44,16 +51,21 @@ class NotificationService
             'url' => $this->commentUrl($comment),
             'excerpt' => Str::limit($comment->body, 120),
         ];
+        $alreadyTold = null;
 
         if ($replyingTo !== null) {
-            $this->send($replyingTo->user, $author, new CommentReplied($payload));
-
-            return;
+            $alreadyTold = $replyingTo->user;
+            $this->send($alreadyTold, $author, new CommentReplied($payload));
+        } elseif ($comment->ranking_post_id !== null) {
+            $post = $comment->rankingPost;
+            $alreadyTold = $post?->creator;
+            $this->send($alreadyTold, $author, new RankingCommented([...$payload, 'title' => $post?->title]));
         }
 
-        if ($comment->ranking_post_id !== null) {
-            $post = $comment->rankingPost;
-            $this->send($post?->creator, $author, new RankingCommented([...$payload, 'title' => $post?->title]));
+        foreach ($mentioned ?? [] as $user) {
+            if (! $user->is($alreadyTold)) {
+                $this->send($user, $author, new CommentMentioned($payload));
+            }
         }
     }
 

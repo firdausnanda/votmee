@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Comment;
 use App\Models\CommentImage;
 use App\Models\CommentLike;
+use App\Models\CommentMention;
 use App\Models\MasterObject;
 use App\Models\Message;
 use App\Models\ObjectArticle;
@@ -16,6 +17,7 @@ use App\Models\UserAchievement;
 use App\Services\AchievementService;
 use App\Services\CommentImageProcessor;
 use App\Services\GamificationService;
+use App\Services\MentionService;
 use App\Services\NotificationService;
 use DateTimeImmutable;
 use Illuminate\Http\JsonResponse;
@@ -95,6 +97,7 @@ class SocialController extends Controller
             return $c;
         });
         CommentImage::attachToComments($comments);
+        CommentMention::attachToComments($comments);
         UserAchievement::attachToComments($comments);
 
         $totalCount = DB::table('comments')
@@ -163,6 +166,7 @@ class SocialController extends Controller
             return $comment;
         });
         CommentImage::attachToComments($comments);
+        CommentMention::attachToComments($comments);
         UserAchievement::attachToComments($comments);
         $total = Comment::query()->whereIn('object_id', $objectIds)->where('status', 'visible')->count();
 
@@ -227,6 +231,7 @@ class SocialController extends Controller
             return $comment;
         });
         CommentImage::attachToComments($comments);
+        CommentMention::attachToComments($comments);
         UserAchievement::attachToComments($comments);
         $total = Comment::query()->where('article_id', $article->id)->where('status', 'visible')->count();
 
@@ -358,18 +363,20 @@ class SocialController extends Controller
      */
     private function createComment(Request $request, CommentImageProcessor $images, array $attributes, ?Comment $replyingTo = null): JsonResponse
     {
-        $comment = DB::transaction(function () use ($request, $images, $attributes): Comment {
+        $mentionService = app(MentionService::class);
+        [$comment, $mentioned] = DB::transaction(function () use ($request, $images, $attributes, $mentionService): array {
             $comment = Comment::create($attributes);
             $images->attach($comment, $request->file('images', []));
 
-            return $comment;
+            return [$comment, $mentionService->record($comment)];
         });
 
-        app(NotificationService::class)->commentCreated($comment, $replyingTo);
+        app(NotificationService::class)->commentCreated($comment, $replyingTo, $mentionService->notifiable($comment, $mentioned));
 
         return response()->json([
             ...$comment->toArray(),
             'images' => $comment->images->map(fn (CommentImage $image): array => $image->toListing())->all(),
+            'mentions' => $mentioned->map(fn (User $user): array => ['id' => $user->id, 'username' => $user->username, 'name' => $user->name])->all(),
         ], 201);
     }
 

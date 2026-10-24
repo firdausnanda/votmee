@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, categoryHashtag, CoinIcon, dateLabel, dictionary, Layout, numberLabel, objectImageSrcSet, objectImageUrl, openLoginModal, PageHead, path, useSavedRanking } from './Shared';
 import { CommentImageAttachButton, CommentImageGallery, CommentImagePreviews, commentPayload, useCommentImages } from './CommentImages';
 import { CommentBadges } from './Achievements';
+import { MentionInput, MentionText } from './Mentions';
 import ReportDialog from './ReportDialog';
 import ShareModal from './ShareModal';
 
@@ -497,6 +498,7 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
 
     // Build comment map and hierarchy for threaded replies
     const commentMap = Object.fromEntries(comments.map((c) => [c.id, c]));
+    const mentionParticipants = [post.creator, ...comments];
 
     // Root comments: comments with no parent_id or whose parent is outside the current window
     const rootComments = comments.filter((c) => !c.parent_id || !commentMap[c.parent_id]);
@@ -593,7 +595,7 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
                         </div>
                     )}
 
-                    <p className="vr-comment-text">{item.body}</p>
+                    <p className="vr-comment-text"><MentionText body={item.body} mentions={item.mentions} locale={locale} /></p>
                     <CommentImageGallery images={item.images} locale={locale} authorName={item.name} />
 
                     {/* Like & Reply Action Row with Micro-Interactions */}
@@ -663,7 +665,7 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
                                 </button>
                             </div>
                             <div className="vr-chat-bar">
-                                <input
+                                <MentionInput
                                     type="text"
                                     className="vr-chat-input"
                                     placeholder={
@@ -672,7 +674,9 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
                                             : `Reply to @${item.name}...`
                                     }
                                     value={replyBody}
-                                    onChange={(e) => setReplyBody(e.target.value)}
+                                    onValueChange={setReplyBody}
+                                    participants={mentionParticipants}
+                                    locale={locale}
                                     autoFocus
                                     autoComplete="off"
                                     required
@@ -1007,14 +1011,16 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
                 {user ? (
                     <form className="vr-chat-composer" onSubmit={submitComment}>
                         <div className="vr-chat-bar">
-                            <input
+                            <MentionInput
                                 type="text"
                                 className="vr-chat-input"
                                 id="comment"
                                 placeholder={isId ? 'Tulis komentar...' : 'Write a comment...'}
                                 value={comment}
                                 maxLength={3000}
-                                onChange={(e) => setComment(e.target.value)}
+                                onValueChange={setComment}
+                                participants={mentionParticipants}
+                                locale={locale}
                                 autoComplete="off"
                                 required
                             />

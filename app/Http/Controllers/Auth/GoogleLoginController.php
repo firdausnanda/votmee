@@ -131,18 +131,11 @@ class GoogleLoginController extends Controller
             } else {
                 $name = $profileResponse->json('name');
                 $name = is_string($name) && trim($name) !== '' ? Str::limit(trim($name), 255, '') : Str::before($email, '@');
-                $baseUsername = rtrim(Str::limit(Str::slug($name), 240, ''), '-') ?: 'user';
-                $username = $baseUsername;
-
-                while (User::withTrashed()->where('username', $username)->exists()) {
-                    $username = $baseUsername.'-'.random_int(1000, 9999);
-                }
-
                 $user = new User;
                 $user->forceFill([
                     'name' => $name,
                     'email' => $email,
-                    'username' => $username,
+                    'username' => null,
                     'password' => Str::random(64),
                     'locale' => $locale,
                     'region_code' => $locale === 'id' ? 'ID' : 'GLOBAL',
@@ -160,6 +153,12 @@ class GoogleLoginController extends Controller
 
         Auth::login($user);
         $request->session()->regenerate();
+
+        if ($user->username === null) {
+            $request->session()->put('username_return_to', $flow['return_to'] ?? null);
+
+            return redirect()->route('community.username.create', ['locale' => $locale]);
+        }
 
         return redirect()->intended($flow['return_to'] ?? route('community.home', ['locale' => $locale]));
     }

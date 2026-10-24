@@ -6,6 +6,10 @@ const groups = {
         id: ['Balasan & komentar', 'Seseorang membalas komentar Anda atau mengomentari ranking Anda.'],
         en: ['Replies & comments', 'Someone replies to your comment or comments on your ranking.'],
     },
+    mentions: {
+        id: ['Mention', 'Seseorang menyebut Anda di komentar.'],
+        en: ['Mentions', 'Someone mentions you in a comment.'],
+    },
     likes: {
         id: ['Suka', 'Seseorang menyukai komentar Anda.'],
         en: ['Likes', 'Someone likes your comment.'],

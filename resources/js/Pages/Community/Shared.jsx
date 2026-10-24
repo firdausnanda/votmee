@@ -375,7 +375,7 @@ function MessagesLink({ locale, active, count }) {
 export function Layout({ locale, categories = [], leaders = [], children, active = '', searchPosts = [], loginModal = false, registerModal = false, recentComments: propRecentComments }) {
     const compactLayout = useCompactLayout();
     const t = dictionary(locale);
-    const showRankingPanel = active === 'home' || active === 'explore';
+    const showRankingPanel = ['home', 'explore', 'saved'].includes(active);
     const useWideContent = ['create', 'wallet', 'profile', 'object', 'ranking', 'settings', 'hall-of-fame', 'notifications', 'messages'].includes(active);
     const useFeedFrame = showRankingPanel || useWideContent;
     const user = usePage().props.auth?.user;

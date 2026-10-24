@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Category;
+use App\Models\MissionCompletion;
 use App\Models\PointLedger;
 use App\Models\QuickDuel;
 use App\Models\RankingEntry;
@@ -79,7 +80,7 @@ test('an object does not return to a duel for a week and stays out of the same d
         ->and($quickVotes->generate(now('Asia/Jakarta')->addDays(8)->toDateString()))->toBe(1);
 });
 
-test('a quick vote is free, records one point and pays only the daily mission', function () {
+test('a quick vote is free, records one point and leaves the daily mission ready to claim', function () {
     $user = User::factory()->create();
     [, $entries] = rankingWithEntries(2);
     $duel = QuickDuel::factory()->create(['ranking_post_id' => $entries[0]->ranking_post_id, 'entry_a_id' => $entries[0]->id, 'entry_b_id' => $entries[1]->id]);
@@ -97,8 +98,9 @@ test('a quick vote is free, records one point and pays only the daily mission', 
         ->and($event->amount)->toBe(1)
         ->and($event->ledger_id)->toBeNull()
         ->and($event->user_id)->toBe($user->id)
-        ->and(Wallet::query()->where('user_id', $user->id)->value('balance'))->toBe(3)
-        ->and(PointLedger::query()->pluck('type')->all())->toBe(['mission_reward']);
+        ->and(Wallet::query()->where('user_id', $user->id)->value('balance'))->toBe(0)
+        ->and(MissionCompletion::query()->where('user_id', $user->id)->where('mission', 'quick_vote')->value('amount'))->toBe(3)
+        ->and(PointLedger::query()->count())->toBe(0);
 });
 
 test('only one quick vote per Jakarta day is allowed and a new day restores it', function () {

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Comment;
 use App\Models\CommentImage;
+use App\Models\CommentMention;
 use App\Models\Conversation;
 use App\Models\MasterObject;
 use App\Models\ObjectArticle;
@@ -129,6 +130,7 @@ class CommunityController extends Controller
             return $c;
         });
         CommentImage::attachToComments($comments);
+        CommentMention::attachToComments($comments);
 
         $totalCommentsCount = DB::table('comments')
             ->where('comments.ranking_post_id', $post->id)
@@ -512,6 +514,7 @@ class CommunityController extends Controller
             'leaders' => $leaderboard->leaders(),
             'streak' => $gamification->streak($request->user()),
             'missions' => $gamification->missions($request->user()),
+            'pendingMissions' => $gamification->pendingMissions($request->user()),
             'summary' => $this->walletSummary($request->user()),
         ]);
     }

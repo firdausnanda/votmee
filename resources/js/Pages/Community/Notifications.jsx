@@ -32,6 +32,8 @@ export function notificationText(notification, locale) {
     switch (notification.type) {
         case 'comment_reply':
             return isId ? `${actor} membalas komentar Anda` : `${actor} replied to your comment`;
+        case 'comment_mention':
+            return isId ? `${actor} menyebut Anda di komentar` : `${actor} mentioned you in a comment`;
         case 'ranking_comment':
             return isId ? `${actor} mengomentari ranking Anda${title}` : `${actor} commented on your ranking${title}`;
         case 'comment_liked': {

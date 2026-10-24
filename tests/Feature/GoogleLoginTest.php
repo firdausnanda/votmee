@@ -77,22 +77,34 @@ test('google callback creates and verifies a new user', function () {
 
     $this->withSession(googleOAuthSession('en', '/en/explore'))
         ->get(route('google.callback', ['state' => 'valid-state', 'code' => 'auth-code']))
-        ->assertRedirect('/en/explore');
+        ->assertRedirect(route('community.username.create', ['locale' => 'en']));
 
     $user = User::where('email', 'new@example.com')->firstOrFail();
 
     $this->assertAuthenticatedAs($user);
     expect($user->google_id)->toBe('google-subject-1')
-        ->and($user->username)->toBe('new-voter')
+        ->and($user->username)->toBeNull()
         ->and($user->email_verified_at)->not->toBeNull()
         ->and($user->locale)->toBe('en')
         ->and($user->hasRole('user'))->toBeTrue();
 
     Http::assertSent(fn ($request) => $request->url() === 'https://oauth2.googleapis.com/token'
         && $request['code_verifier'] === 'valid-code-verifier');
+
+    $this->get(route('community.username.create', ['locale' => 'en']))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Auth/ChooseUsername')
+            ->where('suggestedUsername', 'new-voter')
+            ->etc());
+
+    $this->post(route('community.username.store', ['locale' => 'en']), ['username' => 'my-voter-name'])
+        ->assertRedirect('/en/explore');
+
+    expect($user->fresh()->username)->toBe('my-voter-name');
 });
 
-test('google callback adds random digits when a username is already taken', function () {
+test('google signup suggests a numbered username when the name is taken', function () {
     User::factory()->create(['username' => 'new-voter']);
 
     fakeGoogleProfile([
@@ -104,12 +116,39 @@ test('google callback adds random digits when a username is already taken', func
 
     $this->withSession(googleOAuthSession())
         ->get(route('google.callback', ['state' => 'valid-state', 'code' => 'auth-code']))
-        ->assertRedirect(route('community.home', ['locale' => 'id']));
+        ->assertRedirect(route('community.username.create', ['locale' => 'id']));
 
     $user = User::where('email', 'another@example.com')->firstOrFail();
 
     $this->assertAuthenticatedAs($user);
-    expect($user->username)->toMatch('/^new-voter-[1-9][0-9]{3}$/');
+    $this->get(route('community.username.create', ['locale' => 'id']))
+        ->assertInertia(fn ($page) => $page
+            ->component('Auth/ChooseUsername')
+            ->where('suggestedUsername', 'new-voter-2')
+            ->etc());
+
+    $this->post(route('community.username.store', ['locale' => 'id']), ['username' => 'new-voter'])
+        ->assertSessionHasErrors('username');
+
+    $this->post(route('community.username.store', ['locale' => 'id']), ['username' => 'new-voter-2'])
+        ->assertRedirect(route('community.home', ['locale' => 'id']));
+
+    expect($user->fresh()->username)->toBe('new-voter-2');
+});
+
+test('a Google account without a username must choose one before using the site', function () {
+    $user = User::factory()->create(['username' => null]);
+
+    $this->actingAs($user)->get(route('community.home', ['locale' => 'id']))
+        ->assertRedirect(route('community.username.create', ['locale' => $user->locale]));
+
+    $this->post(route('community.username.store', ['locale' => 'id']), ['username' => 'chosen-name'])
+        ->assertRedirect(route('community.home', ['locale' => 'id']));
+
+    $this->post(route('community.username.store', ['locale' => 'id']), ['username' => 'other-name'])
+        ->assertRedirect(route('community.home', ['locale' => 'id']));
+
+    expect($user->fresh()->username)->toBe('chosen-name');
 });
 
 test('google callback links an existing Gmail account', function () {

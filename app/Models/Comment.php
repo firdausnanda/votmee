@@ -55,4 +55,9 @@ class Comment extends Model
     {
         return $this->hasMany(CommentLike::class);
     }
+
+    public function mentions(): HasMany
+    {
+        return $this->hasMany(CommentMention::class);
+    }
 }
