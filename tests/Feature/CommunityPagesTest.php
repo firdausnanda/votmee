@@ -213,7 +213,7 @@ test('profile shows received support and owned wallet points', function () {
     $this->get('/id/profile/'.$creator->username)->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('Community/Profile')
         ->where('profile.stats.support_points_received', 6)
-        ->where('profile.stats.wallet_balance', 17)
+        ->where('profile.stats.wallet_balance', 17 + config('gamification.achievement_points.bronze'))
         ->where('rankings.total', 1)
         ->where('rankings.data.0.support_points', 6)
         ->etc());

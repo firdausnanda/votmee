@@ -24,7 +24,7 @@ class QuickVoteService
 
     private const CANDIDATE_POSTS = 300;
 
-    public function __construct(private FeedService $feed, private MissionService $missions) {}
+    public function __construct(private FeedService $feed, private MissionService $missions, private AchievementService $achievements) {}
 
     /** The quick vote day follows the Jakarta calendar, like the daily bonus. */
     public function today(): string
@@ -87,6 +87,7 @@ class QuickVoteService
         }
 
         $this->missions->record($user, 'quick_vote');
+        $this->achievements->evaluate($user, 'voter');
 
         return $this->present($duel, $event);
     }

@@ -1,10 +1,12 @@
 <?php
 
+use App\Models\Category;
 use App\Models\Comment;
 use App\Models\CommentLike;
 use App\Models\MasterObject;
 use App\Models\ObjectContentRevision;
 use App\Models\PointLedger;
+use App\Models\RankingPost;
 use App\Models\Report;
 use App\Models\User;
 use App\Models\UserAchievement;
@@ -13,6 +15,8 @@ use App\Services\AchievementService;
 use App\Services\MissionService;
 use App\Services\ModerationService;
 use App\Services\SupportService;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 
 function achievementKeys(User $user): array
@@ -118,7 +122,7 @@ test('the profile lists every badge with progress', function () {
     app(AchievementService::class)->evaluate($user, 'curator');
 
     $this->get("/id/profile/{$user->username}")->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->has('achievements', 18)
+        ->has('achievements', 29)
         ->where('achievements.3.key', 'curator_bronze')
         ->where('achievements.3.current', 3)
         ->where('achievements.3.featured', false)
@@ -181,8 +185,8 @@ test('locked hidden badges stay out of the profile progress', function () {
     app(AchievementService::class)->unlockHidden($user, 'night_owl');
 
     $this->get("/id/profile/{$user->username}")->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->has('achievements', 19)
-        ->where('achievements.18.key', 'hidden_night_owl')
+        ->has('achievements', 30)
+        ->where('achievements.29.key', 'hidden_night_owl')
         ->where('hiddenAchievementsLocked', 2));
 });
 
@@ -241,4 +245,150 @@ test('the hall of fame ranks contributors within the current month', function ()
         ->where('board.curator.0.user.username', $top->username)
         ->where('board.curator.0.count', 3)
         ->where('board.curator.1.count', 1));
+});
+
+test('the hall of fame archive shows a past month with the viewer standing', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00', 'Asia/Jakarta'));
+    $viewer = User::factory()->create(['created_at' => now()->subMonths(3)]);
+    $leader = User::factory()->create();
+    $september = CarbonImmutable::parse('2026-09-10 12:00', 'Asia/Jakarta')->utc();
+    MasterObject::factory()->count(3)->create(['submitted_by' => $leader->id, 'verified_at' => $september]);
+    MasterObject::factory()->count(2)->create(['submitted_by' => $viewer->id, 'verified_at' => $september]);
+    MasterObject::factory()->create(['submitted_by' => $viewer->id]);
+
+    foreach (['2026-11', '2026-06', '2026-13', 'bogus'] as $month) {
+        $this->get("/id/hall-of-fame?month={$month}")->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('month', '2026-10')
+            ->where('standing', null));
+    }
+
+    $this->actingAs($viewer)->get('/id/hall-of-fame?month=2026-09')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('month', '2026-09')
+        ->where('isCurrentMonth', false)
+        ->where('previousMonth', '2026-08')
+        ->where('nextMonth', '2026-10')
+        ->where('board.curator.0.user.username', $leader->username)
+        ->where('standing.curator', ['rank' => 2, 'count' => 2])
+        ->where('standing.writer', ['rank' => null, 'count' => 0]));
+
+    $this->actingAs($viewer)->get('/id/hall-of-fame')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('month', '2026-10')
+        ->where('isCurrentMonth', true)
+        ->where('nextMonth', null)
+        ->where('standing.curator', ['rank' => 1, 'count' => 1]));
+});
+
+test('crowning a finished month gives each board leader a shared champion title once', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-10-01 01:00', 'Asia/Jakarta'));
+    $september = CarbonImmutable::parse('2026-09-20 12:00', 'Asia/Jakarta')->utc();
+    [$first, $tied, $restricted, $writer] = User::factory()->count(4)->create(['created_at' => $september]);
+    $restricted->forceFill(['restricted_until' => now()->addWeek()])->save();
+    MasterObject::factory()->count(4)->create(['submitted_by' => $first->id, 'verified_at' => $september]);
+    MasterObject::factory()->count(4)->create(['submitted_by' => $tied->id, 'verified_at' => $september]);
+    MasterObject::factory()->count(6)->create(['submitted_by' => $restricted->id, 'verified_at' => $september]);
+    ObjectContentRevision::factory()->count(2)->create(['author_id' => $writer->id, 'status' => 'published', 'published_at' => $september]);
+
+    $this->artisan('votmee:crown-champions')->assertSuccessful();
+    $this->artisan('votmee:crown-champions --month=2026-09')->assertSuccessful();
+
+    $key = 'champion_2026_09_curator';
+    expect(achievementKeys($first))->toContain($key)
+        ->and(achievementKeys($tied))->toContain($key)
+        ->and(achievementKeys($restricted))->not->toContain($key)
+        ->and(achievementKeys($writer))->not->toContain('champion_2026_09_writer')
+        ->and(PointLedger::query()->where('idempotency_key', "achievement:{$first->id}:{$key}")->sum('amount'))->toBe(25);
+
+    $this->artisan('votmee:crown-champions --month=2026-10')->assertFailed();
+
+    $this->get('/id/hall-of-fame?month=2026-09')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('champions.curator', [$first->id, $tied->id])
+        ->where('champions.writer', []));
+
+    $this->get("/id/profile/{$first->username}")->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('achievements', fn ($badges) => collect($badges)->contains(fn ($badge) => $badge['key'] === $key && $badge['group'] === 'champion' && $badge['period'] === '2026-09')));
+});
+
+test('publishing a ranking unlocks the ranker badge', function () {
+    $user = User::factory()->create();
+    $category = Category::factory()->create();
+    [$first, $second] = MasterObject::factory()->count(2)->create(['category_id' => $category->id])->all();
+
+    $this->actingAs($user)->postJson(route('backend.rankings.store'), [
+        'title' => 'Which candidate is better?',
+        'criteria' => 'Choose the strongest candidate overall.',
+        'category_id' => $category->id,
+        'language_code' => 'en',
+        'region_code' => 'GLOBAL',
+        'object_ids' => [$first->id, $second->id],
+    ])->assertCreated();
+
+    expect(achievementKeys($user))->toBe(['ranker_bronze'])
+        ->and(achievementPoints($user))->toBe(5);
+});
+
+test('supports unlock the voter badge and count each other supporter once toward the influencer badge', function () {
+    config(['gamification.achievements.voter.bronze' => 2, 'gamification.achievements.influencer.bronze' => 2]);
+    $creator = User::factory()->create();
+    $post = RankingPost::factory()->create(['creator_id' => $creator->id]);
+    $entry = $post->entries()->create(['object_id' => MasterObject::factory()->create(['category_id' => $post->category_id])->id, 'position' => 1]);
+    [$first, $second] = User::factory()->count(2)->create()->all();
+    $support = app(SupportService::class);
+
+    foreach ([$creator, $first, $second] as $member) {
+        $support->claimDaily($member);
+    }
+
+    $support->support($creator, $entry, 1, (string) Str::uuid());
+    $support->support($first, $entry, 1, (string) Str::uuid());
+    $support->support($first, $entry, 1, (string) Str::uuid());
+
+    expect(achievementKeys($first))->toBe(['voter_bronze'])
+        ->and(achievementKeys($creator))->not->toContain('influencer_bronze');
+
+    $support->support($second, $entry, 1, (string) Str::uuid());
+
+    expect(achievementKeys($creator))->toContain('influencer_bronze')
+        ->and(achievementKeys($second))->not->toContain('voter_bronze');
+});
+
+test('the influence and ranking boards count unique outside supporters and supported rankings', function () {
+    config(['gamification.seasonal.influencer' => 2, 'gamification.seasonal.ranker' => 2]);
+    [$creator, $rival, $fan, $friend] = User::factory()->count(4)->create()->all();
+    [$selfSupported, $supported, $alsoSupported] = RankingPost::factory()->count(3)->create(['creator_id' => $creator->id])->all();
+    $rivalPost = RankingPost::factory()->create(['creator_id' => $rival->id]);
+    [$selfEntry, $entry, $otherEntry, $rivalEntry] = collect([$selfSupported, $supported, $alsoSupported, $rivalPost])
+        ->map(fn (RankingPost $post) => $post->entries()->create([
+            'object_id' => MasterObject::factory()->create(['category_id' => $post->category_id])->id,
+            'position' => 1,
+        ]))
+        ->all();
+    $support = app(SupportService::class);
+
+    foreach ([$creator, $fan, $friend] as $member) {
+        $support->claimDaily($member);
+    }
+
+    $support->support($creator, $selfEntry, 1, (string) Str::uuid());
+    $support->support($fan, $entry, 1, (string) Str::uuid());
+    $support->support($fan, $otherEntry, 1, (string) Str::uuid());
+    $support->support($friend, $rivalEntry, 1, (string) Str::uuid());
+    $month = now('Asia/Jakarta')->format('Y_m');
+
+    expect(achievementKeys($creator))->toContain("season_{$month}_ranker")
+        ->not->toContain("season_{$month}_influencer");
+
+    $support->support($friend, $entry, 1, (string) Str::uuid());
+
+    expect(achievementKeys($creator))->toContain("season_{$month}_influencer");
+
+    $this->actingAs($creator)->get('/id/hall-of-fame')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('board.influencer.0.user.username', $creator->username)
+        ->where('board.influencer.0.count', 2)
+        ->where('board.influencer.1.count', 1)
+        ->where('board.ranker.0.user.username', $creator->username)
+        ->where('board.ranker.0.count', 2)
+        ->where('board.ranker.1.count', 1)
+        ->where('standing.influencer', ['rank' => 1, 'count' => 2])
+        ->where('standing.ranker', ['rank' => 1, 'count' => 2])
+        ->where('thresholds.influencer', 2));
 });

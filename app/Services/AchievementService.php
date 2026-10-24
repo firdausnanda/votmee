@@ -6,7 +6,9 @@ use App\Models\Comment;
 use App\Models\MasterObject;
 use App\Models\ObjectContentRevision;
 use App\Models\PointLedger;
+use App\Models\RankingPost;
 use App\Models\Report;
+use App\Models\SupportEvent;
 use App\Models\User;
 use App\Models\UserAchievement;
 use App\Models\Wallet;
@@ -20,6 +22,8 @@ use InvalidArgumentException;
 class AchievementService
 {
     private const HOLDERS_CACHE_KEY = 'achievements.holders';
+
+    private const FIRST_MONTH_CACHE_KEY = 'achievements.first-month';
 
     /**
      * Unlock every tier of a category the user has reached, plus this month's seasonal
@@ -90,7 +94,7 @@ class AchievementService
 
     /**
      * Every tiered badge with progress, this month's seasonal badges, earlier seasonal
-     * badges the user holds, and hidden badges once they are unlocked.
+     * badges and monthly champion titles the user holds, and hidden badges once they are unlocked.
      *
      * @return list<array{key: string, group: string, category: string, tier: string|null, period: string|null, threshold: int, points: int, current: int, unlocked_at: string|null, featured: bool, holders_percent: float}>
      */
@@ -137,6 +141,11 @@ class AchievementService
                     'group' => 'season', 'category' => $match[3], 'tier' => null, 'period' => "{$match[1]}-{$match[2]}",
                     'threshold' => (int) config("gamification.seasonal.{$match[3]}", 0), 'points' => (int) config('gamification.seasonal_points'),
                     'current' => (int) config("gamification.seasonal.{$match[3]}", 0),
+                ]);
+            } elseif (preg_match('/^champion_(\d{4})_(\d{2})_(\w+)$/', $key, $match)) {
+                $badges[] = $badge($key, [
+                    'group' => 'champion', 'category' => $match[3], 'tier' => null, 'period' => "{$match[1]}-{$match[2]}",
+                    'threshold' => 1, 'points' => (int) config('gamification.champion_points'), 'current' => 1,
                 ]);
             } elseif (str_starts_with($key, 'hidden_')) {
                 $badges[] = $badge($key, [
@@ -206,6 +215,9 @@ class AchievementService
             'writer' => ObjectContentRevision::query()->where('author_id', $user->id)->where('status', 'published')->count(),
             'voice' => $this->receivedLikes()->where('comments.user_id', $user->id)->count(),
             'guardian' => Report::query()->where('reporter_id', $user->id)->where('status', 'resolved')->count(),
+            'ranker' => RankingPost::query()->where('creator_id', $user->id)->where('status', 'published')->count(),
+            'voter' => SupportEvent::query()->where('user_id', $user->id)->where('status', 'valid')->count(),
+            'influencer' => $this->supportersReceived($user),
             default => throw new InvalidArgumentException("Unknown achievement category [{$category}]."),
         };
     }
@@ -213,7 +225,12 @@ class AchievementService
     /** The count of a seasonal category within one Jakarta month. */
     public function monthlyCount(User $user, string $category, CarbonImmutable $month): int
     {
-        return $this->monthlyQuery($category, $month)->where($this->contributorColumn($category), $user->id)->count();
+        $total = $this->monthlyQuery($category, $month)
+            ->where($this->contributorColumn($category), $user->id)
+            ->selectRaw($this->monthlyTotal($category).' as total')
+            ->first();
+
+        return (int) ($total->total ?? 0);
     }
 
     /**
@@ -231,7 +248,7 @@ class AchievementService
             foreach (array_keys(config('gamification.seasonal')) as $category) {
                 $column = $this->contributorColumn($category);
                 $counts = $this->monthlyQuery($category, $month)
-                    ->selectRaw("{$column} as contributor_id, COUNT(*) as total")
+                    ->selectRaw("{$column} as contributor_id, {$this->monthlyTotal($category)} as total")
                     ->groupBy($column)
                     ->orderByDesc('total')
                     ->orderBy($column)
@@ -253,6 +270,102 @@ class AchievementService
         });
     }
 
+    /**
+     * The viewer's place on each seasonal board of a Jakarta month, ordered like the hall of fame.
+     * The rank is null when the viewer has not contributed that month.
+     *
+     * @return array<string, array{rank: int|null, count: int}>
+     */
+    public function standing(User $user, CarbonImmutable $month): array
+    {
+        $standing = [];
+
+        foreach (array_keys(config('gamification.seasonal')) as $category) {
+            $column = $this->contributorColumn($category);
+            $total = $this->monthlyTotal($category);
+            $count = $this->monthlyCount($user, $category, $month);
+            $ahead = $count === 0 ? null : DB::query()->fromSub(
+                $this->monthlyQuery($category, $month)
+                    ->select($column)
+                    ->groupBy($column)
+                    ->havingRaw("{$total} > ? OR ({$total} = ? AND {$column} < ?)", [$count, $count, $user->id]),
+                'ahead',
+            )->count();
+
+            $standing[$category] = ['rank' => $ahead === null ? null : $ahead + 1, 'count' => $count];
+        }
+
+        return $standing;
+    }
+
+    /**
+     * Give a finished month's champion title to the top contributor of each seasonal board,
+     * shared on a tie. Only members who can participate and reached the seasonal threshold
+     * qualify. Returns how many titles were newly awarded.
+     */
+    public function crownChampions(CarbonImmutable $month): int
+    {
+        if (! $month->startOfMonth()->lessThan($this->currentMonth())) {
+            throw new InvalidArgumentException('Only a finished month can be crowned.');
+        }
+
+        Cache::forget('achievements.hall-of-fame.'.$month->format('Y-m'));
+        $crowned = 0;
+
+        foreach ($this->hallOfFame($month) as $category => $entries) {
+            $users = User::query()->whereIn('id', array_column(array_column($entries, 'user'), 'id'))->get()->keyBy('id');
+            $eligible = array_values(array_filter($entries, fn (array $entry): bool => $users->get($entry['user']['id'])?->canParticipate() ?? false));
+            $topCount = $eligible[0]['count'] ?? 0;
+
+            if ($topCount < (int) config("gamification.seasonal.{$category}")) {
+                continue;
+            }
+
+            foreach ($eligible as $entry) {
+                if ($entry['count'] === $topCount
+                    && $this->unlock($users->get($entry['user']['id']), $this->championKey($month, $category), (int) config('gamification.champion_points'), true)) {
+                    $crowned++;
+                }
+            }
+        }
+
+        return $crowned;
+    }
+
+    /**
+     * The members holding each seasonal board's champion title for a Jakarta month.
+     *
+     * @return array<string, list<int>>
+     */
+    public function champions(CarbonImmutable $month): array
+    {
+        $keys = [];
+
+        foreach (array_keys(config('gamification.seasonal')) as $category) {
+            $keys[$this->championKey($month, $category)] = $category;
+        }
+
+        $champions = array_fill_keys(array_values($keys), []);
+
+        UserAchievement::query()->whereIn('achievement_key', array_keys($keys))->orderBy('user_id')
+            ->get(['user_id', 'achievement_key'])
+            ->each(function (UserAchievement $achievement) use ($keys, &$champions): void {
+                $champions[$keys[$achievement->achievement_key]][] = $achievement->user_id;
+            });
+
+        return $champions;
+    }
+
+    /** The Jakarta month the first member joined, the earliest month the hall of fame shows. */
+    public function firstMonth(): CarbonImmutable
+    {
+        $first = Cache::remember(self::FIRST_MONTH_CACHE_KEY, now()->addDay(), fn (): ?string => User::query()->min('created_at'));
+
+        return $first === null
+            ? $this->currentMonth()
+            : CarbonImmutable::parse($first, 'UTC')->setTimezone('Asia/Jakarta')->startOfMonth();
+    }
+
     /** The first day of the current Jakarta month. */
     public function currentMonth(): CarbonImmutable
     {
@@ -264,6 +377,11 @@ class AchievementService
         return 'season_'.$month->format('Y_m')."_{$category}";
     }
 
+    private function championKey(CarbonImmutable $month, string $category): string
+    {
+        return 'champion_'.$month->format('Y_m')."_{$category}";
+    }
+
     /** Rows credited to contributors of a seasonal category within a Jakarta month. */
     private function monthlyQuery(string $category, CarbonImmutable $month): Builder
     {
@@ -273,8 +391,22 @@ class AchievementService
             'curator' => DB::table('objects')->whereIn('status', ['verified', 'merged'])->whereBetween('verified_at', $range),
             'writer' => DB::table('object_content_revisions')->where('status', 'published')->whereBetween('published_at', $range),
             'voice' => $this->receivedLikes()->whereBetween('comment_likes.created_at', $range),
+            'influencer' => $this->rankingSupports()->whereBetween('support_events.occurred_at', $range),
+            'ranker' => DB::table('ranking_posts')->where('status', 'published')->whereBetween('published_at', $range)
+                ->whereExists(fn (Builder $query) => $query->from('support_events')
+                    ->join('ranking_entries', 'ranking_entries.id', '=', 'support_events.ranking_entry_id')
+                    ->whereColumn('ranking_entries.ranking_post_id', 'ranking_posts.id')
+                    ->whereColumn('support_events.user_id', '!=', 'ranking_posts.creator_id')
+                    ->where('support_events.source', 'support')
+                    ->where('support_events.status', 'valid')),
             default => throw new InvalidArgumentException("No seasonal achievement for [{$category}]."),
         };
+    }
+
+    /** How a seasonal category's rows add up to each contributor's score. */
+    private function monthlyTotal(string $category): string
+    {
+        return $category === 'influencer' ? 'COUNT(DISTINCT support_events.user_id)' : 'COUNT(*)';
     }
 
     private function contributorColumn(string $category): string
@@ -283,8 +415,30 @@ class AchievementService
             'curator' => 'submitted_by',
             'writer' => 'author_id',
             'voice' => 'comments.user_id',
+            'influencer', 'ranker' => 'ranking_posts.creator_id',
             default => throw new InvalidArgumentException("No seasonal achievement for [{$category}]."),
         };
+    }
+
+    /** Distinct other members who spent points supporting the user's published rankings. */
+    private function supportersReceived(User $user): int
+    {
+        return $this->rankingSupports()
+            ->where('ranking_posts.creator_id', $user->id)
+            ->distinct()
+            ->count('support_events.user_id');
+    }
+
+    /** Valid point supports on published rankings, excluding creators supporting their own. */
+    private function rankingSupports(): Builder
+    {
+        return DB::table('support_events')
+            ->join('ranking_entries', 'ranking_entries.id', '=', 'support_events.ranking_entry_id')
+            ->join('ranking_posts', 'ranking_posts.id', '=', 'ranking_entries.ranking_post_id')
+            ->where('ranking_posts.status', 'published')
+            ->where('support_events.source', 'support')
+            ->where('support_events.status', 'valid')
+            ->whereColumn('support_events.user_id', '!=', 'ranking_posts.creator_id');
     }
 
     /** Likes on visible comments, excluding authors liking their own comments. */

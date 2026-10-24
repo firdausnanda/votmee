@@ -99,6 +99,9 @@ return [
         'writer' => ['bronze' => 5, 'silver' => 25, 'gold' => 100],
         'voice' => ['bronze' => 10, 'silver' => 50, 'gold' => 200],
         'guardian' => ['bronze' => 5, 'silver' => 20, 'gold' => 50],
+        'ranker' => ['bronze' => 1, 'silver' => 10, 'gold' => 50],
+        'voter' => ['bronze' => 10, 'silver' => 50, 'gold' => 200],
+        'influencer' => ['bronze' => 10, 'silver' => 50, 'gold' => 200],
     ],
 
     'achievement_points' => [
@@ -113,7 +116,9 @@ return [
     |--------------------------------------------------------------------------
     |
     | One badge per category each Jakarta month, earned by reaching the count
-    | within that month only. Keys read "season_{YYYY}_{MM}_{category}".
+    | within that month only. Influence counts distinct other supporters, and
+    | rankings count only once another member supported them with points.
+    | Keys read "season_{YYYY}_{MM}_{category}".
     |
     */
 
@@ -121,9 +126,24 @@ return [
         'curator' => 3,
         'writer' => 5,
         'voice' => 20,
+        'influencer' => 10,
+        'ranker' => 3,
     ],
 
     'seasonal_points' => 10,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Monthly Champions
+    |--------------------------------------------------------------------------
+    |
+    | Once a Jakarta month ends, the top contributor of each seasonal board who
+    | reached that board's seasonal threshold earns a permanent champion title,
+    | shared on a tie. Keys read "champion_{YYYY}_{MM}_{category}".
+    |
+    */
+
+    'champion_points' => 25,
 
     /*
     |--------------------------------------------------------------------------

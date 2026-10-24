@@ -27,6 +27,7 @@ use App\Services\ModerationService;
 use App\Services\NotificationService;
 use App\Services\ObjectMatchingService;
 use App\Services\SeoService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -460,12 +461,26 @@ class CommunityController extends Controller
 
     public function hallOfFame(Request $request, LeaderboardService $leaderboard, AchievementService $achievements): Response
     {
-        $month = $achievements->currentMonth();
+        $currentMonth = $achievements->currentMonth();
+        $firstMonth = $achievements->firstMonth();
+        $requested = $request->query('month');
+        $month = is_string($requested) && preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $requested) === 1
+            ? CarbonImmutable::createFromFormat('!Y-m', $requested, 'Asia/Jakarta')
+            : $currentMonth;
+
+        if ($month->greaterThan($currentMonth) || $month->lessThan($firstMonth)) {
+            $month = $currentMonth;
+        }
 
         return Inertia::render('Community/HallOfFame', [
             ...$this->shared($request),
             'month' => $month->format('Y-m'),
+            'isCurrentMonth' => $month->equalTo($currentMonth),
+            'previousMonth' => $month->greaterThan($firstMonth) ? $month->subMonth()->format('Y-m') : null,
+            'nextMonth' => $month->lessThan($currentMonth) ? $month->addMonth()->format('Y-m') : null,
             'board' => $achievements->hallOfFame($month),
+            'champions' => $achievements->champions($month),
+            'standing' => $request->user() === null ? null : $achievements->standing($request->user(), $month),
             'thresholds' => config('gamification.seasonal'),
             'leaders' => $leaderboard->leaders(),
         ]);
