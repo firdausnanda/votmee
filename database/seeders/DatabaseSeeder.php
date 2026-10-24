@@ -21,6 +21,11 @@ class DatabaseSeeder extends Seeder
             MasterObjectSeeder::class,
             RankingPostSeeder::class,
             TransactionSeeder::class,
+            ObjectContentRevisionSeeder::class,
+            ObjectArticleSeeder::class,
+            ObjectDiscussionSeeder::class,
+            CommentLikeSeeder::class,
+            UserAchievementSeeder::class,
         ]);
     }
 }

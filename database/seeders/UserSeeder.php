@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Database\Seeders\Content\CommunityContent;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -29,7 +30,7 @@ class UserSeeder extends Seeder
         ];
 
         foreach ($accounts as [$email, $name, $username, $role, $locale, $region, $permissionRole]) {
-            User::updateOrCreate(['email' => $email], [
+            $user = User::updateOrCreate(['email' => $email], [
                 'name' => $name,
                 'username' => $username,
                 'password' => Hash::make('password'),
@@ -37,14 +38,15 @@ class UserSeeder extends Seeder
                 'locale' => $locale,
                 'region_code' => $region,
                 'email_verified_at' => now(),
-            ])->syncRoles([$permissionRole]);
+            ]);
+            $this->backdateJoin($user->syncRoles([$permissionRole]), now()->subDays(60));
         }
 
         // 2. Community members that author the rankings and discussions in the demo content
         foreach (CommunityContent::members() as $index => $member) {
             $existing = User::where('email', $member['email'])->first();
 
-            User::updateOrCreate(['email' => $member['email']], [
+            $user = User::updateOrCreate(['email' => $member['email']], [
                 'name' => $member['name'],
                 'username' => $member['username'],
                 'password' => Hash::make('password'),
@@ -52,7 +54,8 @@ class UserSeeder extends Seeder
                 'locale' => $member['locale'],
                 'region_code' => $member['region'],
                 'email_verified_at' => $existing?->email_verified_at ?? now()->subDays(30 + ($index * 3 % 60)),
-            ])->syncRoles([$userRole]);
+            ]);
+            $this->backdateJoin($user->syncRoles([$userRole]), $user->email_verified_at->copy()->subMinutes(5 + $index));
         }
 
         // 3. Restricted and unverified sample accounts for testing
@@ -76,5 +79,13 @@ class UserSeeder extends Seeder
             'region_code' => 'ID',
             'email_verified_at' => null,
         ])->syncRoles([$userRole]);
+    }
+
+    /** A freshly created demo account joined on the given date, so its history can precede it. */
+    private function backdateJoin(User $user, CarbonInterface $joinedAt): void
+    {
+        if ($user->wasRecentlyCreated) {
+            $user->forceFill(['created_at' => $joinedAt, 'updated_at' => $joinedAt])->saveQuietly();
+        }
     }
 }

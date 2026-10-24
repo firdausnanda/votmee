@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\PointLedger;
 use App\Models\User;
 use App\Models\Wallet;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 
 class PointLedgerSeeder extends Seeder
@@ -44,7 +45,47 @@ class PointLedgerSeeder extends Seeder
             }
         }
 
+        self::syncStreaks();
         self::syncBalances();
+    }
+
+    /**
+     * Rebuild each wallet's streak from its daily claims, paying the cycle bonus on every
+     * completed cycle the way a live claim would.
+     */
+    public static function syncStreaks(): void
+    {
+        $cycleDays = (int) config('gamification.streak.cycle_days');
+        $bonus = (int) config('gamification.streak.bonus');
+
+        foreach (Wallet::all() as $wallet) {
+            $claims = PointLedger::where('user_id', $wallet->user_id)->where('type', 'daily_bonus')->orderBy('claimed_on')->get();
+            $streak = 0;
+            $longest = 0;
+            $previous = null;
+
+            foreach ($claims as $claim) {
+                $day = CarbonImmutable::parse($claim->claimed_on)->toDateString();
+                $streak = $previous === CarbonImmutable::parse($day)->subDay()->toDateString() ? $streak + 1 : 1;
+                $longest = max($longest, $streak);
+                $previous = $day;
+
+                if ($streak % $cycleDays === 0 && ! PointLedger::where('idempotency_key', "streak:{$wallet->user_id}:{$day}")->exists()) {
+                    (new PointLedger)->forceFill([
+                        'wallet_id' => $wallet->id,
+                        'user_id' => $wallet->user_id,
+                        'amount' => $bonus,
+                        'type' => 'streak_bonus',
+                        'idempotency_key' => "streak:{$wallet->user_id}:{$day}",
+                        'claimed_on' => $day,
+                        'created_at' => $claim->created_at,
+                        'updated_at' => $claim->created_at,
+                    ])->save();
+                }
+            }
+
+            $wallet->update(['streak_days' => $streak, 'longest_streak' => $longest, 'last_claimed_on' => $previous]);
+        }
     }
 
     /** Make every wallet balance match what its ledger says. */
