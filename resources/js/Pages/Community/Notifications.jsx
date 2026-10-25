@@ -11,6 +11,7 @@ import {
     useUnreadCount,
 } from '../../Components/notificationFeed';
 import { achievementName, AchievementBadge } from './Achievements';
+import { AvatarFrame } from './AvatarFrame';
 import { api, commentTimeAgo, Layout, NavIcon, numberLabel, PageHead, path } from './Shared';
 
 const reviewLabels = {
@@ -63,13 +64,13 @@ export function notificationText(notification, locale) {
 function NotificationLead({ notification, size = 36 }) {
     const { data } = notification;
 
-    return <span className="vm-notification-icon">
+    return <AvatarFrame frame={notification.type === 'achievement_unlocked' ? null : data.actor?.avatar_frame} size="sm"><span className="vm-notification-icon">
         {notification.type === 'achievement_unlocked' && data.badge_key
             ? <AchievementBadge achievementKey={data.badge_key} size={size} />
             : data.actor?.avatar_url
                 ? <img src={data.actor.avatar_url} alt="" />
                 : <NavIcon name={{ comment_liked: 'heart', streak_reminder: 'flame' }[notification.type] ?? 'messageSquare'} size={18} />}
-    </span>;
+    </span></AvatarFrame>;
 }
 
 function NotificationItem({ notification, locale, onOpen, onDelete, index = 0 }) {

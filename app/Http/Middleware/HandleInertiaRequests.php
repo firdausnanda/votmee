@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Services\AchievementService;
+use App\Services\AvatarFrameService;
 use App\Services\MessagingService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -52,7 +53,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $user,
+                'user' => $user ? [...$user->toArray(), ...app(AvatarFrameService::class)->flairForUser($user)] : null,
                 'can' => [
                     'createRanking' => $user !== null,
                     'viewWallet' => $user !== null,

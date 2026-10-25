@@ -12,6 +12,7 @@ return [
     'mission_expired' => 'The claim window for this mission reward has ended.',
     'mission_invalid' => 'This mission no longer qualifies because its content is no longer available.',
     'achievement_feature_invalid' => 'Choose up to three badges you have unlocked.',
+    'avatar_frame_locked' => 'Unlock this frame before using it.',
     'review_invalid' => 'Invalid object review transition.',
     'merge_target_invalid' => 'Choose a different verified object.',
     'not_merged' => 'This object is not merged.',

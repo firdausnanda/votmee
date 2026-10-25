@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\MasterObject;
 use App\Models\RankingPost;
 use App\Models\User;
+use App\Services\AvatarFrameService;
 use App\Services\ObjectMatchingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -93,7 +94,7 @@ class SearchController extends Controller
         return response()->json([
             'rankings' => $rankings,
             'objects' => $objects,
-            'users' => $users,
+            'users' => app(AvatarFrameService::class)->decorate($users->all()),
         ]);
     }
 }

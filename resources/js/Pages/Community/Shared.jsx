@@ -5,6 +5,7 @@ import LanguageSelect from '../../Components/LanguageSelect';
 import ProfileDropdown from '../../Components/ProfileDropdown';
 import AuthModal from '../../Components/AuthModal';
 import { AchievementBadge, achievementName } from './Achievements';
+import { AvatarFrame, NameFlair } from './AvatarFrame';
 import { NotificationBell, NotificationPoll, NotificationToasts } from './Notifications';
 import { useNotificationFeed, useNotificationFeedLifecycle, useUnreadMessages } from '../../Components/notificationFeed';
 import id from '../../i18n/id.json';
@@ -439,6 +440,7 @@ export function Layout({ locale, categories = [], leaders = [], children, active
                 name: user.name,
                 username: user.username,
                 avatar: user.avatar_url ? `${user.avatar_url}&size=small` : null,
+                avatarFrame: user.avatar_frame ?? null,
                 rankings: numberLabel(user.rankings_count, locale),
                 href: path(locale, `/profile/${user.username}`),
             })),
@@ -692,18 +694,22 @@ export function Leaderboard({ locale, initialLeaders = [] }) {
                                 <span className={rankClass} aria-label={`Rank ${rankNumber}`}>
                                     {rankNumber}
                                 </span>
-                                <span className="vm-rank-avatar" aria-hidden="true">
-                                    {board === 'objects' && leader.image_path
-                                        ? <img src={objectImageUrl({ id: leader.object_id, image_path: leader.image_path }, 'small')} alt="" loading="lazy" decoding="async" />
-                                        : board === 'creators' && leader.avatar_url
-                                            ? <img src={`${leader.avatar_url}&size=small`} alt="" loading="lazy" decoding="async" />
-                                            : leader.name.slice(0, 1).toUpperCase()}
-                                </span>
+                                <AvatarFrame frame={board === 'creators' ? leader.avatar_frame : null} locale={locale} size="sm" shape="rounded">
+                                    <span className="vm-rank-avatar" aria-hidden="true">
+                                        {board === 'objects' && leader.image_path
+                                            ? <img src={objectImageUrl({ id: leader.object_id, image_path: leader.image_path }, 'small')} alt="" loading="lazy" decoding="async" />
+                                            : board === 'creators' && leader.avatar_url
+                                                ? <img src={`${leader.avatar_url}&size=small`} alt="" loading="lazy" decoding="async" />
+                                                : leader.name.slice(0, 1).toUpperCase()}
+                                    </span>
+                                </AvatarFrame>
                                 <span className="vm-leader-name">
                                     <strong>
-                                        <Link href={path(locale, board === 'objects' ? `/object/${leader.slug}` : `/profile/${leader.username}`)}>
-                                            {leader.name}
-                                        </Link>
+                                        <NameFlair flair={board === 'creators' ? leader.name_flair : null} locale={locale}>
+                                            <Link href={path(locale, board === 'objects' ? `/object/${leader.slug}` : `/profile/${leader.username}`)}>
+                                                {leader.name}
+                                            </Link>
+                                        </NameFlair>
                                     </strong>
                                     {board === 'objects' ? <small>{numberLabel(leader.score, locale)} {t.points}</small> : <>
                                         <small>{locale === 'id' ? 'Skor' : 'Score'} {numberLabel(leader.score, locale)}/100</small>
@@ -1055,13 +1061,15 @@ function DiscussionPanel({ locale, posts = [], categories = [], recentComments =
                             <li key={comment.id} className="vm-comm-comment-item">
                                 <Link href={linkUrl} className="vm-comm-comment-link">
                                     <div className="vm-comm-comment-top">
-                                        <span className="vm-comm-comment-avatar" aria-hidden="true">
-                                            {comment.user?.avatar_url
-                                                ? <img src={`${comment.user.avatar_url}&size=small`} alt="" loading="lazy" decoding="async" />
-                                                : initial}
-                                        </span>
+                                        <AvatarFrame frame={comment.user?.avatar_frame} locale={locale} size="sm" shape="rounded">
+                                            <span className="vm-comm-comment-avatar" aria-hidden="true">
+                                                {comment.user?.avatar_url
+                                                    ? <img src={`${comment.user.avatar_url}&size=small`} alt="" loading="lazy" decoding="async" />
+                                                    : initial}
+                                            </span>
+                                        </AvatarFrame>
                                         <div className="vm-comm-comment-user">
-                                            <strong className="vm-comm-comment-name">{authorName}</strong>
+                                            <strong className="vm-comm-comment-name"><NameFlair flair={comment.user?.name_flair} locale={locale}>{authorName}</NameFlair></strong>
                                             <small className="vm-comm-comment-username">@{authorUsername}</small>
                                         </div>
                                         <span className="vm-comm-comment-time">
@@ -1173,11 +1181,13 @@ export function RankingCard({ post, locale, category, onSavedChange }) {
 
     const avatarImage = post.creator?.avatar_url;
     const avatarBadge = (
-        <span className="vm-avatar">
-            {avatarImage
-                ? <img src={`${avatarImage}&size=small`} alt="" loading="lazy" decoding="async" />
-                : author.replace('@', '').slice(0, 1).toUpperCase()}
-        </span>
+        <AvatarFrame frame={post.creator?.avatar_frame} locale={locale} size="sm">
+            <span className="vm-avatar">
+                {avatarImage
+                    ? <img src={`${avatarImage}&size=small`} alt="" loading="lazy" decoding="async" />
+                    : author.replace('@', '').slice(0, 1).toUpperCase()}
+            </span>
+        </AvatarFrame>
     );
     const avatarElement = profileUrl ? (
         <Link href={profileUrl} className="vm-author-avatar-link" aria-hidden="true" tabIndex={-1}>

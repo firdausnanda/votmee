@@ -12,9 +12,11 @@ class NotificationController extends Controller
     public function index(Request $request, NotificationService $notifications): JsonResponse
     {
         $user = $request->user();
+        $latest = $user->notifications()->limit(10)->get();
+        $flair = $notifications->actorFlair($latest);
 
         return response()->json([
-            'notifications' => $user->notifications()->limit(10)->get()->map(fn ($notification): array => $notifications->listing($notification))->values(),
+            'notifications' => $latest->map(fn ($notification): array => $notifications->listing($notification, $flair))->values(),
             'unread_count' => $user->unreadNotifications()->count(),
         ]);
     }

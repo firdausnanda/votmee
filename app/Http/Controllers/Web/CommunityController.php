@@ -16,8 +16,10 @@ use App\Models\RankingPost;
 use App\Models\Report;
 use App\Models\SavedRanking;
 use App\Models\User;
+use App\Models\UserAchievement;
 use App\Models\Wallet;
 use App\Services\AchievementService;
+use App\Services\AvatarFrameService;
 use App\Services\FeedService;
 use App\Services\GamificationService;
 use App\Services\LeaderboardService;
@@ -101,6 +103,7 @@ class CommunityController extends Controller
         }
 
         $post->load(['creator:id,name,username,avatar_path', 'category:id,name,slug', 'entries.object:id,canonical_name,slug,status,image_path']);
+        app(AvatarFrameService::class)->fill([$post->creator]);
         $coverObject = $post->entries->first(fn ($entry) => $entry->object?->status === 'verified' && $entry->object?->image_path)?->object;
         $scores = DB::table('support_events')->where('status', 'valid')->whereIn('ranking_entry_id', $post->entries->pluck('id'))
             ->selectRaw("ranking_entry_id, SUM(amount) as points, COUNT(DISTINCT CASE WHEN source = 'support' THEN user_id END) as supporters, SUM(CASE WHEN source = 'quick_vote' THEN amount ELSE 0 END) as quick_points")
@@ -133,6 +136,7 @@ class CommunityController extends Controller
         });
         CommentImage::attachToComments($comments);
         CommentMention::attachToComments($comments);
+        UserAchievement::attachToComments($comments);
 
         $totalCommentsCount = DB::table('comments')
             ->where('comments.ranking_post_id', $post->id)
@@ -391,7 +395,7 @@ class CommunityController extends Controller
         ]);
     }
 
-    public function profile(Request $request, string $locale, User $user, LeaderboardService $leaderboard, AchievementService $achievements): Response
+    public function profile(Request $request, string $locale, User $user, LeaderboardService $leaderboard, AchievementService $achievements, AvatarFrameService $frames): Response
     {
         $publishedRankingsQuery = RankingPost::query()
             ->where('creator_id', $user->id)
@@ -429,6 +433,7 @@ class CommunityController extends Controller
             ...$this->shared($request),
             'profile' => [
                 ...$user->only('id', 'name', 'username', 'role', 'locale', 'region_code', 'avatar_url', 'cover_url'),
+                ...$frames->flairForUser($user),
                 'created_at' => $user->created_at?->toIso8601String(),
                 'stats' => [
                     'support_points_received' => $supportPointsReceived,
@@ -439,6 +444,7 @@ class CommunityController extends Controller
             'achievements' => $achievements->progress($user),
             'hiddenAchievementsLocked' => $achievements->hiddenLockedCount($user),
             'trustedContributor' => $user->trusted_at !== null,
+            'avatarFrameOptions' => $request->user()?->is($user) ? $frames->options($user) : null,
             'blockedByViewer' => $request->user() !== null && $request->user()->blocks()->where('blocked_id', $user->id)->exists(),
             'leaders' => $leaderboard->leaders(),
         ]);
@@ -459,7 +465,7 @@ class CommunityController extends Controller
         ]);
     }
 
-    public function hallOfFame(Request $request, LeaderboardService $leaderboard, AchievementService $achievements): Response
+    public function hallOfFame(Request $request, LeaderboardService $leaderboard, AchievementService $achievements, AvatarFrameService $frames): Response
     {
         $currentMonth = $achievements->currentMonth();
         $firstMonth = $achievements->firstMonth();
@@ -478,7 +484,7 @@ class CommunityController extends Controller
             'isCurrentMonth' => $month->equalTo($currentMonth),
             'previousMonth' => $month->greaterThan($firstMonth) ? $month->subMonth()->format('Y-m') : null,
             'nextMonth' => $month->lessThan($currentMonth) ? $month->addMonth()->format('Y-m') : null,
-            'board' => $achievements->hallOfFame($month),
+            'board' => $this->withBoardFrames($achievements->hallOfFame($month), $frames),
             'champions' => $achievements->champions($month),
             'standing' => $request->user() === null ? null : $achievements->standing($request->user(), $month),
             'thresholds' => config('gamification.seasonal'),
@@ -503,8 +509,12 @@ class CommunityController extends Controller
     {
         return Inertia::render('Community/Notifications', [
             ...$this->shared($request),
-            'notifications' => Inertia::scroll(fn () => $request->user()->notifications()->paginate(20)
-                ->through(fn ($notification): array => $notifications->listing($notification))),
+            'notifications' => Inertia::scroll(function () use ($request, $notifications) {
+                $page = $request->user()->notifications()->paginate(20);
+                $flair = $notifications->actorFlair($page->getCollection());
+
+                return $page->through(fn ($notification): array => $notifications->listing($notification, $flair));
+            }),
             'leaders' => $leaderboard->leaders('weekly', 'support'),
         ]);
     }
@@ -602,8 +612,26 @@ class CommunityController extends Controller
                 ->whereHas('rankingPost', fn ($query) => $query->where('status', 'published'))
                 ->latest()
                 ->limit(5)
-                ->get(['id', 'ranking_post_id', 'user_id', 'body', 'created_at']),
+                ->get(['id', 'ranking_post_id', 'user_id', 'body', 'created_at'])
+                ->tap(fn ($comments) => app(AvatarFrameService::class)->fill($comments->pluck('user'))),
         ];
+    }
+
+    /**
+     * Add each listed member's avatar frame and name flair to the hall of fame boards, outside their cache.
+     *
+     * @param  array<string, list<array{user: array<string, mixed>, count: int}>>  $board
+     * @return array<string, list<array{user: array<string, mixed>, count: int}>>
+     */
+    private function withBoardFrames(array $board, AvatarFrameService $frames): array
+    {
+        $flair = $frames->flairFor(collect($board)->flatten(1)->pluck('user.id'));
+
+        return array_map(fn (array $entries): array => array_map(function (array $entry) use ($flair): array {
+            $entry['user'] = [...$entry['user'], ...($flair[$entry['user']['id']] ?? [])];
+
+            return $entry;
+        }, $entries), $board);
     }
 
     private function contentExcerpt(ObjectContentRevision $revision): string

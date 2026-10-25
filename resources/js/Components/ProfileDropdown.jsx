@@ -1,5 +1,6 @@
 import { Link } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
+import { AvatarFrame } from '../Pages/Community/AvatarFrame';
 
 function DropdownIcon({ name, size = 16 }) {
     const icons = {
@@ -123,11 +124,13 @@ export default function ProfileDropdown({
                 aria-controls={open ? 'profile-dropdown-menu' : undefined}
                 aria-label={isId ? `Menu akun ${displayName}` : `${displayName} account menu`}
             >
-                <span className="vm-profile-avatar" aria-hidden="true">
-                    {profileImageUrl && !imageFailed ? (
-                        <img src={profileImageUrl} alt="" onError={() => setImageFailed(true)} />
-                    ) : <DropdownIcon name="user" size={19} />}
-                </span>
+                <AvatarFrame frame={user?.avatar_frame} locale={isId ? 'id' : 'en'} size="sm">
+                    <span className="vm-profile-avatar" aria-hidden="true">
+                        {profileImageUrl && !imageFailed ? (
+                            <img src={profileImageUrl} alt="" onError={() => setImageFailed(true)} />
+                        ) : <DropdownIcon name="user" size={19} />}
+                    </span>
+                </AvatarFrame>
             </button>
 
             {open && (

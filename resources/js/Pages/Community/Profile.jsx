@@ -3,8 +3,37 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
 import SelectBox from '../../Components/SelectBox';
 import { AchievementBadge, AchievementGallery, achievementName } from './Achievements';
+import { AvatarFrame, AvatarFramePicker, NameFlair } from './AvatarFrame';
 import { ALLOWED_TYPES, MAX_BYTES, optimizeImage } from './ObjectImageField';
 import { api, categoryHashtag, dateLabel, dictionary, Layout, NavIcon, numberLabel, PageHead, PaginationLinks, path, rankingPath } from './Shared';
+
+const TROPHY_SHELF_SIZE = 6;
+
+/** Every monthly champion title the member holds, newest first, shown on a shelf under their name. */
+function TrophyShelf({ badges, locale, onOpen }) {
+    const isId = locale === 'id';
+    const trophies = badges
+        .filter((badge) => badge.group === 'champion')
+        .sort((a, b) => b.period.localeCompare(a.period) || a.category.localeCompare(b.category));
+
+    if (!trophies.length) return null;
+
+    const shown = trophies.slice(0, TROPHY_SHELF_SIZE);
+    const hidden = trophies.length - shown.length;
+
+    return <a href="#badges" className="vpr-trophy-shelf" onClick={onOpen} aria-label={isId ? `Rak trofi: ${trophies.length} gelar juara. Lihat semua pencapaian.` : `Trophy shelf: ${trophies.length} champion titles. View all achievements.`}>
+        <span className="vpr-trophy-count">
+            <span aria-hidden="true">🏆</span>
+            {isId ? `Juara ${trophies.length}×` : `${trophies.length}× champion`}
+        </span>
+        <span className="vpr-trophy-row">
+            {shown.map((badge) => <span key={badge.key} className="vpr-trophy" title={achievementName(badge.key, locale)}>
+                <AchievementBadge achievementKey={badge.key} size={30} />
+            </span>)}
+            {hidden > 0 && <span className="vpr-trophy is-more">+{hidden}</span>}
+        </span>
+    </a>;
+}
 
 function formatMemberSince(isoDate, locale) {
     if (!isoDate) return '—';
@@ -360,7 +389,7 @@ function TrustControl({ locale, userId, trusted }) {
     </>;
 }
 
-export default function Profile({ locale, categories = [], leaders = [], profile, rankings, achievements = [], hiddenAchievementsLocked = 0, trustedContributor = false, blockedByViewer = false }) {
+export default function Profile({ locale, categories = [], leaders = [], profile, rankings, achievements = [], hiddenAchievementsLocked = 0, trustedContributor = false, avatarFrameOptions = null, blockedByViewer = false }) {
     const t = dictionary(locale);
     const currentUser = usePage().props.auth?.user;
     const canModerate = usePage().props.auth?.can?.moderate ?? false;
@@ -372,9 +401,15 @@ export default function Profile({ locale, categories = [], leaders = [], profile
     const [badges, setBadges] = useState(achievements);
     const [badgeBusy, setBadgeBusy] = useState(false);
     const [badgeError, setBadgeError] = useState('');
+    const [avatarFrame, setAvatarFrame] = useState(profile.avatar_frame);
+    const [frameOptions, setFrameOptions] = useState(avatarFrameOptions);
+    const [frameBusy, setFrameBusy] = useState(false);
+    const [frameError, setFrameError] = useState('');
     const [activeTab, setActiveTab] = useState(() => typeof window !== 'undefined' && window.location.hash === '#badges' ? 'achievements' : 'rankings');
 
     useEffect(() => setBadges(achievements), [achievements]);
+    useEffect(() => setAvatarFrame(profile.avatar_frame), [profile.avatar_frame]);
+    useEffect(() => setFrameOptions(avatarFrameOptions), [avatarFrameOptions]);
     useEffect(() => {
         setActiveTab(window.location.hash === '#badges' ? 'achievements' : 'rankings');
         const syncTabWithHash = () => {
@@ -415,6 +450,21 @@ export default function Profile({ locale, categories = [], leaders = [], profile
             setBadgeError(error.message);
         } finally {
             setBadgeBusy(false);
+        }
+    };
+
+    const chooseFrame = async (frame) => {
+        setFrameBusy(true);
+        setFrameError('');
+
+        try {
+            const result = await api('/backend/achievements/frame', 'PUT', { frame });
+            setFrameOptions((current) => ({ ...current, preferred: result.preferred }));
+            setAvatarFrame(result.frame);
+        } catch (error) {
+            setFrameError(error.message);
+        } finally {
+            setFrameBusy(false);
         }
     };
 
@@ -499,16 +549,18 @@ export default function Profile({ locale, categories = [], leaders = [], profile
                     <div className="vpr-card">
                         <div className="vpr-card-main">
                             <div className="vpr-avatar-wrap">
-                                <div className="vpr-avatar" aria-hidden="true">
-                                    {profile.avatar_url ? (
-                                        <img
-                                            src={withSize(profile.avatar_url, 'small')}
-                                            srcSet={`${withSize(profile.avatar_url, 'small')} 96w, ${profile.avatar_url} 400w`}
-                                            sizes="84px"
-                                            alt=""
-                                        />
-                                    ) : (profile.name ? profile.name.slice(0, 1).toUpperCase() : 'U')}
-                                </div>
+                                <AvatarFrame frame={avatarFrame} locale={locale} animated className="vpr-avatar-frame">
+                                    <div className="vpr-avatar" aria-hidden="true">
+                                        {profile.avatar_url ? (
+                                            <img
+                                                src={withSize(profile.avatar_url, 'small')}
+                                                srcSet={`${withSize(profile.avatar_url, 'small')} 96w, ${profile.avatar_url} 400w`}
+                                                sizes="84px"
+                                                alt=""
+                                            />
+                                        ) : (profile.name ? profile.name.slice(0, 1).toUpperCase() : 'U')}
+                                    </div>
+                                </AvatarFrame>
                                 {isOwnProfile && (
                                     <ProfileImageEditor
                                         type="avatar"
@@ -527,7 +579,7 @@ export default function Profile({ locale, categories = [], leaders = [], profile
                             <div className="vpr-identity">
                                 <div className="vpr-identity-header">
                                     <div className="vpr-name-group">
-                                        <h1 className="vpr-name">{profile.name}</h1>
+                                        <h1 className="vpr-name"><NameFlair flair={profile.name_flair} locale={locale} size="lg">{profile.name}</NameFlair></h1>
                                         {isOwnProfile && (
                                             <Link
                                                 href="/profile"
@@ -551,6 +603,12 @@ export default function Profile({ locale, categories = [], leaders = [], profile
                                         {achievementName(badge.key, locale)}
                                     </span>)}
                                 </a>}
+
+                                <TrophyShelf badges={badges} locale={locale} onOpen={(event) => {
+                                    event.preventDefault();
+                                    selectTab('achievements');
+                                    requestAnimationFrame(() => document.getElementById('vpr-profile-tabs')?.scrollIntoView({ block: 'start' }));
+                                }} />
 
                                 <div className="vpr-meta-chips">
                                     <span className="vpr-chip">
@@ -600,6 +658,14 @@ export default function Profile({ locale, categories = [], leaders = [], profile
                 </div>}
 
                 {hasBadges && <div id="vpr-panel-achievements" role="tabpanel" aria-labelledby="vpr-tab-achievements" hidden={selectedTab !== 'achievements'}>
+                    {isOwnProfile && frameOptions && <AvatarFramePicker
+                        user={profile}
+                        options={frameOptions}
+                        locale={locale}
+                        busy={frameBusy}
+                        error={frameError}
+                        onChoose={chooseFrame}
+                    />}
                     <AchievementGallery
                         achievements={badges}
                         hiddenLocked={hiddenAchievementsLocked}

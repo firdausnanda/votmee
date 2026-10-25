@@ -161,15 +161,35 @@ class NotificationService
     /**
      * @return array{id: string, type: string, data: array<string, mixed>, read: bool, created_at: string|null}
      */
-    public function listing(DatabaseNotification $notification): array
+    /**
+     * @param  array<int, array{avatar_frame: string|null, name_flair: string|null}>  $actorFlair  from actorFlair()
+     */
+    public function listing(DatabaseNotification $notification, array $actorFlair = []): array
     {
+        $data = $notification->data;
+
+        if (isset($data['actor']['id'], $actorFlair[$data['actor']['id']])) {
+            $data['actor'] = [...$data['actor'], ...$actorFlair[$data['actor']['id']]];
+        }
+
         return [
             'id' => $notification->id,
             'type' => $notification->data['type'] ?? '',
-            'data' => $notification->data,
+            'data' => $data,
             'read' => $notification->read_at !== null,
             'created_at' => $notification->created_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * The current avatar frame and name flair of the members behind a page of notifications.
+     *
+     * @param  iterable<DatabaseNotification>  $notifications
+     * @return array<int, array{avatar_frame: string|null, name_flair: string|null}>
+     */
+    public function actorFlair(iterable $notifications): array
+    {
+        return app(AvatarFrameService::class)->flairFor(collect($notifications)->pluck('data.actor.id'));
     }
 
     /** Skips missing or deleted recipients and never notifies someone about their own action. */

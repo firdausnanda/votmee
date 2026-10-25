@@ -115,6 +115,7 @@ Route::prefix('backend')->middleware(SetRequestLocale::class)->name('backend.')-
         Route::post('wallet/claim', [WalletController::class, 'claim'])->name('wallet.claim');
         Route::post('wallet/missions/{completion}/claim', [WalletController::class, 'claimMission'])->whereNumber('completion')->name('wallet.missions.claim');
         Route::put('achievements/featured', [AchievementController::class, 'feature'])->name('achievements.feature');
+        Route::put('achievements/frame', [AchievementController::class, 'frame'])->name('achievements.frame');
         Route::post('achievements/seen', [AchievementController::class, 'seen'])->name('achievements.seen');
         Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
         Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');

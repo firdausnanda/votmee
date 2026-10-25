@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreMessageRequest;
 use App\Models\Conversation;
 use App\Models\User;
+use App\Services\AvatarFrameService;
 use App\Services\MessagingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,7 +15,7 @@ class MessageController extends Controller
 {
     public function __construct(private MessagingService $messaging) {}
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, AvatarFrameService $frames): JsonResponse
     {
         $data = $request->validate(['box' => ['nullable', 'in:inbox,requests']]);
         $user = $request->user();
@@ -24,9 +25,10 @@ class MessageController extends Controller
             ->orderByDesc('last_message_at')
             ->orderByDesc('id')
             ->paginate(20);
+        $flair = $frames->flairFor($conversations->getCollection()->map(fn (Conversation $conversation) => $conversation->otherParticipant($user)?->user_id));
 
         return response()->json([
-            'conversations' => $conversations->through(fn (Conversation $conversation): array => $this->messaging->summary($conversation, $user)),
+            'conversations' => $conversations->through(fn (Conversation $conversation): array => $this->messaging->summary($conversation, $user, $flair)),
             ...$this->counters($user),
         ]);
     }

@@ -1,15 +1,18 @@
 import { Link, router } from '@inertiajs/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { setMessageCount, useNotificationFeed } from '../../Components/notificationFeed';
+import { AvatarFrame } from './AvatarFrame';
 import ReportDialog from './ReportDialog';
 import { api, commentTimeAgo, Layout, NavIcon, PageHead, path } from './Shared';
 
 const POLL_INTERVAL = 15000;
 
 function Avatar({ person, size = 40 }) {
-    return <span className="vdm-avatar" style={{ width: size, height: size }} aria-hidden="true">
-        {person?.avatar_url ? <img src={`${person.avatar_url}&size=small`} alt="" /> : (person?.name ?? '?').slice(0, 1).toUpperCase()}
-    </span>;
+    return <AvatarFrame frame={person?.avatar_frame} size={size >= 44 ? 'md' : 'sm'}>
+        <span className="vdm-avatar" style={{ width: size, height: size }} aria-hidden="true">
+            {person?.avatar_url ? <img src={`${person.avatar_url}&size=small`} alt="" /> : (person?.name ?? '?').slice(0, 1).toUpperCase()}
+        </span>
+    </AvatarFrame>;
 }
 
 /** Re-runs `callback` on an interval only while the WebSocket is down, as the notification bell does. */

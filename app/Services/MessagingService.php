@@ -153,7 +153,10 @@ class MessagingService
     /**
      * @return array{id: int, state: string, other: array<string, mixed>|null, last_message: array<string, mixed>|null, unread: bool, last_message_at: string|null}
      */
-    public function summary(Conversation $conversation, User $viewer): array
+    /**
+     * @param  array<int, array{avatar_frame: string|null, name_flair: string|null}>|null  $flair  preloaded for a page of conversations
+     */
+    public function summary(Conversation $conversation, User $viewer, ?array $flair = null): array
     {
         $conversation->loadMissing(['participants.user', 'latestMessage']);
         $own = $conversation->participantFor($viewer);
@@ -169,7 +172,10 @@ class MessagingService
                 $other->accepted_at === null => 'pending',
                 default => 'active',
             },
-            'other' => $other?->user ? $this->notifications->actor($other->user) : null,
+            'other' => $other?->user ? [
+                ...$this->notifications->actor($other->user),
+                ...(($flair ?? app(AvatarFrameService::class)->flairFor([$other->user_id]))[$other->user_id] ?? []),
+            ] : null,
             'last_message' => $latest ? $this->listing($latest) : null,
             'unread' => $latest !== null && $latest->user_id !== $viewer->id && $latest->id > (int) $own?->last_read_message_id,
             'last_message_at' => $conversation->last_message_at?->toIso8601String(),

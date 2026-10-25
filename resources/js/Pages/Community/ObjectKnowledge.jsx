@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, dateLabel, NavIcon, openLoginModal, path } from './Shared';
 import { CommentImageAttachButton, CommentImageGallery, CommentImagePreviews, commentPayload, useCommentImages } from './CommentImages';
 import { CommentBadges } from './Achievements';
+import { AvatarFrame, NameFlair } from './AvatarFrame';
 import { MentionInput, MentionText } from './Mentions';
 import ReportDialog from './ReportDialog';
 import ContentBody from './ContentBody';
@@ -123,15 +124,21 @@ export function CommunityDiscussion({ object, article, locale }) {
 
         return (
             <div key={item.id} className={`vr-comment-item ${isReply ? 'is-reply' : ''}`}>
-                <div className="vr-avatar-small">
-                    {item.name ? item.name.slice(0, 1).toUpperCase() : 'U'}
-                </div>
+                <AvatarFrame frame={item.avatar_frame} locale={locale} size="sm" className="vr-comment-avatar-frame">
+                    <div className="vr-avatar-small">
+                        {item.avatar_url
+                            ? <img src={`${item.avatar_url}&size=small`} alt="" loading="lazy" decoding="async" />
+                            : (item.name ? item.name.slice(0, 1).toUpperCase() : 'U')}
+                    </div>
+                </AvatarFrame>
                 <div className="vr-comment-content">
                     <div className="vr-comment-header-row">
                         <div className="vr-comment-user-info">
-                            <Link href={path(locale, `/profile/${item.username}`)} className="vr-comment-user-name">
-                                {item.name}
-                            </Link>
+                            <NameFlair flair={item.name_flair} locale={locale}>
+                                <Link href={path(locale, `/profile/${item.username}`)} className="vr-comment-user-name">
+                                    {item.name}
+                                </Link>
+                            </NameFlair>
                             <CommentBadges keys={item.badges} locale={locale} />
                             <span className="vr-meta-time">
                                 {dateLabel(item.created_at, locale)}

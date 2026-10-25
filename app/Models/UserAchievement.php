@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\AvatarFrameService;
 use Database\Factories\UserAchievementFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -37,7 +38,7 @@ class UserAchievement extends Model
     }
 
     /**
-     * Attach each comment author's featured achievement keys, matched by username.
+     * Attach each comment author's photo, featured achievement keys, avatar frame and name flair, matched by username.
      *
      * @param  Collection<int, object>  $comments
      * @return Collection<int, object>
@@ -52,11 +53,19 @@ class UserAchievement extends Model
             ->get(['users.username', 'user_achievements.achievement_key'])
             ->groupBy('username');
 
-        return $comments->each(function (object $comment) use ($featuredByUsername): void {
+        $authors = User::query()->whereIn('username', $comments->pluck('username')->unique())->get(['id', 'username', 'avatar_path'])->keyBy('username');
+        $flair = app(AvatarFrameService::class)->flairFor($authors->pluck('id'));
+
+        return $comments->each(function (object $comment) use ($featuredByUsername, $authors, $flair): void {
+            $author = $authors->get($comment->username);
+            $comment->avatar_url = $author?->avatar_url;
             $comment->badges = ($featuredByUsername->get($comment->username) ?? collect())
                 ->pluck('achievement_key')
                 ->values()
                 ->all();
+            $authorFlair = $flair[$author?->id] ?? null;
+            $comment->avatar_frame = $authorFlair['avatar_frame'] ?? null;
+            $comment->name_flair = $authorFlair['name_flair'] ?? null;
         });
     }
 }

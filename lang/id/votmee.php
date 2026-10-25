@@ -12,6 +12,7 @@ return [
     'mission_expired' => 'Masa klaim hadiah misi ini sudah berakhir.',
     'mission_invalid' => 'Misi ini tidak lagi memenuhi syarat karena kontennya sudah tidak tersedia.',
     'achievement_feature_invalid' => 'Pilih maksimal tiga badge yang sudah Anda buka.',
+    'avatar_frame_locked' => 'Buka bingkai ini terlebih dahulu sebelum memakainya.',
     'review_invalid' => 'Perubahan status objek tidak valid.',
     'merge_target_invalid' => 'Pilih objek terverifikasi lain.',
     'not_merged' => 'Objek ini tidak sedang digabung.',

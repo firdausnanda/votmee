@@ -1,6 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { AchievementBadge, achievementName, monthLabel } from './Achievements';
+import { NameFlair, UserAvatar } from './AvatarFrame';
 import { Layout, numberLabel, PageHead, path } from './Shared';
 
 const CATEGORY_COPY = {
@@ -62,10 +63,8 @@ function MonthNav({ locale, month, previousMonth, nextMonth }) {
     </nav>;
 }
 
-function Avatar({ user, size }) {
-    return <span className="vhf-avatar" style={{ width: size, height: size }} aria-hidden="true">
-        {user.avatar_url ? <img src={user.avatar_url} alt="" /> : user.name.slice(0, 1).toUpperCase()}
-    </span>;
+function Avatar({ user, size, locale }) {
+    return <UserAvatar user={user} locale={locale} pixels={size} size={size >= 44 ? 'md' : 'sm'} className="vhf-avatar" />;
 }
 
 function ChampionMark({ isChampion, championKey, locale }) {
@@ -138,10 +137,10 @@ function Podium({ locale, entries, unit, viewerId, championIds, championKey }) {
             return <li key={entry.user.id} className={`vhf-seat is-place-${place}` + (entry.user.id === viewerId ? ' is-viewer' : '')}>
                 <span className="vhf-seat-avatar">
                     {place === 1 && <CrownIcon />}
-                    <Avatar user={entry.user} size={place === 1 ? 56 : 44} />
+                    <Avatar user={entry.user} size={place === 1 ? 56 : 44} locale={locale} />
                 </span>
                 <span className="vhf-seat-name">
-                    <Link href={path(locale, `/profile/${entry.user.username}`)}>{entry.user.name}</Link>
+                    <NameFlair flair={entry.user.name_flair} locale={locale}><Link href={path(locale, `/profile/${entry.user.username}`)}>{entry.user.name}</Link></NameFlair>
                     <ChampionMark isChampion={championIds.includes(entry.user.id)} championKey={championKey} locale={locale} />
                 </span>
                 <span className="vhf-seat-score" aria-label={`${numberLabel(entry.count, locale)} ${unit}`}>{numberLabel(entry.count, locale)}</span>
@@ -229,9 +228,9 @@ export default function HallOfFame({ locale, categories, leaders, month, isCurre
                         {rest.length > 0 && <ol className="vhf-list" start={4}>
                             {rest.map((entry, index) => <li key={entry.user.id} className={entry.user.id === viewerId ? 'is-viewer' : ''}>
                                 <span className="vhf-rank">{index + 4}</span>
-                                <Avatar user={entry.user} size={30} />
+                                <Avatar user={entry.user} size={30} locale={locale} />
                                 <span className="vhf-name">
-                                    <Link href={path(locale, `/profile/${entry.user.username}`)}>{entry.user.name}</Link>
+                                    <NameFlair flair={entry.user.name_flair} locale={locale}><Link href={path(locale, `/profile/${entry.user.username}`)}>{entry.user.name}</Link></NameFlair>
                                     <ChampionMark isChampion={championIds.includes(entry.user.id)} championKey={championKey} locale={locale} />
                                 </span>
                                 <span className="vhf-count" aria-label={`${numberLabel(entry.count, locale)} ${categoryCopy.unit}`}>{numberLabel(entry.count, locale)}</span>

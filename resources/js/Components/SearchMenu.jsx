@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AvatarFrame } from "../Pages/Community/AvatarFrame";
 
 const RECENT_SEARCHES_KEY = "votmee_recent_searches";
 const BROWSE_CATEGORY_LIMIT = 8;
@@ -1071,13 +1072,15 @@ export default function SearchMenu({
                                                     aria-selected={isActive}
                                                 >
                                                     <div className="vm-search-item-left">
-                                                        <span className="vm-search-item-icon vm-search-icon-user">
-                                                            {user.avatar ? (
-                                                                <img src={user.avatar} alt="" loading="lazy" decoding="async" />
-                                                            ) : (
-                                                                user.name.slice(0, 1).toUpperCase()
-                                                            )}
-                                                        </span>
+                                                        <AvatarFrame frame={user.avatarFrame} size="sm">
+                                                            <span className="vm-search-item-icon vm-search-icon-user">
+                                                                {user.avatar ? (
+                                                                    <img src={user.avatar} alt="" loading="lazy" decoding="async" />
+                                                                ) : (
+                                                                    user.name.slice(0, 1).toUpperCase()
+                                                                )}
+                                                            </span>
+                                                        </AvatarFrame>
                                                         <div className="vm-search-item-text">
                                                             <div className="vm-search-item-title">
                                                                 {highlightMatch(user.name, query.replace(/^@/, ""))}

@@ -72,6 +72,7 @@ class FeedService
             $topEntries->each(fn ($entry) => $entry->setAttribute('support_points', (int) ($entryScores[$entry->id] ?? 0)));
             $post->setRelation('entries', $topEntries);
         });
+        app(AvatarFrameService::class)->fill($feed->getCollection()->pluck('creator'));
 
         return $feed;
     }

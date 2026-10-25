@@ -175,6 +175,22 @@ return [
 
     'trusted_badge' => 'writer_silver',
 
+    /*
+    |--------------------------------------------------------------------------
+    | Avatar Frames
+    |--------------------------------------------------------------------------
+    |
+    | Frames drawn around a member's avatar, rarest first: champion (a title
+    | from last month, so it lasts one month), veteran (this many champion
+    | titles ever), legend (this many gold badges) and gold (any gold badge).
+    |
+    */
+
+    'avatar_frames' => [
+        'veteran_titles' => 3,
+        'legend_gold_badges' => 3,
+    ],
+
     'hall_of_fame_size' => 10,
 
 ];

@@ -86,7 +86,7 @@ class LeaderboardService
             ->all();
     }
 
-    /** @return array<int, array{user_id: int, name: string, username: string, supporters: int, support_points: int, score: float}> */
+    /** @return array<int, array{user_id: int, name: string, username: string, supporters: int, support_points: int, score: float, avatar_frame: string|null, name_flair: string|null}> */
     public function creators(string $period = 'weekly'): array
     {
         [$start, $end] = $this->bounds($period);
@@ -113,7 +113,7 @@ class LeaderboardService
 
         $scoreSql = '(40.0 * creator_totals.supporters / ? + 60.0 * creator_totals.support_points / ?)';
 
-        return DB::query()->fromSub($totals, 'creator_totals')
+        $creators = DB::query()->fromSub($totals, 'creator_totals')
             ->select('creator_totals.*')
             ->selectRaw("{$scoreSql} as score", [max(1, (int) $maximums->supporters), max(1, (int) $maximums->support_points)])
             ->orderByDesc('score')
@@ -130,7 +130,10 @@ class LeaderboardService
                 'supporters' => (int) $row->supporters,
                 'support_points' => (int) $row->support_points,
                 'score' => round((float) $row->score, 1),
-            ])->all();
+            ]);
+        $flair = app(AvatarFrameService::class)->flairFor($creators->pluck('user_id'));
+
+        return $creators->map(fn (array $creator): array => [...$creator, ...($flair[$creator['user_id']] ?? [])])->all();
     }
 
     /** @return array{0: ?CarbonImmutable, 1: ?CarbonImmutable} */

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, categoryHashtag, CoinIcon, dateLabel, dictionary, Layout, numberLabel, objectImageSrcSet, objectImageUrl, openLoginModal, PageHead, path, useSavedRanking } from './Shared';
 import { CommentImageAttachButton, CommentImageGallery, CommentImagePreviews, commentPayload, useCommentImages } from './CommentImages';
 import { CommentBadges } from './Achievements';
+import { AvatarFrame, NameFlair } from './AvatarFrame';
 import { MentionInput, MentionText } from './Mentions';
 import ReportDialog from './ReportDialog';
 import ShareModal from './ShareModal';
@@ -540,18 +541,24 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
                 key={item.id}
                 className={`vr-comment-item ${isReply ? 'is-reply' : ''} ${isAuthor ? 'is-thread-creator' : ''}`}
             >
-                <div className={`vr-avatar-small ${isAuthor ? 'avatar-creator' : ''}`}>
-                    {item.name ? item.name.slice(0, 1).toUpperCase() : 'U'}
-                </div>
+                <AvatarFrame frame={item.avatar_frame} locale={locale} size="sm" className="vr-comment-avatar-frame">
+                    <div className={`vr-avatar-small ${isAuthor ? 'avatar-creator' : ''}`}>
+                        {item.avatar_url
+                            ? <img src={`${item.avatar_url}&size=small`} alt="" loading="lazy" decoding="async" />
+                            : (item.name ? item.name.slice(0, 1).toUpperCase() : 'U')}
+                    </div>
+                </AvatarFrame>
                 <div className="vr-comment-content">
                     <div className="vr-comment-header-row">
                         <div className="vr-comment-user-info">
-                            <Link
-                                href={path(locale, `/profile/${item.username}`)}
-                                className="vr-comment-user-name"
-                            >
-                                {item.name}
-                            </Link>
+                            <NameFlair flair={item.name_flair} locale={locale}>
+                                <Link
+                                    href={path(locale, `/profile/${item.username}`)}
+                                    className="vr-comment-user-name"
+                                >
+                                    {item.name}
+                                </Link>
+                            </NameFlair>
                             <CommentBadges keys={item.badges} locale={locale} />
                             {isAuthor && (
                                 <span
@@ -781,9 +788,13 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
 
                 <div className="vr-byline">
                     <div className="vr-author">
-                        <div className="vr-author-avatar">
-                            {post.creator?.name ? post.creator.name.slice(0, 1).toUpperCase() : 'V'}
-                        </div>
+                        <AvatarFrame frame={post.creator?.avatar_frame} locale={locale} size="sm">
+                            <div className="vr-author-avatar">
+                                {post.creator?.avatar_url
+                                    ? <img src={`${post.creator.avatar_url}&size=small`} alt="" decoding="async" />
+                                    : (post.creator?.name ? post.creator.name.slice(0, 1).toUpperCase() : 'V')}
+                            </div>
+                        </AvatarFrame>
                         <Link
                             href={path(locale, `/profile/${post.creator?.username}`)}
                             className="vr-author-name"

@@ -1,5 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { AvatarFrame } from './AvatarFrame';
 import { api, path } from './Shared';
 
 /** Same pattern as App\Services\MentionService::PATTERN. */
@@ -152,9 +153,11 @@ function MentionMenu({ autocomplete, locale }) {
                 autocomplete.select(person);
             }}
         >
-            <span className="vm-mention-avatar" aria-hidden="true">
-                {person.avatar_url ? <img src={`${person.avatar_url}&size=small`} alt="" /> : (person.name ?? '?').slice(0, 1).toUpperCase()}
-            </span>
+            <AvatarFrame frame={person.avatar_frame} locale={locale} size="sm">
+                <span className="vm-mention-avatar" aria-hidden="true">
+                    {person.avatar_url ? <img src={`${person.avatar_url}&size=small`} alt="" /> : (person.name ?? '?').slice(0, 1).toUpperCase()}
+                </span>
+            </AvatarFrame>
             <span className="vm-mention-copy"><strong>{person.name}</strong><span>@{person.username}</span></span>
         </li>)}
     </ul>;
