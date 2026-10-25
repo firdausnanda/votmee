@@ -348,8 +348,8 @@ function FrameArt({ type, detail, shape, animated }) {
     </svg>;
 }
 
-/** A royal crown with a velvet cap, arches and an orb, for reigning champions. */
-function Crown({ className = 'vaf-crown' }) {
+/** A royal crown with a velvet cap, arches and an orb, for reigning champions and podium leaders. */
+export function Crown({ className = 'vaf-crown' }) {
     const id = useSvgId();
 
     return <svg className={className} viewBox="0 0 32 30" aria-hidden="true" focusable="false">

@@ -16807,7 +16807,8 @@
     .vaf.is-animated .vaf-holo,
     .vaf.is-animated .vaf-crown,
     .vaf.is-animated .vaf-glint,
-    .vnf-lg .vaf-glint {
+    .vnf-lg .vaf-glint,
+    .vhf-crown .vaf-glint {
         animation: none;
     }
 }
@@ -17387,12 +17388,17 @@
 
 .vhf-crown {
     position: absolute;
-    top: -17px;
+    z-index: 3;
+    top: -30px;
     left: 50%;
-    width: 26px;
-    height: 18px;
-    transform: translateX(-50%) rotate(-8deg);
-    filter: drop-shadow(0 2px 3px rgba(180, 83, 9, 0.35));
+    width: 36px;
+    height: 34px;
+    transform: translateX(-50%) rotate(-6deg);
+    filter: drop-shadow(0 2px 3px rgba(180, 83, 9, 0.45));
+}
+
+.vhf-crown .vaf-glint {
+    animation: vafGlint 2.6s ease-in-out infinite;
 }
 
 .vhf-seat-name {

@@ -1,7 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { AchievementBadge, achievementName, monthLabel } from './Achievements';
-import { NameFlair, UserAvatar } from './AvatarFrame';
+import { Crown, NameFlair, UserAvatar } from './AvatarFrame';
 import { Layout, numberLabel, PageHead, path } from './Shared';
 
 const CATEGORY_COPY = {
@@ -40,12 +40,6 @@ function TrophyArt() {
         <path d="M52 70h16v14H52z" fill="#d97706" />
         <path d="M38 84h44l4 14H34l4-14Z" fill="url(#vhf-trophy-gold)" />
         <path d="m60 32 4.4 9 9.6 1.4-7 6.8 1.7 9.6L60 54.3l-8.7 4.5 1.7-9.6-7-6.8 9.6-1.4L60 32Z" fill="#fffbeb" opacity="0.9" />
-    </svg>;
-}
-
-function CrownIcon() {
-    return <svg className="vhf-crown" viewBox="0 0 24 16" aria-hidden="true" focusable="false">
-        <path d="M2 14 1 3l6 4.5L12 1l5 6.5L23 3l-1 11H2Z" fill="#fbbf24" stroke="#b45309" strokeWidth="1.2" strokeLinejoin="round" />
     </svg>;
 }
 
@@ -136,7 +130,7 @@ function Podium({ locale, entries, unit, viewerId, championIds, championKey }) {
 
             return <li key={entry.user.id} className={`vhf-seat is-place-${place}` + (entry.user.id === viewerId ? ' is-viewer' : '')}>
                 <span className="vhf-seat-avatar">
-                    {place === 1 && <CrownIcon />}
+                    {place === 1 && <Crown className="vhf-crown" />}
                     <Avatar user={entry.user} size={place === 1 ? 56 : 44} locale={locale} />
                 </span>
                 <span className="vhf-seat-name">
