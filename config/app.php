@@ -17,6 +17,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Support Email
+    |--------------------------------------------------------------------------
+    |
+    | The address members are pointed to on the support, privacy and terms
+    | pages for help, privacy requests and legal notices.
+    |
+    */
+
+    'support_email' => env('SUPPORT_EMAIL', 'support@votmee.com'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |

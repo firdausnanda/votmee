@@ -286,11 +286,11 @@ function MessageControls({ locale, profile, blocked, bodyMax = 2000 }) {
         }
     };
 
-    return <div className="vdm-profile-actions">
-        {!isBlocked && <button type="button" className="vdm-profile-message" onClick={() => setOpen(true)} disabled={busy}>
+    return <>
+        {!isBlocked && <button type="button" className="vpr-action-button is-primary" onClick={() => setOpen(true)} disabled={busy}>
             <NavIcon name="mail" size={14} />{isId ? 'Kirim pesan' : 'Message'}
         </button>}
-        <button type="button" className="vac-trust-button" onClick={toggleBlock} disabled={busy}>
+        <button type="button" className={`vpr-action-button${isBlocked ? '' : ' is-danger'}`} onClick={toggleBlock} disabled={busy}>
             {isBlocked ? (isId ? 'Buka blokir' : 'Unblock') : (isId ? 'Blokir' : 'Block')}
         </button>
         {error && !open && <p className="vpr-image-error" role="alert">{error}</p>}
@@ -322,7 +322,7 @@ function MessageControls({ locale, profile, blocked, bodyMax = 2000 }) {
                 </DialogPanel>
             </div>
         </Dialog>
-    </div>;
+    </>;
 }
 
 /** Lets moderators grant or revoke trusted contributor status, with a reason for the audit log. */
@@ -351,10 +351,11 @@ function TrustControl({ locale, userId, trusted }) {
     };
 
     return <>
-        <button type="button" className="vac-trust-button" onClick={() => setOpen(true)}>
+        <button type="button" className="vpr-action-button" onClick={() => setOpen(true)}>
+            <NavIcon name="shield" size={14} />
             {trusted
-                ? (isId ? 'Cabut status tepercaya' : 'Revoke trusted status')
-                : (isId ? 'Jadikan kontributor tepercaya' : 'Make trusted contributor')}
+                ? (isId ? 'Cabut tepercaya' : 'Revoke trusted')
+                : (isId ? 'Jadikan tepercaya' : 'Mark as trusted')}
         </button>
         <Dialog open={open} onClose={() => { if (!busy) setOpen(false); }} className="vt-report-overlay">
             <DialogBackdrop transition className="vt-report-backdrop vpr-confirm-backdrop" />
@@ -627,8 +628,10 @@ export default function Profile({ locale, categories = [], leaders = [], profile
                                         {locale === 'id' ? 'Kontributor Tepercaya' : 'Trusted Contributor'}
                                     </span>}
                                 </div>
-                                {currentUser && !isOwnProfile && <MessageControls locale={locale} profile={profile} blocked={blockedByViewer} />}
-                                {canModerate && !isOwnProfile && <TrustControl locale={locale} userId={profile.id} trusted={trustedContributor} />}
+                                {currentUser && !isOwnProfile && <div className="vpr-profile-actions">
+                                    <MessageControls locale={locale} profile={profile} blocked={blockedByViewer} />
+                                    {canModerate && <TrustControl locale={locale} userId={profile.id} trusted={trustedContributor} />}
+                                </div>}
                                 {imageError && <p className="vpr-image-error" role="alert">{imageError}</p>}
                             </div>
                             <div className="vpr-inline-stats" aria-label={locale === 'id' ? 'Statistik Poin' : 'Point Statistics'}>

@@ -16,7 +16,10 @@ class HandleInertiaRequests extends Middleware
         $ssrEnabled = config('inertia.ssr.enabled');
 
         try {
-            if (! $request->routeIs('community.home', 'community.explore', 'community.ranking', 'community.object', 'community.article')) {
+            if (! $request->routeIs(
+                'community.home', 'community.explore', 'community.ranking', 'community.object', 'community.article',
+                'community.privacy', 'community.terms', 'community.support',
+            )) {
                 config(['inertia.ssr.enabled' => false]);
             }
 

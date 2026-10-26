@@ -54,6 +54,7 @@ class CommunityController extends Controller
                 $locale === 'id' ? 'Ranking pilihan komunitas' : 'Community rankings',
                 $locale === 'id' ? 'Temukan ranking dan pilihan favorit komunitas Votmee.' : 'Discover rankings and community favorites on Votmee.',
                 $isIndexable,
+                $isIndexable ? app(SeoService::class)->localeAlternates() : [],
             ),
             'loginModal' => $request->routeIs('community.login'),
             'registerModal' => $request->routeIs('community.register'),
@@ -82,6 +83,7 @@ class CommunityController extends Controller
                 $locale === 'id' ? 'Jelajahi ranking dan objek' : 'Explore rankings and objects',
                 $locale === 'id' ? 'Jelajahi ranking, artikel, dan objek pilihan komunitas.' : 'Explore rankings, articles, and objects from the community.',
                 $request->query() === [],
+                $request->query() === [] ? app(SeoService::class)->localeAlternates('/explore') : [],
             ),
             'feed' => Inertia::scroll(fn () => $feed->paginate($filters, $request->user())->withQueryString()),
             'filters' => $filters,
@@ -156,7 +158,12 @@ class CommunityController extends Controller
                 [$seoService->breadcrumbs([
                     ['name' => 'Votmee', 'url' => $seoService->url($locale)],
                     ['name' => $post->title, 'url' => $seoService->url($locale, '/ranking/'.$post->slug)],
-                ])],
+                ]), $seoService->itemList($post->title, $post->entries->filter(fn ($entry) => $entry->object !== null)
+                    ->map(fn ($entry): array => [
+                        'position' => (int) $entry->position,
+                        'name' => $entry->object->canonical_name,
+                        ...($entry->object->status === 'verified' ? ['url' => $seoService->url($locale, '/object/'.$entry->object->slug)] : []),
+                    ])->values()->all())],
             ),
             'post' => $post,
             'isSaved' => $request->user() !== null && SavedRanking::query()
@@ -492,6 +499,30 @@ class CommunityController extends Controller
         ]);
     }
 
+    public function privacy(Request $request): Response
+    {
+        return $this->informationPage($request, 'Community/Privacy', '/privacy', [
+            'id' => ['Kebijakan Privasi', 'Pelajari data apa yang dikumpulkan Votmee, cara kami menggunakannya, dan hak Anda atas data tersebut.'],
+            'en' => ['Privacy Policy', 'Learn what data Votmee collects, how we use it, and the rights you have over it.'],
+        ]);
+    }
+
+    public function terms(Request $request): Response
+    {
+        return $this->informationPage($request, 'Community/Terms', '/terms', [
+            'id' => ['Ketentuan Pengguna', 'Aturan dan ketentuan penggunaan Votmee, termasuk konten, poin, dan pedoman komunitas.'],
+            'en' => ['User Agreement', 'The rules for using Votmee, including content, points, and community guidelines.'],
+        ]);
+    }
+
+    public function support(Request $request): Response
+    {
+        return $this->informationPage($request, 'Community/Support', '/support', [
+            'id' => ['Pusat Bantuan', 'Jawaban atas pertanyaan umum seputar akun, ranking, poin, dan cara menghubungi tim Votmee.'],
+            'en' => ['Help Center', 'Answers to common questions about accounts, rankings, points, and how to reach the Votmee team.'],
+        ]);
+    }
+
     public function saved(Request $request, FeedService $feed, LeaderboardService $leaderboard): Response
     {
         $filters = ['saved_by' => $request->user()->id, 'sort' => 'saved'];
@@ -632,6 +663,31 @@ class CommunityController extends Controller
 
             return $entry;
         }, $entries), $board);
+    }
+
+    /**
+     * Render one of the static information pages (privacy, terms, support) in both languages.
+     *
+     * @param  array{id: array{0: string, 1: string}, en: array{0: string, 1: string}}  $copy
+     */
+    private function informationPage(Request $request, string $component, string $path, array $copy): Response
+    {
+        $locale = $this->locale($request);
+        $seoService = app(SeoService::class);
+        [$title, $description] = $copy[$locale] ?? $copy['id'];
+
+        return Inertia::render($component, [
+            ...$this->shared($request),
+            'seo' => $seoService->page(
+                $locale,
+                $path,
+                $title,
+                $description,
+                true,
+                $seoService->localeAlternates($path),
+            ),
+            'supportEmail' => config('app.support_email'),
+        ]);
     }
 
     private function contentExcerpt(ObjectContentRevision $revision): string

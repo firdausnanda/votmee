@@ -65,6 +65,36 @@ class SeoService
     }
 
     /**
+     * Alternate URLs of a page that exists in every supported language, with Indonesian as the default.
+     *
+     * @return array{id: string, en: string, x-default: string}
+     */
+    public function localeAlternates(string $path = ''): array
+    {
+        return [
+            'id' => $this->url('id', $path),
+            'en' => $this->url('en', $path),
+            'x-default' => $this->url('id', $path),
+        ];
+    }
+
+    /**
+     * @param  array<int, array{position: int, name: string, url?: string}>  $items
+     * @return array<string, mixed>
+     */
+    public function itemList(string $name, array $items): array
+    {
+        return [
+            '@context' => 'https://schema.org',
+            '@type' => 'ItemList',
+            'name' => $name,
+            'itemListOrder' => 'https://schema.org/ItemListOrderAscending',
+            'numberOfItems' => count($items),
+            'itemListElement' => array_map(fn (array $item): array => ['@type' => 'ListItem', ...$item], $items),
+        ];
+    }
+
+    /**
      * @param  array<int, array{name: string, url: string}>  $items
      * @return array<string, mixed>
      */

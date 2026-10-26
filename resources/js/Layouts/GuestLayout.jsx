@@ -48,9 +48,10 @@ export default function GuestLayout({ children, currentLocale = null, variant = 
 
     const isId = locale === 'id';
     const isLogin = variant === 'login';
+    const isMinimal = variant === 'minimal';
 
     return (
-        <div className={`vm-auth-page vt-auth${isLogin ? ' vm-auth-login' : ''}`}>
+        <div className={`vm-auth-page vt-auth${isLogin ? ' vm-auth-login' : ''}${isMinimal ? ' vm-auth-minimal' : ''}`}>
             <header className="vm-auth-header">
                 <div className="vm-auth-header-inner">
                     <Link
@@ -91,7 +92,7 @@ export default function GuestLayout({ children, currentLocale = null, variant = 
             <main className="vm-auth-main">
                 <div className="vm-auth-layout">
                     {/* Left Column: Welcome-Style Hero Showcase */}
-                    <section
+                    {!isMinimal && <section
                         className="vm-auth-showcase vt-auth-intro"
                         aria-label={isId ? 'Tentang Votmee' : 'About Votmee'}
                     >
@@ -186,7 +187,7 @@ export default function GuestLayout({ children, currentLocale = null, variant = 
                                 <small>{isId ? 'Member Aktif' : 'Active Members'}</small>
                             </div>
                         </div>}
-                    </section>
+                    </section>}
 
                     {/* Right Column: Auth Card */}
                     <div className="vm-auth-card vt-auth-card">{children}</div>

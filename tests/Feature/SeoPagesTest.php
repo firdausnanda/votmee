@@ -3,7 +3,10 @@
 use App\Models\MasterObject;
 use App\Models\ObjectArticle;
 use App\Models\ObjectContentRevision;
+use App\Models\RankingEntry;
 use App\Models\RankingPost;
+use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Support\Facades\Http;
 use Inertia\Ssr\Gateway;
 use Inertia\Ssr\HasHealthCheck;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -14,6 +17,16 @@ test('home and filtered pages expose their indexing policy', function () {
     $this->get('/id')->assertOk()->assertInertia(fn (Assert $page) => $page
         ->where('seo.robots', 'index, follow')
         ->where('seo.canonical', app('url')->to('/id'))
+        ->where('seo.alternates', [
+            'id' => app('url')->to('/id'),
+            'en' => app('url')->to('/en'),
+            'x-default' => app('url')->to('/id'),
+        ])
+        ->etc());
+
+    $this->get('/en/explore')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('seo.alternates.en', app('url')->to('/en/explore'))
+        ->where('seo.alternates.x-default', app('url')->to('/id/explore'))
         ->etc());
 
     $this->get('/en/explore?q=camera')->assertOk()->assertInertia(fn (Assert $page) => $page
@@ -51,6 +64,34 @@ test('ranking and article URLs use the language of their published content', fun
 
     $post->update(['status' => 'hidden']);
     $this->get('/en/ranking/'.$post->slug)->assertNotFound();
+});
+
+test('ranking pages describe their ordered entries as an item list', function () {
+    $post = RankingPost::factory()->create(['language_code' => 'en']);
+    $verified = MasterObject::factory()->create(['canonical_name' => 'Leica Q3']);
+    $pending = MasterObject::factory()->pending()->create(['canonical_name' => 'Unreviewed Camera']);
+    RankingEntry::factory()->create(['ranking_post_id' => $post->id, 'object_id' => $pending->id, 'position' => 2]);
+    RankingEntry::factory()->create(['ranking_post_id' => $post->id, 'object_id' => $verified->id, 'position' => 1]);
+
+    $this->get('/en/ranking/'.$post->slug)->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('seo.structuredData.1.@type', 'ItemList')
+        ->where('seo.structuredData.1.numberOfItems', 2)
+        ->where('seo.structuredData.1.itemListElement', [
+            ['@type' => 'ListItem', 'position' => 1, 'name' => 'Leica Q3', 'url' => app('url')->to('/en/object/'.$verified->slug)],
+            ['@type' => 'ListItem', 'position' => 2, 'name' => 'Unreviewed Camera'],
+        ])
+        ->etc());
+});
+
+test('indexable information pages are server rendered while private pages are not', function () {
+    config(['inertia.ssr.enabled' => true, 'inertia.ssr.ensure_bundle_exists' => false]);
+    Http::fake(['*/render' => Http::response(['head' => [], 'body' => '<div id="app">Rendered on the server</div>'])]);
+
+    $this->get('/en/privacy')->assertOk()->assertSee('Rendered on the server');
+    $this->get('/en/hall-of-fame')->assertOk()->assertDontSee('Rendered on the server');
+
+    Http::assertSentCount(1);
+    Http::assertSent(fn (HttpRequest $request): bool => $request['component'] === 'Community/Privacy');
 });
 
 test('only verified objects with a published summary are indexable', function () {

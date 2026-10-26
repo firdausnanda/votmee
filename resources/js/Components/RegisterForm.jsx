@@ -114,6 +114,13 @@ export default function RegisterForm({ locale, onLogin }) {
             <button type="submit" className="vm-submit-button" disabled={processing}>
                 {processing ? (isId ? 'Memproses...' : 'Creating account...') : (isId ? 'Daftar' : 'Sign up')}
             </button>
+            <p className="vm-register-consent">
+                {isId ? 'Dengan mendaftar, Anda menyetujui ' : 'By signing up, you agree to the '}
+                <a href={`/${locale}/terms`} target="_blank" rel="noopener">{isId ? 'Ketentuan Pengguna' : 'User Agreement'}</a>
+                {isId ? ' dan ' : ' and '}
+                <a href={`/${locale}/privacy`} target="_blank" rel="noopener">{isId ? 'Kebijakan Privasi' : 'Privacy Policy'}</a>
+                {isId ? ' Votmee.' : '.'}
+            </p>
         </form>
         <div className="vm-auth-divider"><span>{isId ? 'atau' : 'or'}</span></div>
         <GoogleAuthLink locale={locale} returnTo={returnTo} register />

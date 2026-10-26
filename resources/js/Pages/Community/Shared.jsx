@@ -377,7 +377,7 @@ export function Layout({ locale, categories = [], leaders = [], children, active
     const compactLayout = useCompactLayout();
     const t = dictionary(locale);
     const showRankingPanel = ['home', 'explore', 'saved'].includes(active);
-    const useWideContent = ['create', 'wallet', 'profile', 'object', 'ranking', 'settings', 'hall-of-fame', 'notifications', 'messages'].includes(active);
+    const useWideContent = ['create', 'wallet', 'profile', 'object', 'ranking', 'settings', 'hall-of-fame', 'notifications', 'messages', 'privacy', 'terms', 'support'].includes(active);
     const useFeedFrame = showRankingPanel || useWideContent;
     const user = usePage().props.auth?.user;
     const access = useCommunityAccess();
@@ -543,6 +543,12 @@ export function Layout({ locale, categories = [], leaders = [], children, active
                     {!user && <><button type="button" onClick={() => { setMenuOpen(false); setAuthMode('login'); }}>{t.login}</button><button type="button" onClick={() => { setMenuOpen(false); setAuthMode('register'); }}>{locale === 'id' ? 'Daftar' : 'Sign up'}</button></>}
                     <LanguageSelect language={locale} availableLanguages={availableLanguages} onChange={(next) => router.visit(switchLocale(next))} mobile />
                 </div>
+                <nav className="vm-side-legal" aria-label={locale === 'id' ? 'Informasi' : 'Information'}>
+                    <Link className={active === 'privacy' ? 'active' : ''} href={path(locale, '/privacy')}>{locale === 'id' ? 'Privasi' : 'Privacy'}</Link>
+                    <Link className={active === 'terms' ? 'active' : ''} href={path(locale, '/terms')}>{locale === 'id' ? 'Ketentuan' : 'Terms'}</Link>
+                    <Link className={active === 'support' ? 'active' : ''} href={path(locale, '/support')}>{locale === 'id' ? 'Bantuan' : 'Help'}</Link>
+                    <span>© {new Date().getFullYear()} Votmee</span>
+                </nav>
             </aside>
             <main className="vt-main vm-main" id="main-content">{children}</main>
             {user && <AchievementToast locale={locale} username={user.username} />}

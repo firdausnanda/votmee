@@ -46,6 +46,9 @@ Route::prefix('{locale}')->where(['locale' => 'id|en'])->middleware(SetRequestLo
     Route::get('/article/{article}', [CommunityController::class, 'article'])->name('article');
     Route::get('/profile/{user:username}', [CommunityController::class, 'profile'])->name('profile');
     Route::get('/hall-of-fame', [CommunityController::class, 'hallOfFame'])->name('hall-of-fame');
+    Route::get('/privacy', [CommunityController::class, 'privacy'])->name('privacy');
+    Route::get('/terms', [CommunityController::class, 'terms'])->name('terms');
+    Route::get('/support', [CommunityController::class, 'support'])->name('support');
     Route::get('/login', [CommunityController::class, 'home'])->middleware('guest')->name('login');
     Route::get('/auth/google', [GoogleLoginController::class, 'redirect'])
         ->middleware(['guest', 'throttle:10,1'])->name('google.redirect');

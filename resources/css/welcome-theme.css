@@ -19535,3 +19535,72 @@
         transition: none;
     }
 }
+
+/* --- Minimal auth variant (e.g. choose username) --- */
+.vm-auth-minimal .vm-auth-layout {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 420px;
+}
+
+.vm-auth-minimal .vm-auth-card {
+    padding: 36px 32px !important;
+    border-radius: 16px !important;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.08) !important;
+}
+
+.vm-auth-minimal .vm-auth-title {
+    font-size: 22px;
+    letter-spacing: -0.5px;
+}
+
+.vm-auth-minimal .vm-auth-subtitle {
+    margin-bottom: 22px;
+}
+
+.vm-auth-minimal .vm-auth-input {
+    padding-left: 32px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: #ffffff;
+}
+
+.vm-auth-minimal .vm-submit-button {
+    border-radius: 10px;
+    box-shadow: none;
+}
+
+.vm-auth-minimal .vm-submit-button:hover:not(:disabled) {
+    transform: none;
+    box-shadow: 0 4px 10px rgba(16, 68, 187, 0.14);
+}
+
+.vm-username-prefix {
+    left: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.vm-auth-minimal .vm-username-help {
+    justify-content: space-between;
+}
+
+.vm-username-logout {
+    margin-top: 20px;
+    font-size: 12.5px;
+}
+
+.vm-username-logout button {
+    color: #64748b;
+    font-weight: 600;
+}
+
+.vm-username-logout button:hover {
+    color: #0b2046;
+}
+
+@media (max-width: 640px) {
+    .vm-auth-minimal .vm-auth-card {
+        padding: 26px 20px !important;
+    }
+}

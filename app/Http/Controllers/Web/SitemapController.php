@@ -48,6 +48,10 @@ class SitemapController extends Controller
         foreach (['id', 'en'] as $locale) {
             $urls[] = $this->urlEntry($seo->url($locale));
             $urls[] = $this->urlEntry($seo->url($locale, '/explore'));
+
+            foreach (['/privacy', '/terms', '/support'] as $path) {
+                $urls[] = $this->urlEntry($seo->url($locale, $path));
+            }
         }
 
         return $this->urlSet($urls);
