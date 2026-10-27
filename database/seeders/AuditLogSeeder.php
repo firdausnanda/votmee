@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 class AuditLogSeeder extends Seeder
@@ -20,11 +21,22 @@ class AuditLogSeeder extends Seeder
             return;
         }
 
+        $userAgents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15',
+            'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36',
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Mobile/15E148 Safari/604.1',
+        ];
+
         $auditTemplates = [
             [
                 'action' => 'user.login',
                 'target_type' => 'user',
-                'details' => fn ($u) => ['ip_address' => fake()->ipv4(), 'user_agent' => fake()->userAgent(), 'status' => 'success'],
+                'details' => fn ($u) => [
+                    'ip_address' => long2ip(random_int(0x0B000000, 0xDF000000)),
+                    'user_agent' => Arr::random($userAgents),
+                    'status' => 'success',
+                ],
             ],
             [
                 'action' => 'ranking_post.create',
@@ -34,7 +46,7 @@ class AuditLogSeeder extends Seeder
             [
                 'action' => 'support.vote',
                 'target_type' => 'support_event',
-                'details' => fn ($u) => ['points' => fake()->randomElement([1, 2, 5, 10]), 'channel' => 'web'],
+                'details' => fn ($u) => ['points' => Arr::random([1, 2, 5, 10]), 'channel' => 'web'],
             ],
             [
                 'action' => 'comment.hide',
