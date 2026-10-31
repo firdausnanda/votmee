@@ -393,6 +393,7 @@ class AchievementService
             'voice' => $this->receivedLikes()->whereBetween('comment_likes.created_at', $range),
             'influencer' => $this->rankingSupports()->whereBetween('support_events.occurred_at', $range),
             'ranker' => DB::table('ranking_posts')->where('status', 'published')->whereBetween('published_at', $range)
+                ->whereNotIn('ranking_posts.creator_id', $this->officialAccountIds())
                 ->whereExists(fn (Builder $query) => $query->from('support_events')
                     ->join('ranking_entries', 'ranking_entries.id', '=', 'support_events.ranking_entry_id')
                     ->whereColumn('ranking_entries.ranking_post_id', 'ranking_posts.id')
@@ -438,7 +439,14 @@ class AchievementService
             ->where('ranking_posts.status', 'published')
             ->where('support_events.source', 'support')
             ->where('support_events.status', 'valid')
-            ->whereColumn('support_events.user_id', '!=', 'ranking_posts.creator_id');
+            ->whereColumn('support_events.user_id', '!=', 'ranking_posts.creator_id')
+            ->whereNotIn('ranking_posts.creator_id', $this->officialAccountIds());
+    }
+
+    /** The official account publishes generated rankings and never competes for badges or titles. */
+    private function officialAccountIds(): Builder
+    {
+        return DB::table('users')->select('id')->where('is_official', true);
     }
 
     /** Likes on visible comments, excluding authors liking their own comments. */

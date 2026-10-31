@@ -111,7 +111,7 @@ class SupportService
         $this->missions->record($user, 'support');
         $this->achievements->evaluate($user, 'voter');
 
-        if ($entry->post->creator !== null) {
+        if ($entry->post->creator !== null && ! $entry->post->creator->is_official) {
             $this->missions->record($entry->post->creator, 'popular_ranking', $entry->post->created_at);
             $this->achievements->evaluate($entry->post->creator, 'influencer');
             $this->achievements->evaluate($entry->post->creator, 'ranker');

@@ -32,7 +32,7 @@ class RankingController extends Controller
     public function show(RankingPost $post): JsonResponse
     {
         abort_unless($post->status === 'published', 404);
-        $post->load(['creator:id,name,username,avatar_path', 'entries.object', 'comments' => fn ($query) => $query->where('status', 'visible')->with('user:id,name,username,avatar_path')->withCount('likes')->latest()->limit(50)]);
+        $post->load(['creator:id,name,username,avatar_path,is_official', 'entries.object', 'comments' => fn ($query) => $query->where('status', 'visible')->with('user:id,name,username,avatar_path')->withCount('likes')->latest()->limit(50)]);
         $scores = DB::table('support_events')
             ->selectRaw('ranking_entry_id, SUM(amount) as points, COUNT(DISTINCT user_id) as supporters')
             ->where('status', 'valid')

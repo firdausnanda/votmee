@@ -104,7 +104,7 @@ class CommunityController extends Controller
             return redirect()->route('community.ranking', [$contentLocale, $post->slug], 301);
         }
 
-        $post->load(['creator:id,name,username,avatar_path', 'category:id,name,slug', 'entries.object:id,canonical_name,slug,status,image_path']);
+        $post->load(['creator:id,name,username,avatar_path,is_official', 'category:id,name,slug', 'entries.object:id,canonical_name,slug,status,image_path']);
         app(AvatarFrameService::class)->fill([$post->creator]);
         $coverObject = $post->entries->first(fn ($entry) => $entry->object?->status === 'verified' && $entry->object?->image_path)?->object;
         $scores = DB::table('support_events')->where('status', 'valid')->whereIn('ranking_entry_id', $post->entries->pluck('id'))
@@ -232,10 +232,10 @@ class CommunityController extends Controller
                 ->orWhereHas('creator', fn ($creatorQuery) => $creatorQuery->where('name', 'like', '%'.$rankingSearch.'%')));
         }
 
-        $rankings = $rankingsQuery->with(['creator:id,name,username,avatar_path', 'category:id,name,slug'])
+        $rankings = $rankingsQuery->with(['creator:id,name,username,avatar_path,is_official', 'category:id,name,slug'])
             ->orderBy('published_at', $rankingSort === 'oldest' ? 'asc' : 'desc')
             ->orderBy('id', $rankingSort === 'oldest' ? 'asc' : 'desc')
-            ->paginate(10, ['id', 'creator_id', 'category_id', 'slug', 'title', 'language_code', 'published_at'], 'rankings_page')
+            ->paginate(10, ['id', 'creator_id', 'category_id', 'slug', 'title', 'language_code', 'generator', 'published_at'], 'rankings_page')
             ->withQueryString();
         $rankingTotal ??= $rankings->total();
 
@@ -611,12 +611,15 @@ class CommunityController extends Controller
                 ->whereHas('object', fn ($query) => $query->where('status', 'verified'))
                 ->with(['author:id,name,username', 'article:id,type', 'object:id,canonical_name,slug'])->oldest()->paginate(20, ['*'], 'content_page'),
             'reports' => app(ModerationService::class)->withReportedMessages(Report::query()->where('status', 'open')->oldest()->paginate(20, ['*'], 'reports_page')),
+            'rankingQueue' => RankingPost::query()->where('status', 'pending_review')
+                ->with(['category:id,name,slug', 'entries.object:id,canonical_name,slug'])->oldest()->paginate(20, ['*'], 'rankings_queue_page'),
             'mergedObjects' => MasterObject::query()->where('status', 'merged')->latest()->limit(20)->get(['id', 'canonical_name', 'status']),
             'isAdmin' => $request->user()->can('administer'),
             'stats' => [
                 'pendingObjects' => MasterObject::query()->where(fn ($query) => $query->whereIn('status', ['pending', 'needs_revision'])
                     ->orWhere(fn ($images) => $images->where('status', 'verified')->whereNotNull('pending_image_path')))->count(),
                 'openReports' => Report::query()->where('status', 'open')->count(),
+                'pendingRankings' => RankingPost::query()->where('status', 'pending_review')->count(),
                 'verifiedObjects' => MasterObject::query()->where('status', 'verified')->count(),
                 'totalCategories' => Category::query()->count(),
                 'totalMerged' => MasterObject::query()->where('status', 'merged')->count(),

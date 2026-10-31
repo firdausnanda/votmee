@@ -2,6 +2,7 @@
 
 return [
     'objects_distinct' => 'Pilih minimal dua objek berbeda yang tersedia.',
+    'ranking_not_pending' => 'Ranking ini sudah tidak menunggu tinjauan.',
     'key_reused' => 'Kunci ini sudah dipakai untuk transaksi lain.',
     'candidate_unavailable' => 'Kandidat ini belum dapat menerima dukungan.',
     'insufficient_points' => 'Poin tidak mencukupi.',

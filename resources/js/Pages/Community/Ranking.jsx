@@ -1,6 +1,6 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
-import { api, categoryHashtag, CoinIcon, dateLabel, dictionary, Layout, numberLabel, objectImageSrcSet, objectImageUrl, openLoginModal, PageHead, path, useSavedRanking } from './Shared';
+import { api, categoryHashtag, CoinIcon, dateLabel, dictionary, Layout, numberLabel, objectImageSrcSet, objectImageUrl, OfficialBadge, openLoginModal, PageHead, path, useSavedRanking } from './Shared';
 import { CommentImageAttachButton, CommentImageGallery, CommentImagePreviews, commentPayload, useCommentImages } from './CommentImages';
 import { CommentBadges } from './Achievements';
 import { AvatarFrame, NameFlair } from './AvatarFrame';
@@ -801,6 +801,7 @@ export default function Ranking({ locale, categories, leaders, post, isSaved = f
                         >
                             {post.creator?.name}
                         </Link>
+                        <OfficialBadge post={post} locale={locale} />
                     </div>
 
                     <div className="vr-stats-inline">

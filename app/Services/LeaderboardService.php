@@ -98,6 +98,7 @@ class LeaderboardService
             ->where('support_events.status', 'valid')
             ->where('ranking_posts.status', 'published')
             ->whereNull('users.deleted_at')
+            ->where('users.is_official', false)
             ->when($start, fn (Builder $query) => $query->where('support_events.occurred_at', '>=', $start))
             ->when($end, fn (Builder $query) => $query->where('support_events.occurred_at', '<', $end))
             ->selectRaw('users.id as user_id, users.name, users.username, users.avatar_path, COUNT(DISTINCT CASE WHEN support_events.source = \'support\' THEN support_events.user_id END) as supporters, SUM(support_events.amount) as support_points')

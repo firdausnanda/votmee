@@ -42,6 +42,8 @@ class UserSeeder extends Seeder
             $this->backdateJoin($user->syncRoles([$permissionRole]), now()->subDays(60));
         }
 
+        $this->backdateJoin(User::official(), now()->subDays(60));
+
         // 2. Community members that author the rankings and discussions in the demo content
         foreach (CommunityContent::members() as $index => $member) {
             $existing = User::where('email', $member['email'])->first();

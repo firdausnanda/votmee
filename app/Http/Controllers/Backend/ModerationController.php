@@ -31,6 +31,8 @@ class ModerationController extends Controller
             'content' => ObjectContentRevision::query()->where('status', 'pending')->whereHas('object', fn ($query) => $query->where('status', 'verified'))
                 ->with(['author:id,name,username', 'article:id,type', 'object:id,canonical_name,slug'])->oldest()->paginate(20),
             'reports' => $moderation->withReportedMessages(Report::query()->where('status', 'open')->oldest()->paginate(20)),
+            'rankings' => RankingPost::query()->where('status', 'pending_review')
+                ->with(['category:id,name,slug', 'entries.object:id,canonical_name,slug'])->oldest()->paginate(20),
         ]);
     }
 
@@ -106,6 +108,14 @@ class ModerationController extends Controller
     {
         $data = $request->validate(['reason' => ['required', 'string', 'min:5', 'max:2000']]);
         $moderation->hidePost($request->user(), $post, $data['reason']);
+
+        return response()->json($post->refresh());
+    }
+
+    public function reviewPost(Request $request, RankingPost $post, ModerationService $moderation): JsonResponse
+    {
+        $data = $request->validate(['status' => ['required', 'in:published,rejected'], 'reason' => ['required', 'string', 'min:5', 'max:2000']]);
+        $moderation->reviewGeneratedPost($request->user(), $post, $data['status'], $data['reason']);
 
         return response()->json($post->refresh());
     }

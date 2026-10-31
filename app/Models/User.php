@@ -49,6 +49,34 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * The labelled Votmee account that publishes generated rankings. It cannot sign in
+     * and never earns points, missions, achievements, or leaderboard places.
+     */
+    public static function official(): self
+    {
+        $account = config('autopilot.official_account');
+        $official = self::query()->where('is_official', true)->orderBy('id')->first();
+
+        if ($official !== null) {
+            return $official;
+        }
+
+        $official = self::withTrashed()->firstOrNew(['email' => $account['email']]);
+        $official->forceFill([
+            'name' => $account['name'],
+            'username' => $official->username ?? (self::withTrashed()->where('username', $account['username'])->exists() ? self::suggestedUsername($account['username']) : $account['username']),
+            'password' => Str::random(64),
+            'role' => 'user',
+            'is_official' => true,
+            'locale' => 'id',
+            'region_code' => 'GLOBAL',
+            'deleted_at' => null,
+        ])->save();
+
+        return $official;
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -60,6 +88,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'restricted_until' => 'datetime',
             'trusted_at' => 'datetime',
             'trust_revoked_at' => 'datetime',
+            'is_official' => 'boolean',
             'notification_preferences' => 'array',
             'password' => 'hashed',
         ];

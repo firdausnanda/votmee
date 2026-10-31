@@ -99,3 +99,4 @@ Schedule::command('votmee:prune-images')->dailyAt('03:00')->withoutOverlapping()
 Schedule::command('votmee:prune-notifications')->dailyAt('03:30')->withoutOverlapping();
 Schedule::command('votmee:streak-reminders')->dailyAt('19:00')->timezone('Asia/Jakarta')->withoutOverlapping();
 Schedule::command('votmee:crown-champions')->monthlyOn(1, '01:00')->timezone('Asia/Jakarta')->withoutOverlapping();
+Schedule::command('votmee:auto-rankings')->dailyAt('10:00')->timezone('Asia/Jakarta')->withoutOverlapping();

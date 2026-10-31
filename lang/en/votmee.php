@@ -2,6 +2,7 @@
 
 return [
     'objects_distinct' => 'Choose at least two distinct available objects.',
+    'ranking_not_pending' => 'This ranking is no longer awaiting review.',
     'key_reused' => 'This key has already been used for another transaction.',
     'candidate_unavailable' => 'This candidate cannot receive support.',
     'quick_vote_done' => 'You have already used your quick vote today. Come back tomorrow.',

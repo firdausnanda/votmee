@@ -143,6 +143,13 @@ export default function AdminLayout({
             badgeVariant: 'warning',
         },
         {
+            id: 'rankings',
+            label: isId ? 'Ranking Otomatis' : 'Generated Rankings',
+            icon: 'checkSquare',
+            badge: stats.pendingRankings > 0 ? stats.pendingRankings : null,
+            badgeVariant: 'warning',
+        },
+        {
             id: 'reports',
             label: isId ? 'Laporan Konten' : 'Reports Queue',
             icon: 'flag',

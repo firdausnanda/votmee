@@ -152,6 +152,7 @@ Route::prefix('admin/backend')->middleware(['auth', SetRequestLocale::class, 'ca
     Route::post('objects/{object}/aliases', [ModerationController::class, 'addAlias'])->name('objects.aliases.store');
     Route::put('objects/{object}/translations', [ModerationController::class, 'setTranslation'])->name('objects.translations.store');
     Route::patch('rankings/{post}/hide', [ModerationController::class, 'hidePost'])->name('rankings.hide');
+    Route::patch('rankings/{post}/review', [ModerationController::class, 'reviewPost'])->name('rankings.review');
     Route::patch('comments/{comment}/hide', [ModerationController::class, 'hideComment'])->name('comments.hide');
     Route::patch('messages/{message}/hide', [ModerationController::class, 'hideMessage'])->name('messages.hide');
     Route::patch('content-revisions/{revision}', [ObjectContentController::class, 'review'])->name('content-revisions.review');

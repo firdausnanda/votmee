@@ -29,7 +29,7 @@ class FeedService
 
         $query = RankingPost::query()
             ->where('status', 'published')
-            ->with(['creator:id,name,username,avatar_path', 'entries.object:id,canonical_name,slug,status,image_path'])
+            ->with(['creator:id,name,username,avatar_path,is_official', 'entries.object:id,canonical_name,slug,status,image_path'])
             ->withCount(['comments' => fn ($comments) => $comments->where('status', 'visible')])
             ->addSelect([
                 'support_points' => (clone $scoresForPost)->selectRaw('COALESCE(SUM(support_events.amount), 0)'),

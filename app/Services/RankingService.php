@@ -11,8 +11,12 @@ use Illuminate\Validation\ValidationException;
 
 class RankingService
 {
-    /** @param array{title: string, criteria: string, category_id: int, language_code: string, region_code: string, object_ids: array<int, string>} $data */
-    public function publish(User $creator, array $data): RankingPost
+    /**
+     * Publish a ranking, or hold it as "pending_review" until a moderator approves it.
+     *
+     * @param  array{title: string, criteria: string, category_id: int, language_code: string, region_code: string, object_ids: array<int, string>}  $data
+     */
+    public function publish(User $creator, array $data, string $status = 'published', ?string $generator = null): RankingPost
     {
         $objectIds = $data['object_ids'];
         $objects = MasterObject::query()
@@ -24,7 +28,7 @@ class RankingService
             throw ValidationException::withMessages(['object_ids' => __('votmee.objects_distinct')]);
         }
 
-        return DB::transaction(function () use ($creator, $data, $objectIds): RankingPost {
+        return DB::transaction(function () use ($creator, $data, $objectIds, $status, $generator): RankingPost {
             $post = RankingPost::create([
                 'creator_id' => $creator->id,
                 'created_by' => $creator->id,
@@ -35,8 +39,9 @@ class RankingService
                 'criteria' => $data['criteria'],
                 'language_code' => $data['language_code'],
                 'region_code' => $data['region_code'],
-                'status' => 'published',
-                'published_at' => now('UTC'),
+                'status' => $status,
+                'generator' => $generator,
+                'published_at' => $status === 'published' ? now('UTC') : null,
             ]);
 
             foreach ($objectIds as $position => $objectId) {

@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Mattiverse\Userstamps\Traits\Userstamps;
 
-#[Fillable(['creator_id', 'category_id', 'slug', 'title', 'criteria', 'language_code', 'region_code', 'status', 'published_at', 'created_by', 'updated_by'])]
+#[Fillable(['creator_id', 'category_id', 'slug', 'title', 'criteria', 'language_code', 'region_code', 'status', 'generator', 'published_at', 'created_by', 'updated_by'])]
 class RankingPost extends Model
 {
     /** @use HasFactory<RankingPostFactory> */

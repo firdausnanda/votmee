@@ -195,7 +195,7 @@ class NotificationService
     /** Skips missing or deleted recipients and never notifies someone about their own action. */
     private function send(?User $recipient, ?User $actor, InAppNotification $notification): void
     {
-        if ($recipient === null || $recipient->id === $actor?->id) {
+        if ($recipient === null || $recipient->is_official || $recipient->id === $actor?->id) {
             return;
         }
 

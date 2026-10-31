@@ -1170,6 +1170,15 @@ function FeedCover({ entries, categorySlug }) {
     </span>;
 }
 
+export function OfficialBadge({ post, locale }) {
+    if (!post.creator?.is_official) return null;
+    const isId = locale === 'id';
+    return <>
+        <span className="vm-official-badge" title={isId ? 'Akun resmi Votmee' : 'Official Votmee account'}>✓ Official</span>
+        {post.generator === 'gemini' && <span className="vm-ai-label">{isId ? 'Disusun dengan bantuan AI' : 'Drafted with AI assistance'}</span>}
+    </>;
+}
+
 export function RankingCard({ post, locale, category, onSavedChange }) {
     const t = dictionary(locale);
     const renderedAt = usePage().props.renderedAt;
@@ -1225,10 +1234,10 @@ export function RankingCard({ post, locale, category, onSavedChange }) {
             </div>
             <h2><Link href={rankingUrl}>{post.title}</Link></h2>
             <p className="vm-feed-description">{post.criteria}</p>
-            <div className="vm-feed-meta">{avatarElement}<span>{authorLink} <span className="vm-dot">·</span> {relativeDate(post.published_at, locale, renderedAt)}</span><span className="vm-desktop-comments"><span className="vm-dot">·</span><NavIcon name="comment" size={15} /> {numberLabel(post.comments_count ?? 0, locale)} {t.comments}</span></div>
+            <div className="vm-feed-meta">{avatarElement}<span>{authorLink} <OfficialBadge post={post} locale={locale} /> <span className="vm-dot">·</span> {relativeDate(post.published_at, locale, renderedAt)}</span><span className="vm-desktop-comments"><span className="vm-dot">·</span><NavIcon name="comment" size={15} /> {numberLabel(post.comments_count ?? 0, locale)} {t.comments}</span></div>
         </div>
         <div className="vm-mobile-footer">
-            <span className="vm-mobile-author">{avatarElement}<span>{authorLink} · {relativeDate(post.published_at, locale, renderedAt)}</span></span>
+            <span className="vm-mobile-author">{avatarElement}<span>{authorLink} <OfficialBadge post={post} locale={locale} /> ·{relativeDate(post.published_at, locale, renderedAt)}</span></span>
             <div className="vm-mobile-actions"><Link href={rankingUrl}><NavIcon name="chevronUp" size={15} /> {numberLabel(post.supporters_count ?? 0, locale)} <NavIcon name="chevronDown" size={13} /></Link><Link href={rankingUrl} aria-label={`${numberLabel(post.comments_count ?? 0, locale)} ${t.comments}, ${post.title}`}><NavIcon name="comment" size={15} /> {numberLabel(post.comments_count ?? 0, locale)}</Link></div>
         </div>
     </article>;

@@ -12,6 +12,7 @@ export default function Admin({
     leaders = [],
     objects,
     contentQueue,
+    rankingQueue,
     reports,
     mergedObjects = [],
     isAdmin = false,
@@ -48,6 +49,7 @@ export default function Admin({
     const computedStats = {
         pendingObjects: stats.pendingObjects ?? objects?.total ?? 0,
         pendingContent: contentQueue?.total ?? 0,
+        pendingRankings: stats.pendingRankings ?? rankingQueue?.total ?? 0,
         openReports: stats.openReports ?? reports?.total ?? 0,
         verifiedObjects: stats.verifiedObjects ?? 0,
         totalCategories: stats.totalCategories ?? categories.length,
@@ -65,6 +67,10 @@ export default function Admin({
         content: {
             title: isId ? 'Antrean tulisan' : 'Content queue',
             description: isId ? 'Tinjau ringkasan dan artikel dari pengguna.' : 'Review user summaries and articles.',
+        },
+        rankings: {
+            title: isId ? 'Ranking otomatis' : 'Generated rankings',
+            description: isId ? 'Tinjau ranking buatan akun Votmee Official sebelum tayang.' : 'Review rankings drafted for the Votmee Official account before they go live.',
         },
         reports: {
             title: isId ? 'Laporan konten' : 'Content reports',
@@ -182,6 +188,29 @@ export default function Admin({
             await api(`/admin/backend/objects/${object.id}/image`, 'PATCH', { status, reason });
             setReason('');
             setMessage(isId ? 'Gambar objek berhasil ditinjau.' : 'Object image reviewed.');
+            setMessageType('success');
+            router.reload();
+        } catch (error) {
+            setMessage(error.message);
+            setMessageType('error');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const reviewRanking = async (post, status) => {
+        if (reason.trim().length < 5) {
+            setMessage(isId ? 'Alasan tindakan minimal 5 karakter.' : 'Reason must be at least 5 characters.');
+            setMessageType('error');
+            return;
+        }
+        setBusy(true);
+        try {
+            await api(`/admin/backend/rankings/${post.id}/review`, 'PATCH', { status, reason });
+            setReason('');
+            setMessage(status === 'published'
+                ? (isId ? 'Ranking diterbitkan.' : 'Ranking published.')
+                : (isId ? 'Ranking ditolak.' : 'Ranking rejected.'));
             setMessageType('success');
             router.reload();
         } catch (error) {
@@ -365,7 +394,7 @@ export default function Admin({
                     </div>
                 </div>}
 
-                {['objects', 'content', 'reports', 'master'].includes(activeTab) && <div className="vap-reason-card">
+                {['objects', 'content', 'rankings', 'reports', 'master'].includes(activeTab) && <div className="vap-reason-card">
                     <div className="vap-reason-header">
                         <div className="vap-reason-title-row">
                             <span className="vap-reason-icon">
@@ -587,6 +616,27 @@ export default function Admin({
                             </article>) : <p>{isId ? 'Tidak ada tulisan menunggu tinjauan.' : 'No content awaits review.'}</p>}
                         </div>
                         <div className="vap-card-footer"><PaginationLinks pagination={contentQueue} locale={locale} /></div>
+                    </div>
+                </div>}
+
+                {activeTab === 'rankings' && <div className="vap-tab-section">
+                    <div className="vap-card">
+                        <div className="vap-card-header"><h2>{isId ? 'Ranking otomatis menunggu tinjauan' : 'Generated rankings awaiting review'}</h2></div>
+                        <div className="vap-card-body">
+                            {rankingQueue?.data.length ? rankingQueue.data.map((post) => <article key={post.id} className="vap-report-item">
+                                <div className="vap-report-meta">
+                                    <strong>{post.title}</strong>
+                                    <p>{post.category?.name} · {post.generator === 'gemini' ? 'Gemini' : 'Template'} · {post.language_code.toUpperCase()}</p>
+                                    <p style={{ whiteSpace: 'pre-line' }}>{post.criteria}</p>
+                                    <ol>{post.entries?.map((entry) => <li key={entry.id}>{entry.object?.canonical_name}</li>)}</ol>
+                                </div>
+                                <div className="vap-report-actions">
+                                    <button type="button" className="vap-btn vap-btn-success" disabled={busy} onClick={() => reviewRanking(post, 'published')}>✓ {t.approve}</button>
+                                    <button type="button" className="vap-btn vap-btn-danger" disabled={busy} onClick={() => reviewRanking(post, 'rejected')}>✕ {t.reject}</button>
+                                </div>
+                            </article>) : <p>{isId ? 'Tidak ada ranking otomatis menunggu tinjauan.' : 'No generated rankings await review.'}</p>}
+                        </div>
+                        {rankingQueue && <div className="vap-card-footer"><PaginationLinks pagination={rankingQueue} locale={locale} /></div>}
                     </div>
                 </div>}
 
